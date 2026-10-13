@@ -89,11 +89,11 @@ The agent may choose tools, check outputs and recover from a bounded tool failur
 
 ## Team ownership
 
-### Backend developer 1 — application and data
+### Backend developer 1 — mson-wagz — application and data
 
 Own the Next.js APIs, database schema, authentication, role checks, approval transactions, queue state and synchronisation behaviour. Coordinate shared API types with the frontend developer.
 
-### Backend developer 2 — agents and MCP
+### Backend developer 2 — Mejja — agents and MCP
 
 Own LangGraph orchestration, the custom MCP server, borrowed-server integration, local model connection, protocol implementation, tool traces and agent evaluations.
 
@@ -102,6 +102,8 @@ Own LangGraph orchestration, the custom MCP server, borrowed-server integration,
 Own mobile and desktop layouts, registration and observations, queue views, evidence and approval screens, PWA installation, local drafts and connectivity indicators. Use contract-aligned mocks while APIs are being implemented.
 
 All three developers review the shared contracts and demonstrate the complete workflow. Each developer should be able to explain their code during the challenge's live technical review.
+
+Backend branches: `codex/backend-mson-wagz` and `codex/backend-mejja`. See [assigned backend tasks and shared milestones](specs/tasks.md). The frontend contributor's name is still to be provided.
 
 ## Repository organisation
 
@@ -159,7 +161,7 @@ Specification deliverables:
 - `specs/tasks.md`: dependency-ordered work assigned to the three developers.
 - `EVALS.md`: repeatable test tasks, recorded results and unresolved failures.
 
-ARCHITECTURE.md and EVALS.md exist as planning documents. The four detailed documents under specs/ are still to be written. The team will review the specifications before application implementation begins.
+ARCHITECTURE.md and EVALS.md exist as planning documents. specs/tasks.md assigns backend work and shared milestones. The requirements, data-model and contract documents remain to be written and reviewed before application implementation begins.
 
 For each feature:
 

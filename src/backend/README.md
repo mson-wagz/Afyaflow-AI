@@ -1,6 +1,6 @@
 # Backend application logic
 
-Owner: Backend developer 1.
+Owner: mson-wagz (backend developer 1), on `codex/backend-mson-wagz`.
 
 Own server-side operations, role checks and persistence. Agent proposals enter through controlled interfaces; clinical approval remains server-enforced. Browser code must not import this directory.
 
