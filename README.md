@@ -10,7 +10,7 @@ The project is being prepared for the **African Agentic AI Design Challenge**, i
 
 **Specification phase — application implementation has not started.**
 
-This repository currently contains this README. The team will define requirements, architecture, contracts and acceptance criteria before writing application code. Features, infrastructure and commands described as planned are not yet implemented or verified.
+This repository contains a documented directory scaffold, a proposed architecture and an evaluation plan. The team will define requirements, data contracts and acceptance criteria before writing application code. Features, infrastructure and commands described as planned are not yet implemented or verified.
 
 The competition prototype will use synthetic patient data. It is not a clinical deployment or a validated triage product.
 
@@ -103,11 +103,54 @@ Own mobile and desktop layouts, registration and observations, queue views, evid
 
 All three developers review the shared contracts and demonstrate the complete workflow. Each developer should be able to explain their code during the challenge's live technical review.
 
+## Repository organisation
+
+```text
+Afyaflow-AI/
+├── specs/                    # Requirements, contracts and tasks
+├── src/
+│   ├── app/                  # Next.js pages and API entry points
+│   │   ├── patients/
+│   │   ├── queue/
+│   │   └── api/
+│   │       ├── patients/
+│   │       ├── observations/
+│   │       └── recommendations/
+│   ├── frontend/
+│   │   ├── features/
+│   │   │   ├── registration/
+│   │   │   ├── triage/
+│   │   │   └── queue/
+│   │   ├── components/
+│   │   └── offline/
+│   ├── backend/
+│   │   ├── modules/
+│   │   │   ├── patients/
+│   │   │   ├── triage/
+│   │   │   ├── queue/
+│   │   │   └── approvals/
+│   │   ├── auth/
+│   │   └── database/
+│   └── shared/
+│       └── contracts/
+├── services/
+│   ├── agents/
+│   └── mcp/
+├── public/
+├── tests/
+├── ARCHITECTURE.md
+└── EVALS.md
+```
+
+Each scaffold directory contains a README explaining its responsibilities and owner so Git preserves the structure. Pages and API routes stay thin; feature logic belongs in frontend or backend modules. The frontend imports browser-safe contracts, never backend code or credentials.
+
+See [the proposed architecture](ARCHITECTURE.md), [specification workflow](specs/README.md) and [evaluation plan](EVALS.md). Package configuration, runtime entry points and executable tests will be added after specification review.
+
 ## Spec-driven development
 
 **Workflow: specify → review → plan → implement → verify.**
 
-The next deliverables are planned repository documents:
+Specification deliverables:
 
 - `specs/requirements.md`: users, scope, requirement IDs and acceptance criteria.
 - `ARCHITECTURE.md`: concise architecture, trust boundaries and built-versus-borrowed MCP decisions.
@@ -116,7 +159,7 @@ The next deliverables are planned repository documents:
 - `specs/tasks.md`: dependency-ordered work assigned to the three developers.
 - `EVALS.md`: repeatable test tasks, recorded results and unresolved failures.
 
-These files do not exist yet. The team will review the specifications before application implementation begins.
+ARCHITECTURE.md and EVALS.md exist as planning documents. The four detailed documents under specs/ are still to be written. The team will review the specifications before application implementation begins.
 
 For each feature:
 

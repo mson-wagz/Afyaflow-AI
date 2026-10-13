@@ -1,0 +1,23 @@
+# Dependencies and build output
+node_modules/
+.next/
+out/
+dist/
+coverage/
+*.tsbuildinfo
+
+# Local environment and logs
+.env
+.env.*
+!.env.example
+*.log
+
+# Local tooling and operating system files
+.DS_Store
+Thumbs.db
+.idea/
+
+# Generated test and agent run artifacts
+test-results/
+playwright-report/
+artifacts/local/
