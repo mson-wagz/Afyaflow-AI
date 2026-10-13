@@ -1,6 +1,6 @@
 # Queue pages
 
-Owner: Frontend developer.
+Owner: JecintaK (frontend developer).
 
 Compose department queues and waiting-time views from frontend features. Show approved queue state and pending recommendations distinctly.
 
