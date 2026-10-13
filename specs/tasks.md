@@ -4,13 +4,13 @@ Status: work assigned for planning; implementation starts after requirements and
 
 ## Contributors and branches
 
-- **mson-wagz — backend developer 1:** `feature/patient-queue-and-clinical-approvals`, covering patient APIs, persistence, approved queue state and clinical approvals.
-- **Mejja — backend developer 2:** `feature/triage-agent-and-mcp`, covering agent execution, protocol scoring and MCP integration.
+- **mson-wagz — backend developer 1:** `feature/queue-management` (P0) and `feature/department-routing` (P1), with ownership of shared patient APIs, persistence and clinical approval operations.
+- **Mejja — backend developer 2:** `feature/patient-prioritisation` (P0) and `feature/deterioration-monitoring` (P1), with ownership of shared agent execution, protocol scoring and MCP integration.
 - **Frontend contributor:** React pages, frontend features and PWA behaviour. Their GitHub username has not been provided.
 
 Mejja is a contributor label supplied by the team, not a verified GitHub username. This document assigns work within the repository; it does not create GitHub issue assignees or change repository permissions.
 
-The split balances two substantial workstreams rather than counting files. Application transactions and offline synchronisation sit with mson-wagz; model execution, protocol logic and agent recovery sit with Mejja. Reassess remaining effort at each shared milestone and pair on whichever integration task is blocking progress.
+The split assigns two product features to each contributor, supported by the technical work packages below. See [feature specifications and lifecycle](features/README.md). Application transactions and offline synchronisation sit with mson-wagz; model execution, protocol logic and agent recovery sit with Mejja. Reassess remaining effort at each shared milestone and pair on whichever integration task is blocking progress.
 
 ## Shared specification milestone
 
@@ -108,20 +108,20 @@ Run the planned evaluations after implementation and record actual pass/fail out
 - **M3 — Complete clinical review workflow:** APP-05/06 plus AGENT-05; demonstrate authorised approval, stale-proposal rejection and visible failure recovery.
 - **M4 — Evidence and packaging:** AGENT-06 plus shared documentation, setup verification and demo recording. Both backend contributors review the actual evaluation results.
 
-Deterioration monitoring and department routing follow the first verified slice. Assign their tasks after estimating the remaining workload; they must retain the same approval and evidence boundaries.
+Deterioration monitoring belongs to Mejja and department routing to mson-wagz. Both follow the first verified P0 slice and retain the same approval and evidence boundaries. Refine their task estimates when P0 integration is complete.
 
 ## Branch workflow
 
-Both feature branches start from the same main commit containing this plan. Contributor ownership is recorded here; branch names describe the work being built. Each developer checks out their branch after cloning or fetching the repository:
+The four feature branches start from the same main commit containing this plan. Contributor ownership is recorded here; branch names describe the work being built. Each developer checks out a P0 branch after cloning or fetching the repository:
 
 ```sh
 git fetch origin
-git switch --track origin/feature/patient-queue-and-clinical-approvals
+git switch --track origin/feature/queue-management
 ```
 
-Mejja uses `origin/feature/triage-agent-and-mcp` instead. If the branch already exists locally, use `git switch` with its local name.
+Mejja uses `origin/feature/patient-prioritisation` instead. If the branch already exists locally, use `git switch` with its local name. Reserve the P1 branches for later; incorporate current main before starting them.
 
-Name future branches by purpose: `feature/<specific-capability>`, `fix/<specific-problem>` or `docs/<specific-document>`. Use lowercase words separated by hyphens. Keep personal names out of branch names and use no `codex/` prefix. When the two initial workstreams are integrated, create smaller feature branches for subsequent changes, such as `feature/deterioration-reassessment` or `feature/department-routing`, rather than retaining a permanent branch per developer.
+Name future branches by purpose: `feature/<specific-capability>`, `fix/<specific-problem>` or `docs/<specific-document>`. Use lowercase words separated by hyphens. Keep personal names out of branch names and use no `codex/` prefix. Merge completed feature branches into main through reviewed PRs and retire them when no longer needed. Subsequent work gets a new scoped branch.
 
 Commit small reviewed slices and open pull requests into `main`. Include task IDs, relevant acceptance criteria and verification evidence in the PR description. Keep generated files and secrets out of commits. Incorporate latest `main` into the contributor branch after each integration merge; do not force-push shared branches or overwrite the other contributor's work.
 

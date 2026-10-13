@@ -103,13 +103,19 @@ Own mobile and desktop layouts, registration and observations, queue views, evid
 
 All three developers review the shared contracts and demonstrate the complete workflow. Each developer should be able to explain their code during the challenge's live technical review.
 
-Backend feature branches: `feature/patient-queue-and-clinical-approvals` (mson-wagz) and `feature/triage-agent-and-mcp` (Mejja). See [assigned backend tasks and shared milestones](specs/tasks.md). The frontend contributor's name is still to be provided.
+Backend feature branches:
+
+- mson-wagz: `feature/queue-management` (P0) and `feature/department-routing` (P1).
+- Mejja: `feature/patient-prioritisation` (P0) and `feature/deterioration-monitoring` (P1).
+
+See [feature specifications and lifecycle](specs/features/README.md) and [foundational backend tasks and milestones](specs/tasks.md). The frontend contributor owns UI work across features; their name is still to be provided.
 
 ## Repository organisation
 
 ```text
 Afyaflow-AI/
-├── specs/                    # Requirements, contracts and tasks
+├── specs/                    # Shared requirements, contracts and tasks
+│   └── features/             # One specification per product feature
 ├── src/
 │   ├── app/                  # Next.js pages and API entry points
 │   │   ├── patients/
@@ -161,7 +167,7 @@ Specification deliverables:
 - `specs/tasks.md`: dependency-ordered work assigned to the three developers.
 - `EVALS.md`: repeatable test tasks, recorded results and unresolved failures.
 
-ARCHITECTURE.md and EVALS.md exist as planning documents. specs/tasks.md assigns backend work and shared milestones. The requirements, data-model and contract documents remain to be written and reviewed before application implementation begins.
+ARCHITECTURE.md and EVALS.md exist as planning documents. specs/tasks.md assigns backend work and shared milestones. specs/features/ contains four draft feature specifications with requirement IDs, acceptance criteria and task checklists. Shared requirements, data-model and contract documents remain to be written and reviewed before application implementation begins.
 
 For each feature:
 
