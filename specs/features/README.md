@@ -6,10 +6,10 @@ Each product feature has one specification directory and one implementation bran
 
 ## Feature ownership
 
-- [Queue management](queue-management/spec.md): `feature/queue-management`, owned by mson-wagz. P0.
-- [Patient prioritisation](patient-prioritisation/spec.md): `feature/patient-prioritisation`, owned by Mejja. P0.
-- [Deterioration monitoring](deterioration-monitoring/spec.md): `feature/deterioration-monitoring`, owned by Mejja. P1.
-- [Department routing](department-routing/spec.md): `feature/department-routing`, owned by mson-wagz. P1.
+- [Queue management](queue-management/spec.md): `feature/backend-queue-management`, owned by mson-wagz. P0.
+- [Patient prioritisation](patient-prioritisation/spec.md): `feature/backend-patient-prioritisation`, owned by Mejja. P0.
+- [Deterioration monitoring](deterioration-monitoring/spec.md): `feature/backend-deterioration-monitoring`, owned by Mejja. P1.
+- [Department routing](department-routing/spec.md): `feature/backend-department-routing`, owned by mson-wagz. P1.
 
 JecintaK owns all UI tasks across the four product features and shared frontend foundations, working with the backend owner on each end-to-end slice. See [frontend specs and dedicated branches](../frontend/README.md). Two features per backend contributor establishes responsibility, not an equal-hours estimate. Review actual remaining effort at each milestone and pair where needed. Build the P0 journey before starting P1 implementation.
 
@@ -34,7 +34,7 @@ Queue management and prioritisation can proceed together against shared contract
 
 ## Branch and PR conventions
 
-Use `feature/<capability>`, `fix/<problem>` and `docs/<document>` with lowercase hyphenated words. Avoid personal names and the codex prefix. Refresh reserved P1 branches from main before their first implementation commit.
+Use `feature/backend-<capability>` for backend work and `feature/frontend-<capability>` for frontend work. Use `fix/<problem>` and `docs/<document>` for fixes and documentation. Choose lowercase hyphenated words, without personal names or the codex prefix. Refresh reserved P1 branches from main before their first implementation commit.
 
 Each PR must state:
 
