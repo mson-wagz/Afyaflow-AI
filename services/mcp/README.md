@@ -1,6 +1,6 @@
 # Custom MCP server
 
-Owner: Mejja (backend developer 2), on `backend-mejja`.
+Owner: Mejja (backend developer 2), on `feature/triage-agent-and-mcp`.
 
 Implement distinct typed tools for retrieving observations, scoring a protocol-based proposal and persisting a pending recommendation. Authenticate tool access and log calls. The agent cannot approve recommendations or mutate approved queues. Integrate the borrowed server through the agent service.
 

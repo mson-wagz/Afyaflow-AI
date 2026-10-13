@@ -4,8 +4,8 @@ Status: work assigned for planning; implementation starts after requirements and
 
 ## Contributors and branches
 
-- **mson-wagz — backend developer 1:** `backend-mson-wagz`, covering application APIs, persistence and clinical approvals.
-- **Mejja — backend developer 2:** `backend-mejja`, covering agent execution, protocol scoring and MCP integration.
+- **mson-wagz — backend developer 1:** `feature/patient-queue-and-clinical-approvals`, covering patient APIs, persistence, approved queue state and clinical approvals.
+- **Mejja — backend developer 2:** `feature/triage-agent-and-mcp`, covering agent execution, protocol scoring and MCP integration.
 - **Frontend contributor:** React pages, frontend features and PWA behaviour. Their GitHub username has not been provided.
 
 Mejja is a contributor label supplied by the team, not a verified GitHub username. This document assigns work within the repository; it does not create GitHub issue assignees or change repository permissions.
@@ -112,14 +112,16 @@ Deterioration monitoring and department routing follow the first verified slice.
 
 ## Branch workflow
 
-Both contributor branches start from the same main commit containing this plan. Each developer checks out their branch after cloning or fetching the repository:
+Both feature branches start from the same main commit containing this plan. Contributor ownership is recorded here; branch names describe the work being built. Each developer checks out their branch after cloning or fetching the repository:
 
 ```sh
 git fetch origin
-git switch --track origin/backend-mson-wagz
+git switch --track origin/feature/patient-queue-and-clinical-approvals
 ```
 
-Mejja uses `origin/backend-mejja` instead. If the branch already exists locally, use `git switch` with its local name. Branch names use no `codex/` prefix.
+Mejja uses `origin/feature/triage-agent-and-mcp` instead. If the branch already exists locally, use `git switch` with its local name.
+
+Name future branches by purpose: `feature/<specific-capability>`, `fix/<specific-problem>` or `docs/<specific-document>`. Use lowercase words separated by hyphens. Keep personal names out of branch names and use no `codex/` prefix. When the two initial workstreams are integrated, create smaller feature branches for subsequent changes, such as `feature/deterioration-reassessment` or `feature/department-routing`, rather than retaining a permanent branch per developer.
 
 Commit small reviewed slices and open pull requests into `main`. Include task IDs, relevant acceptance criteria and verification evidence in the PR description. Keep generated files and secrets out of commits. Incorporate latest `main` into the contributor branch after each integration merge; do not force-push shared branches or overwrite the other contributor's work.
 
