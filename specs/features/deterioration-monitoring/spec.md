@@ -1,6 +1,6 @@
 # Deterioration monitoring specification
 
-Status: draft for review. Priority: P1. Backend owner: Mejja. UI owner: JecintaK. Application collaborator: mson-wagz. Branch: `feature/deterioration-monitoring`.
+Status: draft for review. Priority: P1. Backend owner: Mejja. UI owner: JecintaK. Application collaborator: mson-wagz. Branch: `feature/backend-deterioration-monitoring`.
 
 ## User outcome and scope
 

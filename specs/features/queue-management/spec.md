@@ -1,6 +1,6 @@
 # Queue management specification
 
-Status: draft for review. Priority: P0. Backend owner: mson-wagz. UI owner: JecintaK. Branch: `feature/queue-management`.
+Status: draft for review. Priority: P0. Backend owner: mson-wagz. UI owner: JecintaK. Branch: `feature/backend-queue-management`.
 
 ## User outcome and scope
 

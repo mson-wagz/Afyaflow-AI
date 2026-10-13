@@ -4,8 +4,8 @@ Status: work assigned for planning; implementation starts after requirements and
 
 ## Contributors and branches
 
-- **mson-wagz — backend developer 1:** `feature/queue-management` (P0) and `feature/department-routing` (P1), with ownership of shared patient APIs, persistence and clinical approval operations.
-- **Mejja — backend developer 2:** `feature/patient-prioritisation` (P0) and `feature/deterioration-monitoring` (P1), with ownership of shared agent execution, protocol scoring and MCP integration.
+- **mson-wagz — backend developer 1:** `feature/backend-queue-management` (P0) and `feature/backend-department-routing` (P1), with ownership of shared patient APIs, persistence and clinical approval operations.
+- **Mejja — backend developer 2:** `feature/backend-patient-prioritisation` (P0) and `feature/backend-deterioration-monitoring` (P1), with ownership of shared agent execution, protocol scoring and MCP integration.
 - **JecintaK — frontend contributor:** all React pages, frontend features, PWA behaviour, UI verification and demo presentation. See [frontend tasks and dedicated branches](frontend/README.md).
 
 Mejja is a contributor label supplied by the team, not a verified GitHub username. This document assigns work within the repository; it does not create GitHub issue assignees or change repository permissions.
@@ -116,12 +116,12 @@ The four feature branches start from the same main commit containing this plan. 
 
 ```sh
 git fetch origin
-git switch --track origin/feature/queue-management
+git switch --track origin/feature/backend-queue-management
 ```
 
-Mejja uses `origin/feature/patient-prioritisation` instead. If the branch already exists locally, use `git switch` with its local name. Reserve the P1 branches for later; incorporate current main before starting them.
+Mejja uses `origin/feature/backend-patient-prioritisation` instead. If the branch already exists locally, use `git switch` with its local name. Reserve the P1 branches for later; incorporate current main before starting them.
 
-Name future branches by purpose: `feature/<specific-capability>`, `fix/<specific-problem>` or `docs/<specific-document>`. Use lowercase words separated by hyphens. Keep personal names out of branch names and use no `codex/` prefix. Merge completed feature branches into main through reviewed PRs and retire them when no longer needed. Subsequent work gets a new scoped branch.
+Name future feature branches by layer and purpose: `feature/backend-<specific-capability>` or `feature/frontend-<specific-capability>`. Use `fix/<specific-problem>` and `docs/<specific-document>` for fixes and documentation. Use lowercase words separated by hyphens. Keep personal names out of branch names and use no `codex/` prefix. Merge completed feature branches into main through reviewed PRs and retire them when no longer needed. Subsequent work gets a new scoped branch.
 
 Commit small reviewed slices and open pull requests into `main`. Include task IDs, relevant acceptance criteria and verification evidence in the PR description. Keep generated files and secrets out of commits. Incorporate latest `main` into the contributor branch after each integration merge; do not force-push shared branches or overwrite the other contributor's work.
 
