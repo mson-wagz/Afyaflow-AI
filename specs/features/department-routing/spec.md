@@ -1,6 +1,6 @@
 # Department routing specification
 
-Status: draft for review. Priority: P1. Backend owner: mson-wagz. UI owner: frontend contributor. Agent collaborator: Mejja. Branch: `feature/department-routing`.
+Status: draft for review. Priority: P1. Backend owner: mson-wagz. UI owner: JecintaK. Agent collaborator: Mejja. Branch: `feature/department-routing`.
 
 ## User outcome and scope
 
