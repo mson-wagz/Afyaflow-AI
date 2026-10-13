@@ -1,6 +1,6 @@
 # Patient prioritisation specification
 
-Status: draft for review. Priority: P0. Backend owner: Mejja. UI owner: frontend contributor. Application/approval collaborator: mson-wagz. Branch: `feature/patient-prioritisation`.
+Status: draft for review. Priority: P0. Backend owner: Mejja. UI owner: JecintaK. Application/approval collaborator: mson-wagz. Branch: `feature/patient-prioritisation`.
 
 ## User outcome and scope
 

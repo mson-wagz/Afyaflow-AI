@@ -6,7 +6,7 @@ Status: proposed architecture; source directories exist, application services ar
 
 One Next.js application will host React pages and API Route Handlers. src/app contains routing entry points; src/frontend contains UI features and offline draft handling; src/backend contains authenticated domain operations and PostgreSQL access. src/shared/contracts contains browser-safe runtime schemas and types used by both sides.
 
-The frontend developer owns pages and UI. Backend developer 1 owns APIs, persistence, staff access and clinical approvals. Backend developer 2 owns the TypeScript agent workflow and MCP integration. All three review contracts before implementation.
+JecintaK owns all pages, UI features, frontend verification and PWA behaviour, using dedicated frontend feature branches. mson-wagz owns APIs, persistence, server-side staff access and clinical approvals. Mejja owns the TypeScript agent workflow and MCP integration. All three review contracts before implementation.
 
 ## Agent and MCP boundaries
 

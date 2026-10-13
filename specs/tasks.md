@@ -6,7 +6,7 @@ Status: work assigned for planning; implementation starts after requirements and
 
 - **mson-wagz — backend developer 1:** `feature/queue-management` (P0) and `feature/department-routing` (P1), with ownership of shared patient APIs, persistence and clinical approval operations.
 - **Mejja — backend developer 2:** `feature/patient-prioritisation` (P0) and `feature/deterioration-monitoring` (P1), with ownership of shared agent execution, protocol scoring and MCP integration.
-- **Frontend contributor:** React pages, frontend features and PWA behaviour. Their GitHub username has not been provided.
+- **JecintaK — frontend contributor:** all React pages, frontend features, PWA behaviour, UI verification and demo presentation. See [frontend tasks and dedicated branches](frontend/README.md).
 
 Mejja is a contributor label supplied by the team, not a verified GitHub username. This document assigns work within the repository; it does not create GitHub issue assignees or change repository permissions.
 
@@ -18,7 +18,7 @@ Before either contributor writes application code:
 
 1. All three review `specs/requirements.md`, including scope, roles, acceptance criteria and clinical approval boundaries. This document still needs to be written.
 2. mson-wagz drafts `specs/data-model.md`; Mejja reviews evidence versions, recommendation state and trace references.
-3. mson-wagz drafts HTTP request/response contracts; Mejja drafts MCP and agent-job contracts. Combine them in `specs/contracts.md` and review with the frontend contributor.
+3. mson-wagz drafts HTTP request/response contracts; Mejja drafts MCP and agent-job contracts. Combine them in `specs/contracts.md` and review with JecintaK.
 4. Mejja leads selection of the protocol, supported population and model/hardware. The team verifies source permissions and reviews the protocol with a clinical adviser before defining clinical thresholds.
 5. Agree shared schemas in `src/shared/contracts/`, synthetic fixtures and error semantics before parallel implementation.
 
@@ -42,7 +42,7 @@ Implement authenticated staff identity, session locking support and role checks.
 
 Own `src/app/api/patients/`, `src/app/api/observations/` and associated backend operations.
 
-Implement contract-defined validation, units, staff attribution and retry-safe writes. Verify duplicate submissions create one logical observation and missing or invalid fields produce documented errors. Coordinate offline draft sync with the frontend contributor.
+Implement contract-defined validation, units, staff attribution and retry-safe writes. Verify duplicate submissions create one logical observation and missing or invalid fields produce documented errors. Coordinate offline draft sync with JecintaK.
 
 ### APP-04 — Recommendation and approval APIs
 
@@ -54,13 +54,13 @@ Expose recommendation status and a controlled agent-to-application interface for
 
 Own `src/backend/modules/queue/` and its API entry points when specified.
 
-Expose approved queue state, arrival-based waiting times and assessment status. Pending recommendations remain separate from approved ordering. Verify patients stay visible when agent execution fails. Review response shapes with the frontend contributor.
+Expose approved queue state, arrival-based waiting times and assessment status. Pending recommendations remain separate from approved ordering. Verify patients stay visible when agent execution fails. Review response shapes with JecintaK.
 
 ### APP-06 — Application integration and setup
 
 Own database/application startup instructions and application-side integration checks in `tests/`.
 
-Verify the registration → observations → pending proposal → clinician decision → queue journey against agreed contracts. Exercise transaction rollback, access denial and retry safety. Pair with Mejja on reproducible full-system startup; pair with the frontend contributor on server acknowledgement and stale-data display.
+Verify the registration → observations → pending proposal → clinician decision → queue journey against agreed contracts. Exercise transaction rollback, access denial and retry safety. Pair with Mejja on reproducible full-system startup; pair with JecintaK on server acknowledgement and stale-data display.
 
 ## Mejja tasks
 
@@ -98,7 +98,7 @@ Handle missing evidence, invalid model outputs, tool outages and expired work wi
 
 Own agent evaluation fixtures, repeated runs and result recording in `EVALS.md`.
 
-Run the planned evaluations after implementation and record actual pass/fail outcomes, latency, variation and an observed unresolved failure. Pair with mson-wagz for approval and rollback checks. Prepare real on-screen agent/tool evidence for the frontend contributor's demo recording.
+Run the planned evaluations after implementation and record actual pass/fail outcomes, latency, variation and an observed unresolved failure. Pair with mson-wagz for approval and rollback checks. Prepare real on-screen agent/tool evidence for JecintaK's demo recording.
 
 ## Integration milestones and dependencies
 
@@ -125,4 +125,4 @@ Name future branches by purpose: `feature/<specific-capability>`, `fix/<specific
 
 Commit small reviewed slices and open pull requests into `main`. Include task IDs, relevant acceptance criteria and verification evidence in the PR description. Keep generated files and secrets out of commits. Incorporate latest `main` into the contributor branch after each integration merge; do not force-push shared branches or overwrite the other contributor's work.
 
-Shared contracts require review by the other backend contributor and the frontend contributor before incompatible changes. Each contributor owns their directories but can pair on changes across boundaries. A task is complete when its agreed checks pass and its PR is merged, not when a folder contains code.
+Shared contracts require review by the other backend contributor and JecintaK before incompatible changes. Each contributor owns their directories but can pair on changes across boundaries. A task is complete when its agreed checks pass and its PR is merged, not when a folder contains code.
