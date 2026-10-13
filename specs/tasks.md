@@ -4,8 +4,8 @@ Status: work assigned for planning; implementation starts after requirements and
 
 ## Contributors and branches
 
-- **mson-wagz — backend developer 1:** `codex/backend-mson-wagz`, covering application APIs, persistence and clinical approvals.
-- **Mejja — backend developer 2:** `codex/backend-mejja`, covering agent execution, protocol scoring and MCP integration.
+- **mson-wagz — backend developer 1:** `backend-mson-wagz`, covering application APIs, persistence and clinical approvals.
+- **Mejja — backend developer 2:** `backend-mejja`, covering agent execution, protocol scoring and MCP integration.
 - **Frontend contributor:** React pages, frontend features and PWA behaviour. Their GitHub username has not been provided.
 
 Mejja is a contributor label supplied by the team, not a verified GitHub username. This document assigns work within the repository; it does not create GitHub issue assignees or change repository permissions.
@@ -116,10 +116,10 @@ Both contributor branches start from the same main commit containing this plan. 
 
 ```sh
 git fetch origin
-git switch --track origin/codex/backend-mson-wagz
+git switch --track origin/backend-mson-wagz
 ```
 
-Mejja uses `origin/codex/backend-mejja` instead. If the branch already exists locally, use `git switch` with its local name.
+Mejja uses `origin/backend-mejja` instead. If the branch already exists locally, use `git switch` with its local name. Branch names use no `codex/` prefix.
 
 Commit small reviewed slices and open pull requests into `main`. Include task IDs, relevant acceptance criteria and verification evidence in the PR description. Keep generated files and secrets out of commits. Incorporate latest `main` into the contributor branch after each integration merge; do not force-push shared branches or overwrite the other contributor's work.
 

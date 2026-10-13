@@ -103,7 +103,7 @@ Own mobile and desktop layouts, registration and observations, queue views, evid
 
 All three developers review the shared contracts and demonstrate the complete workflow. Each developer should be able to explain their code during the challenge's live technical review.
 
-Backend branches: `codex/backend-mson-wagz` and `codex/backend-mejja`. See [assigned backend tasks and shared milestones](specs/tasks.md). The frontend contributor's name is still to be provided.
+Backend branches: `backend-mson-wagz` and `backend-mejja`. See [assigned backend tasks and shared milestones](specs/tasks.md). The frontend contributor's name is still to be provided.
 
 ## Repository organisation
 
