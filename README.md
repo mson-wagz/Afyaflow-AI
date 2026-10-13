@@ -105,8 +105,8 @@ All three developers review the shared contracts and demonstrate the complete wo
 
 Backend feature branches:
 
-- mson-wagz: `feature/queue-management` (P0) and `feature/department-routing` (P1).
-- Mejja: `feature/patient-prioritisation` (P0) and `feature/deterioration-monitoring` (P1).
+- mson-wagz: `feature/backend-queue-management` (P0) and `feature/backend-department-routing` (P1).
+- Mejja: `feature/backend-patient-prioritisation` (P0) and `feature/backend-deterioration-monitoring` (P1).
 
 See [feature specifications and lifecycle](specs/features/README.md), [foundational backend tasks and milestones](specs/tasks.md) and [JecintaK's frontend specs and branches](specs/frontend/README.md). All frontend tasks belong to JecintaK, with one dedicated frontend branch per feature.
 
