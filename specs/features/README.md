@@ -11,7 +11,7 @@ Each product feature has one specification directory and one implementation bran
 - [Deterioration monitoring](deterioration-monitoring/spec.md): `feature/deterioration-monitoring`, owned by Mejja. P1.
 - [Department routing](department-routing/spec.md): `feature/department-routing`, owned by mson-wagz. P1.
 
-The frontend contributor owns the UI tasks across all four features and works with the feature owner on each end-to-end slice. Two features per backend contributor establishes responsibility, not an equal-hours estimate. Review actual remaining effort at each milestone and pair where needed. Build the P0 journey before starting P1 implementation.
+JecintaK owns all UI tasks across the four product features and shared frontend foundations, working with the backend owner on each end-to-end slice. See [frontend specs and dedicated branches](../frontend/README.md). Two features per backend contributor establishes responsibility, not an equal-hours estimate. Review actual remaining effort at each milestone and pair where needed. Build the P0 journey before starting P1 implementation.
 
 ## Specification lifecycle
 
@@ -44,4 +44,4 @@ Each PR must state:
 - Actual verification evidence, including failure behaviour.
 - Dependencies on other PRs.
 
-Each developer opens PRs for their own commits. If the frontend and backend edit the same feature branch, coordinate explicitly; alternatively use short-lived implementation branches such as `feature/queue-management-ui` and merge reviewed work into main. Do not force-push shared branches.
+Each developer opens PRs for their own commits. Backend feature branches hold backend changes; JecintaK uses the dedicated `feature/frontend-*` branches documented in specs/frontend/README.md. Review shared contract changes together, merge them first and update dependent branches. Do not force-push shared branches.

@@ -1,6 +1,6 @@
 # React frontend
 
-Owner: Frontend developer.
+Owner: JecintaK (frontend developer).
 
 Organise UI by features. Call backend APIs through shared contracts. Never import backend modules, database clients or model credentials into browser code.
 

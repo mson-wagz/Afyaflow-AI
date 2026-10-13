@@ -97,7 +97,7 @@ Own the Next.js APIs, database schema, authentication, role checks, approval tra
 
 Own LangGraph orchestration, the custom MCP server, borrowed-server integration, local model connection, protocol implementation, tool traces and agent evaluations.
 
-### Frontend developer — React PWA
+### Frontend developer — JecintaK — React PWA
 
 Own mobile and desktop layouts, registration and observations, queue views, evidence and approval screens, PWA installation, local drafts and connectivity indicators. Use contract-aligned mocks while APIs are being implemented.
 
@@ -108,14 +108,15 @@ Backend feature branches:
 - mson-wagz: `feature/queue-management` (P0) and `feature/department-routing` (P1).
 - Mejja: `feature/patient-prioritisation` (P0) and `feature/deterioration-monitoring` (P1).
 
-See [feature specifications and lifecycle](specs/features/README.md) and [foundational backend tasks and milestones](specs/tasks.md). The frontend contributor owns UI work across features; their name is still to be provided.
+See [feature specifications and lifecycle](specs/features/README.md), [foundational backend tasks and milestones](specs/tasks.md) and [JecintaK's frontend specs and branches](specs/frontend/README.md). All frontend tasks belong to JecintaK, with one dedicated frontend branch per feature.
 
 ## Repository organisation
 
 ```text
 Afyaflow-AI/
 ├── specs/                    # Shared requirements, contracts and tasks
-│   └── features/             # One specification per product feature
+│   ├── features/             # One specification per product feature
+│   └── frontend/             # JecintaK's UI specs, tasks and branches
 ├── src/
 │   ├── app/                  # Next.js pages and API entry points
 │   │   ├── patients/
@@ -128,7 +129,10 @@ Afyaflow-AI/
 │   │   ├── features/
 │   │   │   ├── registration/
 │   │   │   ├── triage/
-│   │   │   └── queue/
+│   │   │   ├── queue/
+│   │   │   ├── staff-access/
+│   │   │   ├── deterioration/
+│   │   │   └── routing/
 │   │   ├── components/
 │   │   └── offline/
 │   ├── backend/

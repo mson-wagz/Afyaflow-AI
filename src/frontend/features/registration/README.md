@@ -1,6 +1,6 @@
 # Registration feature
 
-Owner: Frontend developer.
+Owner: JecintaK (frontend developer).
 
 Capture synthetic patient and visit information with clear validation and locally saved draft status.
 
