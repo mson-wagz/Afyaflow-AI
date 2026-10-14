@@ -26,7 +26,7 @@ Offline sync state and policy contracts in `src/shared/contracts/offline.js`.
 Web app manifest in `public/manifest.json`.
 Primary UI location: `src/frontend/src/offline/`.
 
-## Verification results
+Primary UI location: `src/frontend/src/offline/`. Use src/frontend/src/pages for React page components and src/frontend/public for non-sensitive assets. Client routing will be selected during contract review. Import browser-safe schemas from src/shared/contracts; never import backend/database/model credentials into browser code.
 
 Automated test verification:
 - `FE-OFFLINE-PWA-01`: PWA manifest defined with standalone display mode, theme colors, and mobile shell configuration.
