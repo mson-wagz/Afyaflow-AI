@@ -31,3 +31,12 @@ be implemented on the backend.
 Workflow regression tests cover registration through approval and transfer, persistent
 queue consistency, stale/incomplete proposals, rejected visits, reassessment priority
 changes, clinical role checks, the actual offline approval form and reconnect replay.
+
+## Connected backend mode
+
+Backend mode is now the default. The Vite proxy forwards /api to NestJS on port 3000.
+Staff sign-in uses a server cookie, and all patient/workflow adapters call PostgreSQL-backed
+HTTP endpoints. No frontend AWS keys are needed. Set VITE_API_MODE=demo only to review
+the isolated browser-local prototype described above. Existing frontend unit tests use
+that isolated mode; backend integration tests and the live Bedrock evidence are separate.
+See ../backend/README.md for startup and deployment preparation.

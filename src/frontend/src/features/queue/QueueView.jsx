@@ -1,4 +1,5 @@
 import React from 'react';
+import { useBackend } from '../../api/client.js';
 import useQueue from './useQueue';
 import { Card, Button, Badge, Alert } from '../../components';
 
@@ -217,7 +218,7 @@ export default function QueueView() {
                     ) : pt.assessmentStatus === 'AWAITING_ASSESSMENT' ? (
                       <Badge variant="admin">Awaiting Assessment</Badge>
                     ) : (
-                      <Badge variant="online">{pt.assessmentStatus === 'REJECTED_REQUIRES_REASSESSMENT' ? 'Reassessment Required' : 'Saved Demo State'}</Badge>
+                      <Badge variant="online">{pt.assessmentStatus === 'REJECTED_REQUIRES_REASSESSMENT' ? 'Reassessment Required' : (useBackend?'Confirmed Server State':'Saved Demo State')}</Badge>
                     )}
                   </td>
                   <td style={{ padding: '0.75rem 0.5rem', color: 'var(--color-text-muted)' }}>

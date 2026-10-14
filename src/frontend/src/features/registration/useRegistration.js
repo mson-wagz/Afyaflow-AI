@@ -8,11 +8,13 @@ import {
 import { apiRegisterPatient } from './apiAdapter';
 
 import { SyncContext } from '../../offline/SyncContext.jsx';
+import { useBackend } from '../../api/client.js';
 
-const REGISTRATION_DRAFT_KEY = 'afyaflow_patient_reg_draft_v1';
+const DRAFT_KEY_PREFIX = 'afyaflow_patient_reg_draft_v1';
 
 export default function useRegistration(currentStaff) {
   const sync = useContext(SyncContext);
+  const REGISTRATION_DRAFT_KEY=useBackend?DRAFT_KEY_PREFIX+'_'+currentStaff?.id:DRAFT_KEY_PREFIX;
   const [formData, setFormData] = useState(() => {
     try {
       const saved = localStorage.getItem(REGISTRATION_DRAFT_KEY);
@@ -31,8 +33,8 @@ export default function useRegistration(currentStaff) {
       respiratoryRate: '',
       temperature: '',
       spO2: '',
-      avpu: 'Alert',
-      mobility: 'Walking normally',
+      avpu: '',
+      mobility: '',
     };
   });
 
@@ -151,8 +153,8 @@ export default function useRegistration(currentStaff) {
       respiratoryRate: '',
       temperature: '',
       spO2: '',
-      avpu: 'Alert',
-      mobility: 'Walking normally',
+      avpu: '',
+      mobility: '',
     });
     setValidationErrors({});
     setMissingObservations([]);

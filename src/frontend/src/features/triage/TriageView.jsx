@@ -1,5 +1,9 @@
 import React from 'react';
+import { useBackend } from '../../api/client.js';
 import useTriage from './useTriage';
+import AgentWorkflowPanel from './AgentWorkflowPanel.jsx';
+import DecisionNotice from '../../components/DecisionNotice.jsx';
+import { decisionFailureMessage } from './decisionMessages.js';
 import { Card, Button, Badge, Alert, Modal, Input } from '../../components';
 import { TRIAGE_PRIORITY } from '../../../../shared/contracts/triage.js';
 
@@ -26,6 +30,7 @@ export default function TriageView({ currentStaff, isClinical = false }) {
     activeTrace,
     setActiveTrace,
     overrideModalOpen,
+    decisionCase,
     setOverrideModalOpen,
     rejectModalOpen,
     setRejectModalOpen,
@@ -41,11 +46,19 @@ export default function TriageView({ currentStaff, isClinical = false }) {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+      {useBackend && <AgentWorkflowPanel isClinical={isClinical} />}
+      {actionSuccess && <DecisionNotice
+        title={actionSuccess.decision === 'OVERRIDDEN' ? 'Priority override successful' : 'Clinical decision saved'}
+        onClose={clearMessages}>
+        {actionSuccess.decision === 'OVERRIDDEN'
+          ? `The priority for ${actionSuccess.patientName} was updated to ${actionSuccess.priority?.label}. Your decision has been recorded.`
+          : `Your decision for ${actionSuccess.patientName} has been recorded.`}
+      </DecisionNotice>}
       {/* Success Banner */}
       {actionSuccess && (
         <Alert
           variant="success"
-          title="Clinical Decision Saved in Demo"
+          title={useBackend?"Clinical Decision Server-Acknowledged":"Clinical Decision Saved in Demo"}
           onClose={clearMessages}
         >
           <div>
@@ -92,7 +105,7 @@ export default function TriageView({ currentStaff, isClinical = false }) {
 
       {activeCase ? (
         <Card
-          title="SATS Priority Recommendation"
+          title={useBackend?"Synthetic Protocol Priority Recommendation":"SATS Priority Recommendation"}
           subtitle={`Input Version: v${activeCase.observationVersion} • Arrived: ${new Date(activeCase.arrivalTime).toLocaleTimeString()}`}
           actions={
             <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
@@ -100,7 +113,7 @@ export default function TriageView({ currentStaff, isClinical = false }) {
                 variant="outline"
                 size="sm"
                 onClick={() => setActiveTrace(activeCase.toolTrace)}
-                aria-label="Inspect simulated tool trace"
+                aria-label={useBackend?"Inspect agent tool trace":"Inspect simulated tool trace"}
               >
                 🔍 Inspect Tool Trace
               </Button>
@@ -233,7 +246,7 @@ export default function TriageView({ currentStaff, isClinical = false }) {
               </div>
             )}
             <div style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)', marginTop: '4px' }}>
-              * Proposals do not alter hospital queues until an authorised clinician records a decision in this local demo.
+              * Proposals do not alter hospital queues until an authorised clinician records a server-confirmed clinical decision.
             </div>
           </div>
 
@@ -253,6 +266,7 @@ export default function TriageView({ currentStaff, isClinical = false }) {
               disabled={actionInProgress}
               onClick={() => {
                 setReasonInput('');
+                clearMessages();
                 setOverrideModalOpen(true);
               }}
             >
@@ -264,6 +278,7 @@ export default function TriageView({ currentStaff, isClinical = false }) {
               disabled={actionInProgress}
               onClick={() => {
                 setReasonInput('');
+                clearMessages();
                 setRejectModalOpen(true);
               }}
             >
@@ -335,7 +350,7 @@ export default function TriageView({ currentStaff, isClinical = false }) {
         <Modal
           isOpen={Boolean(activeTrace)}
           onClose={() => setActiveTrace(null)}
-          title={`Simulated MCP Tool Trace Inspector: ${activeTrace.runId}`}
+          title={`${useBackend?"MCP Tool Trace Inspector":"Simulated MCP Tool Trace Inspector"}: ${activeTrace.runId}`}
           maxWidth="640px"
           footer={
             <Button variant="secondary" onClick={() => setActiveTrace(null)}>
@@ -345,7 +360,7 @@ export default function TriageView({ currentStaff, isClinical = false }) {
         >
           <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', fontSize: '0.85rem' }}>
             <div>
-              <strong>Simulated model:</strong> <code>{activeTrace.model}</code>
+              <strong>{useBackend?"Model:":"Simulated model:"}</strong> <code>{activeTrace.model}</code>
             </div>
             <div>
               <strong>Timestamp:</strong> {new Date(activeTrace.timestamp).toLocaleString()}
@@ -353,7 +368,7 @@ export default function TriageView({ currentStaff, isClinical = false }) {
 
             <div>
               <h4 style={{ fontWeight: 700, marginBottom: '0.5rem' }}>
-                Simulated Tool Pipeline ({activeTrace.toolCalls.length} tool calls)
+                {useBackend?"Recorded Tool Pipeline":"Simulated Tool Pipeline"} ({activeTrace.toolCalls.length} tool calls)
               </h4>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
                 {activeTrace.toolCalls.map((tc, idx) => (
@@ -405,6 +420,10 @@ export default function TriageView({ currentStaff, isClinical = false }) {
           </>
         }
       >
+        {actionError && <Alert variant="danger" aria-live="assertive" title="Override could not be completed">
+          {decisionFailureMessage(actionError,'override')}
+        </Alert>}
+        <p>Patient: <strong>{decisionCase?.patientName}</strong> · Observation version {decisionCase?.observationVersion}</p>
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
           <div className="form-group">
             <label htmlFor="override-priority-select" className="form-label">
@@ -460,6 +479,10 @@ export default function TriageView({ currentStaff, isClinical = false }) {
           </>
         }
       >
+        {actionError && <Alert variant="danger" aria-live="assertive" title="Rejection could not be completed">
+          {decisionFailureMessage(actionError,'reject')}
+        </Alert>}
+        <p>Patient: <strong>{decisionCase?.patientName}</strong> · Observation version {decisionCase?.observationVersion}</p>
         <div className="form-group">
           <label htmlFor="reject-reason-input" className="form-label">
             Clinical Reason for Rejection <span style={{ color: 'var(--color-danger)' }}>*</span>

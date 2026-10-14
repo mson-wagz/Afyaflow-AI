@@ -20,6 +20,8 @@ export default function useDeterioration(currentStaff) {
       if (data.length > 0 && !selectedCaseId) {
         setSelectedCaseId(data[0].patientId);
       }
+    } catch (error) {
+      setActionError(error.message);
     } finally {
       setLoading(false);
     }
@@ -40,6 +42,7 @@ export default function useDeterioration(currentStaff) {
     try {
       const result = await apiCommitReassessmentDecision(currentStaff, {
         patientId: activeCase.patientId,
+        observationVersion:activeCase.observationVersion,
         action: 'ESCALATE',
         reason: 'Confirmed significant vital signs deterioration across observation intervals.',
         targetPriority: TRIAGE_PRIORITY.RED,
@@ -73,6 +76,7 @@ export default function useDeterioration(currentStaff) {
       const result = await apiCommitReassessmentDecision(currentStaff, {
         patientId: activeCase.patientId,
         action: 'DISMISS',
+        observationVersion:activeCase.observationVersion,
         reason: dismissReason,
       });
 

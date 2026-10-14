@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import useAuth from './useAuth';
 import { Card, Badge } from '../../components';
 
@@ -6,7 +6,12 @@ import { Card, Badge } from '../../components';
  * Security & Staff Access Audit Log View
  */
 export default function SecurityAuditView() {
-  const { auditLogs } = useAuth();
+  const { auditLogs, refreshLogs } = useAuth();
+  useEffect(() => {
+    refreshLogs();
+    const timer=setInterval(refreshLogs,5000);
+    return () => clearInterval(timer);
+  },[refreshLogs]);
 
   const getEventBadge = (eventType) => {
     switch (eventType) {
@@ -26,7 +31,7 @@ export default function SecurityAuditView() {
   return (
     <Card
       title="Security & Staff Access Audit Trail"
-      subtitle="Immutable event history of authentications, terminal locks, and authorization denials"
+      subtitle="Persisted staff access and patient workflow events"
     >
       <div style={{ overflowX: 'auto' }}>
         <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.875rem' }}>

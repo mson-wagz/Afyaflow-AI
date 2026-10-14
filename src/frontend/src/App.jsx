@@ -17,9 +17,12 @@ import { SyncProvider, useOfflineSync, OfflineSyncView } from './offline';
 import { Header, Navigation } from './components';
 import { SESSION_STATUS, SYNTHETIC_STAFF_FIXTURES } from '../../shared/contracts/auth.js';
 
+import { useBackend } from './api/client.js';
+
 function AppShell() {
   const {
     staff,
+    restoring,authError,
     sessionStatus,
     lockSession,
     signOut,
@@ -33,9 +36,10 @@ function AppShell() {
   const [currentView, setCurrentView] = useState('registration');
   const [profileOpen, setProfileOpen] = useState(false);
 
+  if(restoring)return <div role="status">Restoring staff session…</div>;
   // If unauthenticated, show the Sign-In screen
   if (sessionStatus === SESSION_STATUS.UNAUTHENTICATED || !staff) {
-    return <SignInScreen />;
+    return <><div role="alert">{authError}</div><SignInScreen /></>;
   }
 
   // Quick switcher handler for evaluators/demos
@@ -46,8 +50,8 @@ function AppShell() {
   return (
     <div className="app-container">
       <div role="note" style={{padding:'0.6rem 1rem',backgroundColor:'#fff7ed',color:'#7c2d12'}}>
-        Synthetic demo — data is saved in this browser only. Server responses, protocol citations,
-        model activity, and MCP traces are simulated. Clinical scoring is not validated.
+        {useBackend ? 'Connected to PostgreSQL • Synthetic patient data • Amazon Bedrock agent • Clinician approval required. Scoring uses an unvalidated test protocol.'
+          : 'Synthetic demo — browser-local data and simulated tools. Clinical scoring is not validated.'}
       </div>
       {/* Shared-device lock screen overlay if locked */}
       {sessionStatus === SESSION_STATUS.LOCKED && <LockScreen />}
@@ -131,9 +135,9 @@ function AppShell() {
             }}
           >
             <div style={{ fontWeight: 600, color: 'var(--color-text)', marginBottom: '4px' }}>
-              Demo Workflow
+              {useBackend?"Connected Workflow":"Demo Workflow"}
             </div>
-            <div>• Simulated protocol citations</div>
+            <div>• Synthetic protocol fixture</div>
             <div>• Human clinician review gate</div>
             <div>• Zero guessed measurements</div>
             <div>• Offline safe outbox retention</div>
@@ -141,7 +145,7 @@ function AppShell() {
         </aside>
 
         <main hidden={sessionStatus === SESSION_STATUS.LOCKED} className="app-main" id="main-content" tabIndex={-1}>
-          {currentView === 'registration' && <RegistrationView currentStaff={staff} />}
+          {currentView === 'registration' && <RegistrationView key={staff.id} currentStaff={staff} />}
           {currentView === 'triage' && <TriageView currentStaff={staff} isClinical={isClinical} />}
           {currentView === 'queue' && <QueueView />}
           {currentView === 'deterioration' && <DeteriorationView currentStaff={staff} isClinical={isClinical} />}

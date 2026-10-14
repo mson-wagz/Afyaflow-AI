@@ -1,4 +1,5 @@
 import React from 'react';
+import { useBackend } from '../../api/client.js';
 import useRouting from './useRouting';
 import { Card, Button, Badge, Alert } from '../../components';
 
@@ -32,7 +33,7 @@ export default function RoutingView({ currentStaff, isClinical = false }) {
       {actionSuccess && (
         <Alert
           variant="success"
-          title="Department Transfer Saved in Demo"
+          title={useBackend?"Department Transfer Confirmed by Server":"Department Transfer Saved in Demo"}
           onClose={clearMessages}
         >
           <div>

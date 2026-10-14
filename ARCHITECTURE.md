@@ -1,6 +1,25 @@
 # AfyaFlow AI architecture
 
-Status: proposed architecture; React + Vite starter exists, NestJS backend services are not implemented.
+Status: a synthetic development slice is implemented. React talks to NestJS through
+same-origin /api routes; PostgreSQL persists visits, immutable observations, jobs,
+proposals, decisions, transfers, retry keys, sessions and audit events.
+
+## Implemented runtime
+
+Registration and observation writes queue durable assessment jobs. A leased worker
+runs a LangGraph loop against Amazon Bedrock Converse, connects to run-scoped custom
+MCP tools and retrieves the fixed test protocol through the official filesystem
+MCP reference server. The graph stops at a persisted human-review state. Only an
+authenticated clinical session can commit a separate approval transaction. The
+model never receives an approval tool. Client staff IDs are not authority.
+
+The tested hosted model is Nova Lite through an EU inference profile. The former
+local Qwen plan below is historical; provider selection was changed to Bedrock.
+The scorer is a named unvalidated synthetic fixture, not an approved SATS protocol.
+Docker/RDS deployment is prepared but untested; nothing has been hosted on AWS.
+See specs/contracts.md and src/backend/README.md for implemented behavior.
+
+## Original design plan (not a claim of completed clinical validation)
 
 ## Application boundaries
 

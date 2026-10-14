@@ -1,6 +1,47 @@
 # AfyaFlow AI evaluation plan
 
-Status: planned evaluations only. No application, model run or automated evaluation has been executed.
+Status: development evaluations executed on 14 October 2026; clinical validity is not evaluated.
+
+## Executed development checks
+
+- PostgreSQL 18.4 integration suite: 12 tests passed, including a complete proposal/approval
+  journey through real MCP tools, parallel retry safety, clinical role denial, observation
+  freshness, missing-evidence suppression, versioned transfers, rollback and session lock/logout.
+  Model responses in this suite are explicitly injected test doubles, not Bedrock calls.
+- Frontend: 48 tests passed (including authorised and unauthorised override notifications) and the production build passed after API integration.
+- NestJS/TypeScript build passed.
+- Browser: seeded staff sign-in, actual tool-trace inspection and human approval of a live
+  Bedrock proposal were verified. The server acknowledged the decision and marked the run DECIDED.
+
+## Live Bedrock run
+
+Run ID: RUN-bb738974-a910-4171-bb2e-61fa4006e470. Synthetic adult fixture with complete
+observations; protocol afyaflow-synthetic-adult-v1/demo-v1. Model eu.amazon.nova-lite-v1:0,
+region eu-west-1. PostgreSQL, NestJS and MCP processes ran on Windows with Node 24;
+inference ran on Bedrock, not local hardware.
+
+The model retrieved the versioned observations, read the fixture via the official filesystem
+MCP server, called deterministic scoring, and saved a pending proposal. The run reached
+WAITING_FOR_REVIEW in 10,203 ms. Four model calls used 5,034 input and 331 output tokens.
+There were five custom-tool calls because the model requested read_protocol twice.
+Both reads succeeded; the final score matched the deterministic fixture. The proposal
+did not change approved priority until browser approval by the synthetic nurse account.
+Actual messages, outputs, usage and measured durations are retained in local PostgreSQL
+tool_traces; they are not hardcoded UI traces. No dollar cost is estimated here.
+
+## Observed limitations
+
+The first live invocation using the base amazon.nova-lite-v1:0 ID failed because this region
+requires an inference profile. Configuration was corrected after querying the account's
+active profile. The failed run remains visible for inspection.
+
+The successful model run made a redundant protocol read. Per-round and overall budgets
+bound it, but repeated-run variation and tool-choice efficiency have not been evaluated.
+Only one complete hosted model run is reported here; no claim of repeated-model reliability
+is made. Docker and AWS hosting have not been tested. The synthetic scorer is unvalidated,
+and Nova Lite does not satisfy an open-weights challenge run by itself.
+
+## Remaining planned evaluations
 
 ## Planned tasks
 
@@ -23,4 +64,4 @@ Only label results as passed after a real run. Keep mocked UI demonstrations sep
 
 ## Unresolved failures
 
-There are no executed results from which to report an observed failure yet. Before submission, record at least one actual unresolved failure, its impact and the next experiment to try. The planned tasks above are not submission evidence.
+The redundant protocol read in the live run remains an observed efficiency issue. Repeat model runs and measure unnecessary tool calls before adding a deduplication policy. The original planned tasks above remain incomplete where no executed result is listed.

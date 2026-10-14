@@ -15,12 +15,18 @@ import {
 
 export const AuthContext = createContext(null);
 
+import { api, useBackend, errorResult } from '../../api/client.js';
+import { apiRefreshAuditLogs } from './apiAdapter.js';
+
 const DRAFT_STORAGE_KEY = 'afyaflow_local_draft_v1';
 const SESSION_STORAGE_KEY = 'afyaflow_session_v1';
 
 export function AuthProvider({ children }) {
+  const [restoring,setRestoring]=useState(useBackend);
+  const [authError,setAuthError]=useState('');
   // Initialize with the senior triage nurse fixture for convenient development/demo
   const [staff, setStaff] = useState(() => {
+    if (useBackend) return null;
     try {
       const stored = localStorage.getItem(SESSION_STORAGE_KEY);
       if (stored) {
@@ -54,8 +60,8 @@ export function AuthProvider({ children }) {
 
   const inactivityTimerRef = useRef(null);
 
-  const refreshLogs = useCallback(() => {
-    setAuditLogs(apiGetAuditLogs());
+  const refreshLogs = useCallback(async () => {
+    try {setAuditLogs(await apiRefreshAuditLogs());}catch(error){setAuthError(error.message);}
   }, []);
 
   // Save session state to localStorage
@@ -68,9 +74,24 @@ export function AuthProvider({ children }) {
     }
   }, []);
 
+  useEffect(() => {
+    if (!useBackend) return;
+    let cancelled=false;
+    api('/auth/me').then(result => {
+      if(cancelled)return;
+      updateStaff(result.staff);setSessionStatus(result.locked?SESSION_STATUS.LOCKED:SESSION_STATUS.AUTHENTICATED);
+      refreshLogs();
+    }).catch(() => {if(!cancelled){updateStaff(null);setSessionStatus(SESSION_STATUS.UNAUTHENTICATED);}})
+      .finally(()=>{if(!cancelled)setRestoring(false);});
+    const expired=()=>{updateStaff(null);setSessionStatus(SESSION_STATUS.UNAUTHENTICATED);};
+    window.addEventListener('afyaflow-session-expired',expired);
+    return ()=>{cancelled=true;window.removeEventListener('afyaflow-session-expired',expired);};
+  }, [updateStaff,refreshLogs]);
+
   // Locking function
   const lockSession = useCallback(() => {
     setSessionStatus(SESSION_STATUS.LOCKED);
+    if(useBackend)api('/auth/lock',{method:'POST',body:{}}).catch(error=>setAuthError(error.message));
     setLockTimestamp(new Date().toLocaleTimeString());
     setLastPermissionError(null);
   }, []);
@@ -118,7 +139,7 @@ export function AuthProvider({ children }) {
 
   // Sign In handler
   const signIn = async (identifier, pin) => {
-    setLastPermissionError(null);
+    setLastPermissionError(null); setAuthError('');
     const result = await apiSignIn(identifier, pin);
     if (result.success) {
       updateStaff(result.staff);
@@ -131,6 +152,7 @@ export function AuthProvider({ children }) {
 
   // Sign Out handler
   const signOut = () => {
+    if(useBackend)api('/auth/logout',{method:'POST',body:{}}).catch(error=>setAuthError('Server sign-out could not be confirmed: '+error.message));
     updateStaff(null);
     setSessionStatus(SESSION_STATUS.UNAUTHENTICATED);
     setLockTimestamp(null);
@@ -208,6 +230,7 @@ export function AuthProvider({ children }) {
   };
 
   const value = {
+    restoring,authError,
     staff,
     sessionStatus,
     lockTimestamp,
@@ -216,7 +239,7 @@ export function AuthProvider({ children }) {
     hasDraft: Boolean(localDraft),
     lastPermissionError,
     idleTimeoutMinutes,
-    auditLogs,
+    auditLogs,refreshLogs,
     signIn,
     signOut,
     lockSession,
