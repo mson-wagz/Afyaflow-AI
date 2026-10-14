@@ -20,8 +20,8 @@ Staffing recommendations do not move staff or patients automatically. Department
 
 - [ ] Complete shared patient, authentication and approval foundations: APP-01 through APP-04.
 - [ ] Agree queue response schema, ordering, waiting-time semantics and workload snapshot fields in specs/contracts.md.
-- [ ] Implement queue queries and approved changes in src/backend/modules/queue/ with corresponding API handlers: APP-05.
-- [ ] Implement the queue UI in src/frontend/features/queue/ and src/app/queue/.
+- [ ] Implement queue queries and approved changes in src/backend/src/modules/queue/ with corresponding API handlers: APP-05.
+- [ ] Implement the queue UI in src/frontend/src/features/queue/ and src/frontend/src/pages/queue/.
 - [ ] Verify QUEUE-01 through QUEUE-05 using synthetic fixtures and record evidence: APP-06.
 
 ## Review questions and completion gate
