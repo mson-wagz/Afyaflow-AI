@@ -43,6 +43,26 @@ and Nova Lite does not satisfy an open-weights challenge run by itself.
 
 ## Remaining planned evaluations
 
+## Lambda refactor verification (14 October 2026)
+
+The backend suite passed 39 tests and the frontend suite passed 58 tests (97 total).
+Both TypeScript/backend and Vite/frontend builds passed. SAM CLI 1.169.0 accepted
+`deploy/lambda/template.yaml` with `sam validate --lint`. Migration 003 applied to
+the local database; integration tests apply migrations in isolated schemas.
+
+New cases exercise transactional outbox rollback and ambiguous queue sends,
+duplicate deliveries, expired/active worker leases, bounded crash recovery,
+saved-proposal recovery, retry-generation fencing, shared auth throttling, partial
+SQS batch failures, and authenticated CloudFront viewer addresses. A separate Node
+process invokes the actual Lambda API handler against the test database and checks
+NestJS initialization, JSON sign-in, secure cookies, origin protection, and session
+access. Agent tests use a model test double with real MCP and PostgreSQL; no hosted
+model reliability claim follows from these results.
+
+Docker is unavailable in this environment. Lambda image execution, AWS IAM and VPC
+connectivity, CloudFront behavior, SQS delivery, RDS TLS, and end-to-end hosted
+operation remain staging verification tasks. No AWS resources were deployed.
+
 ## Planned tasks
 
 1. Complete evidence: a synthetic visit produces a pending recommendation tied to input records and a selected protocol rule. Approved queue state remains unchanged.

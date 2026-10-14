@@ -57,6 +57,8 @@ run, its token usage and browser approval verification.
 
 ## AWS deployment preparation
 
+For Lambda, use [the SAM deployment guide](../../deploy/lambda/README.md). It provides separate API, SQS worker, transactional outbox dispatcher, and migration functions, plus private S3/CloudFront frontend hosting. Run migration 003 before starting this refactored backend locally.
+
 The Dockerfile builds and serves the frontend and NestJS app on one origin. It has
 not been executed here because Docker is not installed. For ECS/Fargate or another
 container host, provide `DATABASE_URL` for RDS PostgreSQL, `DATABASE_SSL=true`, the
@@ -69,7 +71,7 @@ accounts on a public deployment.
 No AWS hosting resources have been created. Local PostgreSQL is independent of
 RDS, so the connection URL can change without replacing application logic. Worker
 jobs are durable across app restarts; multiple app instances claim jobs using
-SKIP LOCKED. Load tests, operational monitoring, backup/restore exercises and
+database row locks and leases. Load tests, backup/restore exercises and
 production staff provisioning are not yet covered.
 
 The protocol is an unvalidated synthetic scoring fixture. Bedrock inference is

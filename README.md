@@ -211,6 +211,8 @@ No application or external submission has been made from this repository.
 
 ## Development setup
 
+For Lambda hosting, see [the deployment guide](deploy/lambda/README.md). The API, SQS worker, outbox dispatcher, migration function, and SAM template retain the existing patient workflows and MCP tools.
+
 See [TESTING.md](TESTING.md) for unit tests, PostgreSQL/HTTP integration tests, and the commands to run the full suite.
 
 Install root and frontend dependencies, configure `.env`, start PostgreSQL, run `npm run db:migrate` and `npm run db:seed`, then start `npm run dev:backend` and `npm run dev --prefix src/frontend`. The app opens at http://localhost:5173. [Full setup instructions](src/backend/README.md) include the portable local PostgreSQL option and Bedrock configuration.

@@ -43,7 +43,7 @@ export async function createRunTools(database:Database,runId:string) {
       const result=await database.transaction(async db => {
         const visit=(await db.query('SELECT * FROM visits WHERE id=$1 FOR UPDATE',[run.visit_id])).rows[0];
         const lockedRun=(await db.query('SELECT * FROM agent_runs WHERE id=$1 FOR UPDATE',[runId])).rows[0];
-        if (lockedRun.status !== 'RUNNING' || lockedRun.attempts !== run.attempts || new Date(lockedRun.lease_until).getTime() < Date.now()) throw new Error('Agent lease expired.');
+        if (lockedRun.status !== 'RUNNING' || lockedRun.attempts !== run.attempts || lockedRun.delivery_generation !== run.delivery_generation || new Date(lockedRun.lease_until).getTime() < Date.now()) throw new Error('Agent lease expired.');
         if (visit.observation_version !== run.observation_version) throw new Error('STALE_OBSERVATIONS: request a new assessment.');
         const data={proposal:scoring,protocol,summary,protocolChecksum:hash(JSON.stringify(protocol)),observationId:evidence.observationId,
           observationVersion:run.observation_version,clinicalValidated:false};
@@ -75,6 +75,6 @@ export async function createRunTools(database:Database,runId:string) {
   const client=new Client({name:'afyaflow-agent',version:'0.1.0'});
   const [clientTransport,serverTransport]=InMemoryTransport.createLinkedPair();
   await server.connect(serverTransport);await client.connect(clientTransport);
-  return {server,client,attempt:run.attempts,isSaved:()=>saved,isSufficient:()=>Boolean(scoring?.isSufficientEvidence),
+  return {server,client,attempt:run.attempts,generation:run.delivery_generation,isSaved:()=>saved,isSufficient:()=>Boolean(scoring?.isSufficientEvidence),
     close:async () => {await client.close();await server.close();}};
 }

@@ -1,0 +1,354 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: AfyaFlow Lambda staging backend using an existing private PostgreSQL database and VPC
+Parameters:
+  SubnetIds:
+    Type: List<AWS::EC2::Subnet::Id>
+    Description: At least two subnets with private access to PostgreSQL and required AWS service endpoints
+  SecurityGroupIds:
+    Type: List<AWS::EC2::SecurityGroup::Id>
+    Description: Lambda security groups permitted to reach PostgreSQL and interface endpoints
+  DatabaseSecretArn:
+    Type: String
+    Description: Secrets Manager secret containing DATABASE_URL or host, port, dbname, username, password
+    AllowedPattern: 'arn:aws[a-z-]*:secretsmanager:.*'
+  DatabaseHost:
+    Type: String
+    Default: ''
+    Description: Optional database or RDS Proxy endpoint override
+  AppOrigin:
+    Type: String
+    Description: Exact HTTPS browser origin (no trailing slash)
+    AllowedPattern: 'https://[^/]+|http://localhost:[0-9]+'
+  ModelId:
+    Type: String
+    Default: eu.amazon.nova-lite-v1:0
+  BedrockResourceArns:
+    Type: CommaDelimitedList
+    Description: Model and inference-profile ARNs needed by the configured model, including destination region model ARNs for cross-region profiles
+  SecretKmsKeyArn:
+    Type: String
+    Default: ''
+    Description: Optional customer-managed KMS key used by the database secret
+  AllowSyntheticSeed:
+    Type: String
+    Default: 'false'
+    AllowedValues: ['false', 'true']
+  ApiConcurrency:
+    Type: Number
+    Default: 5
+    MinValue: 1
+    MaxValue: 20
+  WorkerConcurrency:
+    Type: Number
+    Default: 2
+    MinValue: 2
+    MaxValue: 10
+Conditions:
+  HasSecretKmsKey: !Not [!Equals [!Ref SecretKmsKeyArn, '']]
+Globals:
+  Function:
+    Architectures: [x86_64]
+    MemorySize: 1024
+    Timeout: 30
+    Environment:
+      Variables:
+        NODE_ENV: production
+        AGENT_WORKER_DISABLED: 'true'
+        DATABASE_SECRET_ARN: !Ref DatabaseSecretArn
+        DATABASE_HOST: !Ref DatabaseHost
+        DATABASE_POOL_MAX: '2'
+        DATABASE_SSL: 'true'
+        DATABASE_CA_FILE: /opt/rds/global-bundle.pem
+        APP_ORIGIN: !Ref AppOrigin
+        BEDROCK_MODEL_ID: !Ref ModelId
+        AGENT_TIMEOUT_MS: '90000'
+        AGENT_MAX_STEPS: '8'
+    VpcConfig:
+      SubnetIds: !Ref SubnetIds
+      SecurityGroupIds: !Ref SecurityGroupIds
+Resources:
+  HttpApi:
+    Type: AWS::Serverless::HttpApi
+    Properties:
+      StageName: '$default'
+      DefaultRouteSettings:
+        ThrottlingBurstLimit: 30
+        ThrottlingRateLimit: 15
+  DeadLetterQueue:
+    Type: AWS::SQS::Queue
+    Properties:
+      SqsManagedSseEnabled: true
+      MessageRetentionPeriod: 1209600
+  AgentQueue:
+    Type: AWS::SQS::Queue
+    Properties:
+      SqsManagedSseEnabled: true
+      VisibilityTimeout: 1080
+      MessageRetentionPeriod: 1209600
+      RedrivePolicy:
+        deadLetterTargetArn: !GetAtt DeadLetterQueue.Arn
+        maxReceiveCount: 5
+  ApiFunction:
+    Type: AWS::Serverless::Function
+    Metadata: &ImageBuild
+      Dockerfile: Dockerfile.lambda
+      DockerContext: ../..
+      DockerTag: afyaflow-lambda
+    Properties:
+      PackageType: Image
+      ImageConfig:
+        Command: ['dist/src/backend/src/lambda/api.handler']
+      ReservedConcurrentExecutions: !Ref ApiConcurrency
+      Environment:
+        Variables:
+          REQUIRE_CLOUDFRONT_ORIGIN: 'true'
+      Policies: &DatabasePolicies
+        - Statement:
+            - Effect: Allow
+              Action: secretsmanager:GetSecretValue
+              Resource: !Ref DatabaseSecretArn
+            - !If
+              - HasSecretKmsKey
+              - Effect: Allow
+                Action: kms:Decrypt
+                Resource: !Ref SecretKmsKeyArn
+              - !Ref AWS::NoValue
+      Events:
+        Api:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref HttpApi
+            Path: /api/{proxy+}
+            Method: ANY
+            PayloadFormatVersion: '2.0'
+  WorkerFunction:
+    Type: AWS::Serverless::Function
+    Metadata: *ImageBuild
+    Properties:
+      PackageType: Image
+      ImageConfig:
+        Command: ['dist/src/backend/src/lambda/worker.handler']
+      Timeout: 180
+      ReservedConcurrentExecutions: !Ref WorkerConcurrency
+      Policies:
+        - Statement:
+            - Effect: Allow
+              Action: secretsmanager:GetSecretValue
+              Resource: !Ref DatabaseSecretArn
+            - Effect: Allow
+              Action: bedrock:InvokeModel
+              Resource: !Ref BedrockResourceArns
+            - !If
+              - HasSecretKmsKey
+              - Effect: Allow
+                Action: kms:Decrypt
+                Resource: !Ref SecretKmsKeyArn
+              - !Ref AWS::NoValue
+        - SQSPollerPolicy:
+            QueueName: !GetAtt AgentQueue.QueueName
+      Events:
+        Jobs:
+          Type: SQS
+          Properties:
+            Queue: !GetAtt AgentQueue.Arn
+            BatchSize: 1
+            FunctionResponseTypes: [ReportBatchItemFailures]
+            ScalingConfig:
+              MaximumConcurrency: !Ref WorkerConcurrency
+  DispatcherFunction:
+    Type: AWS::Serverless::Function
+    Metadata: *ImageBuild
+    Properties:
+      PackageType: Image
+      ImageConfig:
+        Command: ['dist/src/backend/src/lambda/dispatcher.handler']
+      ReservedConcurrentExecutions: 1
+      Environment:
+        Variables:
+          AGENT_QUEUE_URL: !Ref AgentQueue
+      Policies:
+        - Statement:
+            - Effect: Allow
+              Action: secretsmanager:GetSecretValue
+              Resource: !Ref DatabaseSecretArn
+            - !If
+              - HasSecretKmsKey
+              - Effect: Allow
+                Action: kms:Decrypt
+                Resource: !Ref SecretKmsKeyArn
+              - !Ref AWS::NoValue
+        - SQSSendMessagePolicy:
+            QueueName: !GetAtt AgentQueue.QueueName
+      Events:
+        Dispatch:
+          Type: Schedule
+          Properties:
+            Schedule: rate(1 minute)
+            Enabled: true
+  MigrationFunction:
+    Type: AWS::Serverless::Function
+    Metadata: *ImageBuild
+    Properties:
+      PackageType: Image
+      ImageConfig:
+        Command: ['dist/src/backend/src/lambda/migrate.handler']
+      Timeout: 120
+      ReservedConcurrentExecutions: 1
+      Policies: *DatabasePolicies
+      Environment:
+        Variables:
+          ALLOW_SYNTHETIC_SEED: !Ref AllowSyntheticSeed
+  ApiLogs:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub '/aws/lambda/${ApiFunction}'
+      RetentionInDays: 14
+  WorkerLogs:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub '/aws/lambda/${WorkerFunction}'
+      RetentionInDays: 14
+  DispatcherLogs:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub '/aws/lambda/${DispatcherFunction}'
+      RetentionInDays: 14
+  MigrationLogs:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub '/aws/lambda/${MigrationFunction}'
+      RetentionInDays: 14
+  DeadLetterAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmDescription: Agent deliveries require investigation and redrive
+      Namespace: AWS/SQS
+      MetricName: ApproximateNumberOfMessagesVisible
+      Dimensions:
+        - Name: QueueName
+          Value: !GetAtt DeadLetterQueue.QueueName
+      Statistic: Maximum
+      Period: 60
+      EvaluationPeriods: 1
+      Threshold: 1
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      TreatMissingData: notBreaching
+  FrontendBucket:
+    Type: AWS::S3::Bucket
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+      VersioningConfiguration:
+        Status: Enabled
+  FrontendOriginAccess:
+    Type: AWS::CloudFront::OriginAccessControl
+    Properties:
+      OriginAccessControlConfig:
+        Name: !Sub '${AWS::StackName}-frontend'
+        OriginAccessControlOriginType: s3
+        SigningBehavior: always
+        SigningProtocol: sigv4
+  ApiOriginRequestPolicy:
+    Type: AWS::CloudFront::OriginRequestPolicy
+    Properties:
+      OriginRequestPolicyConfig:
+        Name: !Sub '${AWS::StackName}-api'
+        CookiesConfig:
+          CookieBehavior: all
+        QueryStringsConfig:
+          QueryStringBehavior: all
+        HeadersConfig:
+          HeaderBehavior: whitelist
+          Headers: [Origin, Content-Type, Idempotency-Key, CloudFront-Viewer-Address]
+  Website:
+    Type: AWS::CloudFront::Distribution
+    Properties:
+      DistributionConfig:
+        Enabled: true
+        DefaultRootObject: index.html
+        HttpVersion: http2and3
+        IPV6Enabled: true
+        PriceClass: PriceClass_100
+        Origins:
+          - Id: frontend
+            DomainName: !GetAtt FrontendBucket.RegionalDomainName
+            OriginAccessControlId: !Ref FrontendOriginAccess
+            S3OriginConfig:
+              OriginAccessIdentity: ''
+          - Id: api
+            DomainName: !Sub '${HttpApi}.execute-api.${AWS::Region}.${AWS::URLSuffix}'
+            CustomOriginConfig:
+              OriginProtocolPolicy: https-only
+              OriginSSLProtocols: [TLSv1.2]
+            OriginCustomHeaders:
+              - HeaderName: X-AfyaFlow-Origin-Token
+                HeaderValue: !Sub '{{resolve:secretsmanager:${DatabaseSecretArn}:SecretString:cloudfrontOriginToken}}'
+        DefaultCacheBehavior:
+          TargetOriginId: frontend
+          ViewerProtocolPolicy: redirect-to-https
+          Compress: true
+          CachePolicyId: 658327ea-f89d-4fab-a63d-7e88639e58f6
+        CacheBehaviors:
+          - PathPattern: /api/*
+            TargetOriginId: api
+            ViewerProtocolPolicy: https-only
+            AllowedMethods: [GET, HEAD, OPTIONS, PUT, PATCH, POST, DELETE]
+            CachedMethods: [GET, HEAD]
+            CachePolicyId: 4135ea2d-6df8-44a3-9df3-4b5a84be39ad
+            OriginRequestPolicyId: !Ref ApiOriginRequestPolicy
+        ViewerCertificate:
+          CloudFrontDefaultCertificate: true
+  FrontendBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref FrontendBucket
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: cloudfront.amazonaws.com
+            Action: s3:GetObject
+            Resource: !Sub '${FrontendBucket.Arn}/*'
+            Condition:
+              StringEquals:
+                AWS:SourceArn: !Sub 'arn:${AWS::Partition}:cloudfront::${AWS::AccountId}:distribution/${Website}'
+  DispatcherErrorAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      Namespace: AWS/Lambda
+      MetricName: Errors
+      Dimensions:
+        - Name: FunctionName
+          Value: !Ref DispatcherFunction
+      Statistic: Sum
+      Period: 60
+      EvaluationPeriods: 2
+      Threshold: 1
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      TreatMissingData: notBreaching
+Outputs:
+  WebsiteUrl:
+    Value: !Sub 'https://${Website.DomainName}'
+  FrontendBucketName:
+    Value: !Ref FrontendBucket
+  DistributionId:
+    Value: !Ref Website
+  ApiUrl:
+    Value: !Sub 'https://${HttpApi}.execute-api.${AWS::Region}.${AWS::URLSuffix}'
+  MigrationFunctionName:
+    Value: !Ref MigrationFunction
+  AgentQueueUrl:
+    Value: !Ref AgentQueue
+  DeadLetterQueueUrl:
+    Value: !Ref DeadLetterQueue

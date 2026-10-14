@@ -13,6 +13,10 @@ export async function migrate(database:Database) {
       await db.query(await readFile('src/backend/src/database/002_append_only.sql','utf8'));
       await db.query("INSERT INTO schema_migrations(version) VALUES('002')");
     }
+    if (!(await db.query("SELECT 1 FROM schema_migrations WHERE version='003'")).rowCount) {
+      await db.query(await readFile('src/backend/src/database/003_lambda.sql','utf8'));
+      await db.query("INSERT INTO schema_migrations(version) VALUES('003')");
+    }
   });
 }
 if (process.argv[1]?.endsWith('migrate.ts') || process.argv[1]?.endsWith('migrate.js')) {

@@ -48,6 +48,8 @@ npm run test:frontend
 
 Check production compilation separately:
 
+Lambda cases cover API Gateway v2 cookies, partial SQS batch failures, outbox rollback and duplicate delivery, lease recovery, old retry generations, shared auth throttling, and trusted CloudFront viewer addresses. These run locally; actual AWS networking and Lambda container execution require staging verification described in [the Lambda deployment guide](deploy/lambda/README.md).
+
 ```sh
 npm run build:backend
 npm run build --prefix src/frontend

@@ -20,7 +20,7 @@ export async function executeAgent(database:Database,runId:string,model:Model=be
         if (signal.aborted) throw new Error('Agent deadline exceeded.');
         const started=performance.now();
         const response=await model(state.messages,definitions,signal);
-        await database.pool.query('UPDATE agent_runs SET steps=$2 WHERE id=$1 AND attempts=$3',[runId,state.steps+1,tools.attempt]);
+        await database.pool.query('UPDATE agent_runs SET steps=$2 WHERE id=$1 AND attempts=$3 AND delivery_generation=$4',[runId,state.steps+1,tools.attempt,tools.generation]);
         await database.pool.query('INSERT INTO tool_traces(id,run_id,step,tool,inputs,outputs,duration_ms) VALUES($1,$2,$3,$4,$5,$6,$7)',
           [id('TRACE'),runId,1000+state.steps,'bedrock_converse',JSON.stringify({model:config.model,messageCount:state.messages.length}),JSON.stringify({content:response.content,usage:response.usage}),Math.round(performance.now()-started)]);
         return {messages:[...state.messages,{role:'assistant' as const,content:response.content}],
@@ -52,7 +52,7 @@ export async function executeAgent(database:Database,runId:string,model:Model=be
       .compile();
     await graph.invoke({messages:[{role:'user',content:[{text:'Assess the bound synthetic visit. Retrieve evidence, read the protocol, calculate a proposal and save it for human review.'}]}],steps:0,calls:[]},{recursionLimit:config.maxSteps*3,signal});
     if (!tools.isSaved()) throw new Error('No proposal saved.');
-    await database.pool.query("UPDATE agent_runs SET status=$2,finished_at=now(),lease_until=null WHERE id=$1 AND status='RUNNING' AND attempts=$3",
-      [runId,tools.isSufficient()?'WAITING_FOR_REVIEW':'REVIEW_REQUIRED',tools.attempt]);
+    await database.pool.query("UPDATE agent_runs SET status=$2,finished_at=now(),lease_until=null WHERE id=$1 AND status='RUNNING' AND attempts=$3 AND delivery_generation=$4",
+      [runId,tools.isSufficient()?'WAITING_FOR_REVIEW':'REVIEW_REQUIRED',tools.attempt,tools.generation]);
   } finally {await tools.close();}
 }
