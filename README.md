@@ -8,9 +8,9 @@ The project is being prepared for the **African Agentic AI Design Challenge**, i
 
 ## Project status
 
-**Specification phase — React + Vite frontend initialised; NestJS backend implementation has not started.**
+**Development prototype — React frontend, NestJS/PostgreSQL backend, and a hosted Bedrock agent workflow implemented.**
 
-This repository contains the React + Vite frontend starter, a documented NestJS backend scaffold, draft feature specifications and an evaluation plan. Backend requirements, data contracts and acceptance criteria still need review before implementation. Planned hospital features and infrastructure are not yet implemented or verified.
+The app supports synthetic registration, versioned observations, an agent-generated proposal, clinician approval and a persistent queue. The agent runs on Amazon Bedrock through LangGraph and real MCP tools. Clinical scoring remains an unvalidated test fixture; this is not a clinical deployment. See [backend setup and verified scope](src/backend/README.md), [implemented API contracts](specs/contracts.md), and [executed evaluations](EVALS.md).
 
 The competition prototype will use synthetic patient data. It is not a clinical deployment or a validated triage product.
 
@@ -211,9 +211,9 @@ No application or external submission has been made from this repository.
 
 ## Development setup
 
-The frontend package declares `dev`, `build` and `preview` Vite scripts. Run them from src/frontend after installing its dependencies; their execution has not been verified by this documentation correction. There is no NestJS runtime or complete system startup command yet.
+Install root and frontend dependencies, configure `.env`, start PostgreSQL, run `npm run db:migrate` and `npm run db:seed`, then start `npm run dev:backend` and `npm run dev --prefix src/frontend`. The app opens at http://localhost:5173. [Full setup instructions](src/backend/README.md) include the portable local PostgreSQL option and Bedrock configuration.
 
-After backend implementation, this section will document pinned versions, environment variables, synthetic seeds and a tested one-command full-system startup. It will distinguish real model runs from mocked UI demonstrations and include the hardware used.
+Dependency versions are locked. The backend and frontend builds and PostgreSQL integration tests have run; EVALS.md distinguishes the model test harness from the real hosted Bedrock run. No AWS hosting infrastructure has been provisioned.
 
 ## Sources
 

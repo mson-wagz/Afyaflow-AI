@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useBackend } from '../api/client.js';
 import { useOfflineSync } from './SyncContext';
 import { Card, Button, Badge, Alert } from '../components';
 import { SYNC_ITEM_TYPES, SYNC_STATUS } from '../../../shared/contracts/offline.js';
@@ -57,7 +58,7 @@ export default function OfflineSyncView() {
   const getStatusBadge = (status) => {
     switch (status) {
       case SYNC_STATUS.CONFIRMED:
-        return <Badge variant="online">Saved Demo State</Badge>;
+        return <Badge variant="online">{useBackend?"Confirmed Server State":"Saved Demo State"}</Badge>;
       case SYNC_STATUS.PENDING_SYNC:
         return <Badge variant="draft">Pending Reconnect Sync</Badge>;
       case SYNC_STATUS.FAILED_SYNC:

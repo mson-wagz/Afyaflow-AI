@@ -26,6 +26,8 @@ export default function useRouting(currentStaff) {
       if (cands.length > 0 && !selectedPatientId) {
         setSelectedPatientId(cands[0].id);
       }
+    } catch (error) {
+      setActionError(error.message);
     } finally {
       setLoading(false);
     }
@@ -47,6 +49,8 @@ export default function useRouting(currentStaff) {
       const result = await apiCommitDepartmentTransfer(currentStaff, {
         patientId: activeCandidate.id,
         departmentId,
+        assessmentVersion:activeCandidate.assessmentVersion,
+        departmentVersion:departments.find(d=>d.id===departmentId)?.version,
         rationale: activeCandidate.proposal?.evidenceRationale,
       });
 

@@ -1,4 +1,5 @@
 import React from 'react';
+import { useBackend } from '../../api/client.js';
 import useRegistration from './useRegistration';
 import { Card, Button, Input, Badge, Alert } from '../../components';
 
@@ -40,7 +41,7 @@ export default function RegistrationView({ currentStaff }) {
       {submissionStatus === 'confirmed' && submittedRecord && (
         <Alert
           variant="success"
-          title="Patient Registration Saved in Demo"
+          title={useBackend?"Patient Registration Confirmed by Server":"Patient Registration Saved in Demo"}
           onClose={resetForm}
         >
           <div>
@@ -49,7 +50,7 @@ export default function RegistrationView({ currentStaff }) {
             <code>{submittedRecord.id}</code>.
           </div>
           <div style={{ fontSize: '0.8rem', marginTop: '0.25rem', color: 'var(--color-success-dark)' }}>
-            Status: Queued for clinical triage assessment • Local demo timestamp:{' '}
+            Status: Queued for clinical triage assessment • {useBackend?"Server timestamp:":"Local demo timestamp:"}{' '}
             {new Date(submittedRecord.serverConfirmedAt).toLocaleTimeString()}
           </div>
           <div style={{ marginTop: '0.75rem' }}>
@@ -243,6 +244,7 @@ export default function RegistrationView({ currentStaff }) {
                 onChange={(e) => handleChange('avpu', e.target.value)}
                 className="form-select"
               >
+                <option value="">Not Recorded</option>
                 <option value="Alert">Alert (A)</option>
                 <option value="Voice">Responsive to Voice (V)</option>
                 <option value="Pain">Responsive to Pain (P)</option>
@@ -260,6 +262,7 @@ export default function RegistrationView({ currentStaff }) {
                 onChange={(e) => handleChange('mobility', e.target.value)}
                 className="form-select"
               >
+                <option value="">Not Recorded</option>
                 <option value="Walking normally">Walking normally</option>
                 <option value="Needs assistance to walk">Needs assistance to walk</option>
                 <option value="Immobile / Stretcher">Immobile / Stretcher</option>

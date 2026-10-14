@@ -1,0 +1,15 @@
+.git
+.local
+.env
+.env.*
+**/.env
+**/.env.*
+node_modules
+**/node_modules
+dist
+**/dist
+coverage
+**/coverage
+artifacts
+test-results
+playwright-report

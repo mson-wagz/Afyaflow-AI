@@ -1,0 +1,10 @@
+{
+  "id": "afyaflow-synthetic-adult-v1",
+  "name": "AfyaFlow synthetic adult scoring fixture",
+  "version": "demo-v1",
+  "population": "Synthetic adults aged 18 and above",
+  "authority": "Project test fixture; not an approved clinical protocol",
+  "clinicalValidated": false,
+  "requiredFields": ["heartRate", "systolicBp", "respiratoryRate", "temperature", "avpu"],
+  "purpose": "Exercise the human review workflow. The existing sample scorer is used only for synthetic demonstrations. A reviewed protocol must replace it before clinical use."
+}

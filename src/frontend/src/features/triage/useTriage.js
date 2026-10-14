@@ -19,6 +19,7 @@ export default function useTriage(currentStaff) {
   const [rejectModalOpen, setRejectModalOpen] = useState(false);
   const [reasonInput, setReasonInput] = useState('');
   const [targetOverridePriority, setTargetOverridePriority] = useState('ORANGE');
+  const [decisionCase, setDecisionCase] = useState(null);
 
   const loadProposals = useCallback(async () => {
     setLoading(true);
@@ -29,6 +30,8 @@ export default function useTriage(currentStaff) {
       if (data.length > 0 && !data.some(p => p.patientId === selectedPatientId)) {
         setSelectedPatientId(data[0].patientId);
       }
+    } catch (error) {
+      setActionError({code:error.code || 'LOAD_ERROR',message:error.message});
     } finally {
       setLoading(false);
     }
@@ -36,6 +39,8 @@ export default function useTriage(currentStaff) {
 
   useEffect(() => {
     loadProposals();
+    const timer=setInterval(loadProposals,5000);
+    return ()=>clearInterval(timer);
   }, [loadProposals]);
 
   const activeCase = proposals.find((p) => p.patientId === selectedPatientId) || proposals[0];
@@ -49,6 +54,7 @@ export default function useTriage(currentStaff) {
     try {
       const result = await apiSubmitClinicalDecision(currentStaff, {
         patientId: activeCase.patientId,
+        ...(activeCase.proposalId ? {proposalId:activeCase.proposalId} : {}),
         decision: CLINICAL_DECISION_TYPES.APPROVE,
         reason: 'Confirmed SATS deterministic protocol calculations and clinical discriminators.',
         toolTraceId: activeCase.toolTrace?.runId,
@@ -70,18 +76,19 @@ export default function useTriage(currentStaff) {
   };
 
   const handleReject = async () => {
-    if (!activeCase || actionInProgress) return;
+    if (!decisionCase || actionInProgress) return;
     setActionInProgress(true);
     setActionError(null);
     setActionSuccess(null);
 
     try {
       const result = await apiSubmitClinicalDecision(currentStaff, {
-        patientId: activeCase.patientId,
+        patientId: decisionCase.patientId,
         decision: CLINICAL_DECISION_TYPES.REJECT,
-        observationVersion: activeCase.observationVersion,
+        ...(decisionCase.proposalId ? {proposalId:decisionCase.proposalId} : {}),
+        observationVersion: decisionCase.observationVersion,
         reason: reasonInput,
-        toolTraceId: activeCase.toolTrace?.runId,
+        toolTraceId: decisionCase.toolTrace?.runId,
       });
 
       if (result.success) {
@@ -101,19 +108,20 @@ export default function useTriage(currentStaff) {
   };
 
   const handleOverride = async () => {
-    if (!activeCase || actionInProgress) return;
+    if (!decisionCase || actionInProgress) return;
     setActionInProgress(true);
     setActionError(null);
     setActionSuccess(null);
 
     try {
       const result = await apiSubmitClinicalDecision(currentStaff, {
-        patientId: activeCase.patientId,
+        patientId: decisionCase.patientId,
         decision: CLINICAL_DECISION_TYPES.OVERRIDE,
-        observationVersion: activeCase.observationVersion,
+        ...(decisionCase.proposalId ? {proposalId:decisionCase.proposalId} : {}),
+        observationVersion: decisionCase.observationVersion,
         overridePriority: TRIAGE_PRIORITY[targetOverridePriority],
         reason: reasonInput,
-        toolTraceId: activeCase.toolTrace?.runId,
+        toolTraceId: decisionCase.toolTrace?.runId,
       });
 
       if (result.success) {
@@ -154,9 +162,10 @@ export default function useTriage(currentStaff) {
     activeTrace,
     setActiveTrace,
     overrideModalOpen,
-    setOverrideModalOpen,
+    decisionCase,
+    setOverrideModalOpen: open => {if(open)setDecisionCase(activeCase);setOverrideModalOpen(open);},
     rejectModalOpen,
-    setRejectModalOpen,
+    setRejectModalOpen: open => {if(open)setDecisionCase(activeCase);setRejectModalOpen(open);},
     reasonInput,
     setReasonInput,
     targetOverridePriority,

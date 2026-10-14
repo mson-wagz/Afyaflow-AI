@@ -1,7 +1,26 @@
-# Custom MCP server
+# Run-scoped patient tools
 
-Owner: Mejja (backend developer 2), responsible for `feature/backend-patient-prioritisation`, `feature/backend-deterioration-monitoring` and shared MCP foundations. Review all tool contracts with the relevant feature owner.
+The custom MCP server exposes `get_observations`, `read_protocol`, `score_protocol`
+and `save_pending_proposal`. Every server instance is bound to one active run and
+its immutable observation version; model arguments cannot select another patient,
+write observations, set a priority, approve a decision or transfer a visit.
 
-Implement distinct typed tools for retrieving observations, scoring a protocol-based proposal and persisting a pending recommendation. Authenticate tool access and log calls. The agent cannot approve recommendations or mutate approved queues. Integrate the borrowed server through the agent service.
+The NestJS worker connects through a linked in-memory MCP transport, so the actual
+MCP SDK validates and dispatches tool calls without an unauthenticated network
+listener. `npm run start:mcp` is an optional stdio transport for a trusted local
+process and requires `AFYAFLOW_AGENT_RUN_ID` for an active leased run. Do not expose
+it to untrusted clients with application database credentials.
 
-Status: directory scaffold only; implementation follows specification review.
+`borrowed-protocol.ts` starts the official filesystem MCP reference server and calls
+only `read_text_file` on the fixed synthetic fixture. The model sees a zero-argument
+read_protocol wrapper, not general filesystem tools. The underlying reference
+server supports writes, so directory restrictions alone are not a write ban. The
+container makes the protocol directory non-writable to its runtime user; local
+Windows development relies on the host allowlist and exposes no write tool to the
+model. An external deployment must retain both controls.
+
+The fixture's name, version, required fields, observation ID/version, rule citations
+and deterministic score are stored in the proposal. It is not an approved SATS
+resource. Missing required values and unsupported ages produce staff review with
+no guessed urgency. The model may add a summary, but that summary cannot change
+the score or evidence persisted by the tool.
