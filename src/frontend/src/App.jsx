@@ -45,6 +45,10 @@ function AppShell() {
 
   return (
     <div className="app-container">
+      <div role="note" style={{padding:'0.6rem 1rem',backgroundColor:'#fff7ed',color:'#7c2d12'}}>
+        Synthetic demo — data is saved in this browser only. Server responses, protocol citations,
+        model activity, and MCP traces are simulated. Clinical scoring is not validated.
+      </div>
       {/* Shared-device lock screen overlay if locked */}
       {sessionStatus === SESSION_STATUS.LOCKED && <LockScreen />}
 
@@ -127,16 +131,16 @@ function AppShell() {
             }}
           >
             <div style={{ fontWeight: 600, color: 'var(--color-text)', marginBottom: '4px' }}>
-              System Integrity
+              Demo Workflow
             </div>
-            <div>• SATS v2026.1 protocol citations</div>
+            <div>• Simulated protocol citations</div>
             <div>• Human clinician review gate</div>
             <div>• Zero guessed measurements</div>
             <div>• Offline safe outbox retention</div>
           </div>
         </aside>
 
-        <main className="app-main" id="main-content" tabIndex={-1}>
+        <main hidden={sessionStatus === SESSION_STATUS.LOCKED} className="app-main" id="main-content" tabIndex={-1}>
           {currentView === 'registration' && <RegistrationView currentStaff={staff} />}
           {currentView === 'triage' && <TriageView currentStaff={staff} isClinical={isClinical} />}
           {currentView === 'queue' && <QueueView />}

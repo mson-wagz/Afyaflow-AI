@@ -75,7 +75,7 @@ describe('Triage & Prioritisation Feature Specification Tests', () => {
       });
 
       expect(resultWithReason.success).toBe(true);
-      expect(resultWithReason.data.serverAcknowledged).toBe(true);
+      expect(resultWithReason.data.simulation).toBe(true);
       expect(resultWithReason.data.decision).toBe('OVERRIDDEN');
     });
   });
@@ -90,7 +90,7 @@ describe('Triage & Prioritisation Feature Specification Tests', () => {
         expect(screen.getByText(/Kofi Mwangi/i)).toBeInTheDocument();
       });
 
-      const inspectButton = screen.getByRole('button', { name: /Inspect Tool Trace/i });
+      const inspectButton = screen.getByRole('button', { name: /Inspect simulated tool trace/i });
       fireEvent.click(inspectButton);
 
       await waitFor(() => {

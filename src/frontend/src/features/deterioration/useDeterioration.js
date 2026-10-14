@@ -51,6 +51,8 @@ export default function useDeterioration(currentStaff) {
       } else {
         setActionError(result.error);
       }
+    } catch (error) {
+      setActionError(error.message);
     } finally {
       setActionInProgress(false);
     }
@@ -82,10 +84,21 @@ export default function useDeterioration(currentStaff) {
       } else {
         setActionError(result.error);
       }
+    } catch (error) {
+      setActionError(error.message);
     } finally {
       setActionInProgress(false);
     }
   };
+
+  useEffect(() => {
+    window.addEventListener('afyaflow-demo-change', loadCases);
+    window.addEventListener('storage', loadCases);
+    return () => {
+      window.removeEventListener('afyaflow-demo-change', loadCases);
+      window.removeEventListener('storage', loadCases);
+    };
+  }, [loadCases]);
 
   return {
     cases,

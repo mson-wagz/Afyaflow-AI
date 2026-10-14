@@ -39,7 +39,7 @@ export default function QueueView() {
         >
           <div>{staleError}</div>
           <div style={{ fontSize: '0.8rem', marginTop: '4px' }}>
-            The queue displays the last verified server state. Unsynchronised local changes are not presented as confirmed.
+            The queue displays the last saved demo state. Unsynchronised local changes are not presented as confirmed.
           </div>
         </Alert>
       )}
@@ -48,17 +48,17 @@ export default function QueueView() {
       {workload && (
         <Card
           title="Facility Triage Workload Snapshot"
-          subtitle="Real-time department capacity, patient ratios, and staffing recommendations"
+          subtitle="Synthetic department capacity, patient ratios, and staffing recommendations"
           actions={
             <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-              {/*<Button
+              <Button
                 variant={simulatePollingFailure ? 'danger' : 'outline'}
                 size="sm"
                 onClick={() => setSimulatePollingFailure(!simulatePollingFailure)}
                 title="Toggle simulated polling network failure"
               >
                 {simulatePollingFailure ? '⚡ Restore Network' : '🔌 Simulate Polling Outage'}
-              </Button>*/}
+              </Button>
               <Button
                 variant="outline"
                 size="sm"
@@ -208,7 +208,7 @@ export default function QueueView() {
                     {pt.pendingProposal ? (
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
                         <Badge variant="warning">
-                          Pending Proposal: {pt.pendingProposal.priority.code}
+                          Pending Proposal: {pt.pendingProposal.priority?.code || 'REVIEW REQUIRED'}
                         </Badge>
                         <span style={{ fontSize: '0.7rem', color: 'var(--color-text-subtle)' }}>
                           * Does not change approved order
@@ -217,7 +217,7 @@ export default function QueueView() {
                     ) : pt.assessmentStatus === 'AWAITING_ASSESSMENT' ? (
                       <Badge variant="admin">Awaiting Assessment</Badge>
                     ) : (
-                      <Badge variant="online">Confirmed Server State</Badge>
+                      <Badge variant="online">{pt.assessmentStatus === 'REJECTED_REQUIRES_REASSESSMENT' ? 'Reassessment Required' : 'Saved Demo State'}</Badge>
                     )}
                   </td>
                   <td style={{ padding: '0.75rem 0.5rem', color: 'var(--color-text-muted)' }}>

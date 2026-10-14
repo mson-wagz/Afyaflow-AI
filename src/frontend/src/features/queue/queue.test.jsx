@@ -66,7 +66,7 @@ describe('Queue Management Feature Specification Tests', () => {
       render(<QueueView />);
 
       await waitFor(() => {
-        expect(screen.getByText(/Live Approved Queue/i)).toBeInTheDocument();
+        expect(screen.getByRole('button', {name:/Simulate Polling Outage/i})).toBeInTheDocument();
       });
 
       // Toggle simulated polling outage

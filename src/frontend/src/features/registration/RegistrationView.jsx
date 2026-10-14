@@ -33,10 +33,14 @@ export default function RegistrationView({ currentStaff }) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
       {/* Status Alerts */}
+      {submissionStatus === 'pending' && <Alert variant="warning" title="Offline Draft Saved">
+        This intake is pending reconnect sync and is not yet in the demo queue.
+        <Button variant="outline" onClick={resetForm}>Register Next Patient</Button>
+      </Alert>}
       {submissionStatus === 'confirmed' && submittedRecord && (
         <Alert
           variant="success"
-          title="Patient Registration Confirmed by Server"
+          title="Patient Registration Saved in Demo"
           onClose={resetForm}
         >
           <div>
@@ -45,7 +49,7 @@ export default function RegistrationView({ currentStaff }) {
             <code>{submittedRecord.id}</code>.
           </div>
           <div style={{ fontSize: '0.8rem', marginTop: '0.25rem', color: 'var(--color-success-dark)' }}>
-            Status: Queued for clinical triage assessment • Server timestamp:{' '}
+            Status: Queued for clinical triage assessment • Local demo timestamp:{' '}
             {new Date(submittedRecord.serverConfirmedAt).toLocaleTimeString()}
           </div>
           <div style={{ marginTop: '0.75rem' }}>
@@ -87,7 +91,7 @@ export default function RegistrationView({ currentStaff }) {
         </Alert>
       )}
 
-      <form onSubmit={handleSubmit}>
+      <form noValidate onSubmit={handleSubmit}>
         {/* Section 1: Demographics */}
         <Card
           title="Patient Registration & Visit Intake"

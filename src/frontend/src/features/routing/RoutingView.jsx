@@ -32,7 +32,7 @@ export default function RoutingView({ currentStaff, isClinical = false }) {
       {actionSuccess && (
         <Alert
           variant="success"
-          title="Department Transfer Committed by Server"
+          title="Department Transfer Saved in Demo"
           onClose={clearMessages}
         >
           <div>
@@ -54,7 +54,7 @@ export default function RoutingView({ currentStaff, isClinical = false }) {
       {/* Facility Service Snapshot (FE-DEPARTMENT-ROUTING-01) */}
       <Card
         title="Facility Department Availability & Capacity Snapshot"
-        subtitle="Real-time bed occupancy and department operational status at Kenyatta National Hospital"
+        subtitle="Synthetic bed occupancy and department operational status at Kenyatta National Hospital"
       >
         <div
           style={{

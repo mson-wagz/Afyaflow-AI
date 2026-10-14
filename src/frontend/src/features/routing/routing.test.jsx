@@ -38,11 +38,11 @@ describe('Department Routing Feature Specification Tests', () => {
       expect(proposal.recommendedDepartment.code).toBe('PAEDS');
     });
 
-    it('renders urgency preservation notice and department service availability in UI', () => {
+    it('renders urgency preservation notice and department service availability in UI', async () => {
       render(<RoutingView currentStaff={{ id: 'STAFF-101', name: 'Jane Mwangi' }} isClinical={true} />);
 
       expect(screen.getByText(/Facility Department Availability & Capacity Snapshot/i)).toBeInTheDocument();
-      expect(screen.getByText(/Clinical Urgency Preservation Policy \(ROUTE-04\)/i)).toBeInTheDocument();
+      expect(await screen.findByText(/Clinical Urgency Preservation Policy \(ROUTE-04\)/i)).toBeInTheDocument();
     });
   });
 
@@ -51,13 +51,13 @@ describe('Department Routing Feature Specification Tests', () => {
       const nurse = { id: 'STAFF-101', name: 'Jane Mwangi, RN', role: 'nurse' };
 
       const result = await apiCommitDepartmentTransfer(nurse, {
-        patientId: 'SYN-PT-8821',
+        patientId: 'SYN-PT-8812',
         departmentId: 'DEP-EMERGENCY',
         rationale: 'Confirmed transfer to Resus bay.',
       });
 
       expect(result.success).toBe(true);
-      expect(result.data.serverAcknowledged).toBe(true);
+      expect(result.data.simulation).toBe(true);
       expect(result.data.department).toMatch(/Emergency/i);
       expect(result.data.clinicianName).toBe(nurse.name);
     });

@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useId } from 'react';
+import { useState, useEffect, useCallback, useContext } from 'react';
 import {
   validatePatientRegistration,
   validateObservationData,
@@ -7,9 +7,12 @@ import {
 } from '../../../../shared/contracts/patient.js';
 import { apiRegisterPatient } from './apiAdapter';
 
+import { SyncContext } from '../../offline/SyncContext.jsx';
+
 const REGISTRATION_DRAFT_KEY = 'afyaflow_patient_reg_draft_v1';
 
 export default function useRegistration(currentStaff) {
+  const sync = useContext(SyncContext);
   const [formData, setFormData] = useState(() => {
     try {
       const saved = localStorage.getItem(REGISTRATION_DRAFT_KEY);
@@ -43,13 +46,18 @@ export default function useRegistration(currentStaff) {
   // Save draft on change
   useEffect(() => {
     try {
-      localStorage.setItem(REGISTRATION_DRAFT_KEY, JSON.stringify(formData));
+      if (['confirmed','duplicate','pending'].includes(submissionStatus)) localStorage.removeItem(REGISTRATION_DRAFT_KEY);
+      else localStorage.setItem(REGISTRATION_DRAFT_KEY, JSON.stringify(formData));
     } catch {
       // ignore
     }
-  }, [formData]);
+  }, [formData, submissionStatus]);
 
   const handleChange = (field, value) => {
+    if (['confirmed','duplicate','pending'].includes(submissionStatus)) {
+      setSubmissionStatus('idle'); setSubmittedRecord(null);
+      setIdempotencyKey(generateSubmissionIdempotencyKey('new_reg'));
+    }
     setFormData((prev) => {
       const updated = { ...prev, [field]: value };
       return updated;
@@ -85,7 +93,8 @@ export default function useRegistration(currentStaff) {
   }, [formData]);
 
   const submitRegistration = async () => {
-    const { isValid, errors } = validate();
+    if (submissionStatus === 'submitting') return false;
+    const { isValid } = validate();
     if (!isValid) {
       setSubmissionStatus('error');
       setErrorMessage('Please correct validation errors before submitting.');
@@ -96,6 +105,12 @@ export default function useRegistration(currentStaff) {
     setErrorMessage('');
 
     try {
+      if (sync && !sync.isOnline) {
+        sync.queueItem('REGISTRATION_DRAFT', 'Patient Intake: '+formData.name,
+          {...formData,staffId:currentStaff?.id}, idempotencyKey);
+        setSubmissionStatus('pending');
+        return true;
+      }
       const result = await apiRegisterPatient(
         {
           ...formData,
@@ -110,8 +125,7 @@ export default function useRegistration(currentStaff) {
 
         // Reset draft storage
         localStorage.removeItem(REGISTRATION_DRAFT_KEY);
-        // Refresh idempotency key for next patient
-        setIdempotencyKey(generateSubmissionIdempotencyKey('new_reg'));
+        // Keep the submission key until starting or editing another intake.
         return true;
       } else {
         setSubmissionStatus('error');

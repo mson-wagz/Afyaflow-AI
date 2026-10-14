@@ -25,7 +25,8 @@ export default function useTriage(currentStaff) {
     try {
       const data = await apiGetPendingTriageProposals();
       setProposals(data);
-      if (data.length > 0 && !selectedPatientId) {
+      setDecisionHistory(apiGetTriageDecisionHistory());
+      if (data.length > 0 && !data.some(p => p.patientId === selectedPatientId)) {
         setSelectedPatientId(data[0].patientId);
       }
     } finally {
@@ -51,6 +52,7 @@ export default function useTriage(currentStaff) {
         decision: CLINICAL_DECISION_TYPES.APPROVE,
         reason: 'Confirmed SATS deterministic protocol calculations and clinical discriminators.',
         toolTraceId: activeCase.toolTrace?.runId,
+        observationVersion: activeCase.observationVersion,
       });
 
       if (result.success) {
@@ -60,8 +62,8 @@ export default function useTriage(currentStaff) {
       } else {
         setActionError(result.error);
       }
-    } catch {
-      setActionError({ status: 500, message: 'Server communication error during decision submission.' });
+    } catch (error) {
+      setActionError({code:'DEMO_STORAGE_ERROR',message:error.message});
     } finally {
       setActionInProgress(false);
     }
@@ -77,6 +79,7 @@ export default function useTriage(currentStaff) {
       const result = await apiSubmitClinicalDecision(currentStaff, {
         patientId: activeCase.patientId,
         decision: CLINICAL_DECISION_TYPES.REJECT,
+        observationVersion: activeCase.observationVersion,
         reason: reasonInput,
         toolTraceId: activeCase.toolTrace?.runId,
       });
@@ -90,6 +93,8 @@ export default function useTriage(currentStaff) {
       } else {
         setActionError(result.error);
       }
+    } catch (error) {
+      setActionError({code:'DEMO_STORAGE_ERROR',message:error.message});
     } finally {
       setActionInProgress(false);
     }
@@ -105,6 +110,7 @@ export default function useTriage(currentStaff) {
       const result = await apiSubmitClinicalDecision(currentStaff, {
         patientId: activeCase.patientId,
         decision: CLINICAL_DECISION_TYPES.OVERRIDE,
+        observationVersion: activeCase.observationVersion,
         overridePriority: TRIAGE_PRIORITY[targetOverridePriority],
         reason: reasonInput,
         toolTraceId: activeCase.toolTrace?.runId,
@@ -119,10 +125,21 @@ export default function useTriage(currentStaff) {
       } else {
         setActionError(result.error);
       }
+    } catch (error) {
+      setActionError({code:'DEMO_STORAGE_ERROR',message:error.message});
     } finally {
       setActionInProgress(false);
     }
   };
+
+  useEffect(() => {
+    window.addEventListener('afyaflow-demo-change', loadProposals);
+    window.addEventListener('storage', loadProposals);
+    return () => {
+      window.removeEventListener('afyaflow-demo-change', loadProposals);
+      window.removeEventListener('storage', loadProposals);
+    };
+  }, [loadProposals]);
 
   return {
     proposals,

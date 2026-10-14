@@ -45,7 +45,7 @@ export default function TriageView({ currentStaff, isClinical = false }) {
       {actionSuccess && (
         <Alert
           variant="success"
-          title="Clinical Decision Server-Acknowledged"
+          title="Clinical Decision Saved in Demo"
           onClose={clearMessages}
         >
           <div>
@@ -100,7 +100,7 @@ export default function TriageView({ currentStaff, isClinical = false }) {
                 variant="outline"
                 size="sm"
                 onClick={() => setActiveTrace(activeCase.toolTrace)}
-                aria-label="Inspect agent tool trace"
+                aria-label="Inspect simulated tool trace"
               >
                 🔍 Inspect Tool Trace
               </Button>
@@ -233,7 +233,7 @@ export default function TriageView({ currentStaff, isClinical = false }) {
               </div>
             )}
             <div style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)', marginTop: '4px' }}>
-              * Proposals do not alter hospital queues until an authorised clinician records a server-acknowledged decision.
+              * Proposals do not alter hospital queues until an authorised clinician records a decision in this local demo.
             </div>
           </div>
 
@@ -335,7 +335,7 @@ export default function TriageView({ currentStaff, isClinical = false }) {
         <Modal
           isOpen={Boolean(activeTrace)}
           onClose={() => setActiveTrace(null)}
-          title={`MCP Tool Trace Inspector: ${activeTrace.runId}`}
+          title={`Simulated MCP Tool Trace Inspector: ${activeTrace.runId}`}
           maxWidth="640px"
           footer={
             <Button variant="secondary" onClick={() => setActiveTrace(null)}>
@@ -345,7 +345,7 @@ export default function TriageView({ currentStaff, isClinical = false }) {
         >
           <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', fontSize: '0.85rem' }}>
             <div>
-              <strong>Model Execution:</strong> <code>{activeTrace.model}</code>
+              <strong>Simulated model:</strong> <code>{activeTrace.model}</code>
             </div>
             <div>
               <strong>Timestamp:</strong> {new Date(activeTrace.timestamp).toLocaleString()}
@@ -353,7 +353,7 @@ export default function TriageView({ currentStaff, isClinical = false }) {
 
             <div>
               <h4 style={{ fontWeight: 700, marginBottom: '0.5rem' }}>
-                Tool Execution Pipeline ({activeTrace.toolCalls.length} tool calls)
+                Simulated Tool Pipeline ({activeTrace.toolCalls.length} tool calls)
               </h4>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
                 {activeTrace.toolCalls.map((tc, idx) => (
