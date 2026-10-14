@@ -28,31 +28,31 @@ The detailed requirement, data-model and contract documents are pending. Task ID
 
 ### APP-01 — Database and synthetic fixtures
 
-Own `src/backend/database/` and patient persistence in `src/backend/modules/patients/`.
+Own `src/backend/src/database/` and patient persistence in `src/backend/src/modules/patients/`.
 
 Deliver reviewed schema, migrations and synthetic seed data for visits, observations, pending recommendations, decisions and audit references. Preserve timestamped observation history and version each assessment input. Verify fixtures load reproducibly and versions advance correctly.
 
 ### APP-02 — Staff access and permissions
 
-Own `src/backend/auth/`.
+Own `src/backend/src/auth/`.
 
 Implement authenticated staff identity, session locking support and role checks. Separate administrative permissions from clinical approval permissions. Verify anonymous and unauthorised approval attempts fail without state changes.
 
 ### APP-03 — Patient and observation APIs
 
-Own `src/app/api/patients/`, `src/app/api/observations/` and associated backend operations.
+Own `src/backend/src/modules/patients/`, `src/backend/src/modules/observations/` and associated backend operations.
 
 Implement contract-defined validation, units, staff attribution and retry-safe writes. Verify duplicate submissions create one logical observation and missing or invalid fields produce documented errors. Coordinate offline draft sync with JecintaK.
 
 ### APP-04 — Recommendation and approval APIs
 
-Own `src/app/api/recommendations/`, `src/backend/modules/triage/` and `src/backend/modules/approvals/`.
+Own `src/backend/src/modules/triage/`, `src/backend/src/modules/triage/` and `src/backend/src/modules/approvals/`.
 
 Expose recommendation status and a controlled agent-to-application interface for persisting proposals. Enforce clinician identity, current observation version and decision reason. Commit decision history and approved queue updates atomically. Verify stale proposals and duplicate decisions cannot change the queue incorrectly.
 
 ### APP-05 — Approved queue and waiting times
 
-Own `src/backend/modules/queue/` and its API entry points when specified.
+Own `src/backend/src/modules/queue/` and its API entry points when specified.
 
 Expose approved queue state, arrival-based waiting times and assessment status. Pending recommendations remain separate from approved ordering. Verify patients stay visible when agent execution fails. Review response shapes with JecintaK.
 

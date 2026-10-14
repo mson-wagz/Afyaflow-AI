@@ -26,7 +26,7 @@ Sourced recommendation review and clinical decisions.
 Protocol scoring and decision contracts in `src/shared/contracts/triage.js`.
 Primary UI location: `src/frontend/src/features/triage/`.
 
-## Verification results
+Primary UI location: `src/frontend/src/features/triage/`. Use src/frontend/src/pages for React page components and src/frontend/public for non-sensitive assets. Client routing will be selected during contract review. Import browser-safe schemas from src/shared/contracts; never import backend/database/model credentials into browser code.
 
 Automated test verification:
 - `FE-PATIENT-PRIORITISATION-01`: Verified SATS v2026.1 protocol citations and discriminator rule display.
