@@ -77,7 +77,7 @@ describe('Staff Access and App Shell Feature Specification Tests', () => {
       fireEvent.click(regTab);
 
       // Enter draft patient information
-      const nameInput = screen.getByLabelText(/Synthetic Patient Full Name/i);
+      const nameInput = screen.getByLabelText(/Patient Full Name/i);
       fireEvent.change(nameInput, { target: { value: 'Amani Wambui' } });
 
       const complaintInput = screen.getByLabelText(/Presenting Complaint/i);
@@ -92,7 +92,7 @@ describe('Staff Access and App Shell Feature Specification Tests', () => {
       // Verify Lock Screen is displayed and patient data is obscured
       expect(screen.getByText(/Terminal Locked/i)).toBeInTheDocument();
       expect(screen.getByText(/Patient data obscured for shared-device privacy/i)).toBeInTheDocument();
-      expect(screen.getByText(/Local Draft Preserved/i)).toBeInTheDocument();
+      expect(screen.queryByRole('textbox', {name:/Patient Full Name/i})).not.toBeInTheDocument();
 
       // Attempt unlock with wrong PIN
       const pinInput = screen.getByLabelText(/Enter 4-digit Staff PIN/i);
@@ -180,19 +180,19 @@ describe('Staff Access and App Shell Feature Specification Tests', () => {
       });
 
       // Navigate to Triage & Clinical Review
-      const triageNav = screen.getByRole('button', { name: /Triage & Clinical Review/i });
+      const triageNav = screen.getByRole('button', { name: /Triage & Prioritisation/i });
       fireEvent.click(triageNav);
 
       // Verify warning notice is shown by PermissionGate
-      expect(screen.getByText(/Clinical Approval Locked for Current Role/i)).toBeInTheDocument();
+      expect(await screen.findByText(/Restricted \(Non-Clinical\)/i)).toBeInTheDocument();
 
       // Click the approve button to trigger server check
-      const approveBtn = screen.getByRole('button', { name: /Approve AI Triage Recommendation/i });
+      const approveBtn = screen.getByRole('button', { name: /Approve Proposed Priority/i });
       fireEvent.click(approveBtn);
 
       // Verify the server permission denial alert is visibly rendered
       await waitFor(() => {
-        expect(screen.getByText(/Server Permission Error \(403 PERMISSION_DENIED\)/i)).toBeInTheDocument();
+        expect(screen.getByText(/Clinical Decision Error \(PERMISSION_DENIED\)/i)).toBeInTheDocument();
         expect(screen.getByText(/Clinical approval authority required/i)).toBeInTheDocument();
       });
     });

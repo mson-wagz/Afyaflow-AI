@@ -43,6 +43,15 @@ export default function useQueue(initialPollInterval = 15000) {
     return item.assignedDepartment.toLowerCase().includes(departmentFilter.toLowerCase());
   });
 
+  useEffect(() => {
+    window.addEventListener('afyaflow-demo-change', fetchQueue);
+    window.addEventListener('storage', fetchQueue);
+    return () => {
+      window.removeEventListener('afyaflow-demo-change', fetchQueue);
+      window.removeEventListener('storage', fetchQueue);
+    };
+  }, [fetchQueue]);
+
   return {
     queue: filteredQueue,
     rawQueue: queue,
