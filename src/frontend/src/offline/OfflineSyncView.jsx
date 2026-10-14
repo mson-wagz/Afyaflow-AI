@@ -9,7 +9,7 @@ import { SYNC_ITEM_TYPES, SYNC_STATUS } from '../../../shared/contracts/offline.
  * Fulfills FE-OFFLINE-PWA-01 through 03:
  * - App-shell status, local drafts, and reconnect retry.
  * - Distinct draft, pending, failed, and confirmed sync states.
- * - Enforces that clinical approvals require online server acknowledgement.
+ * - Enforces that clinical approvals require online connectivity in this demo.
  */
 export default function OfflineSyncView() {
   const {
@@ -32,7 +32,7 @@ export default function OfflineSyncView() {
       queueItem(
         SYNC_ITEM_TYPES.REGISTRATION_DRAFT,
         `Offline Patient Registration #${Math.floor(100 + Math.random() * 900)}`,
-        { name: 'Simulated Offline Patient', complaint: 'Fever' }
+        { name: 'Simulated Offline Patient', age:30, gender:'Female', presentingComplaint:'Synthetic test: Fever' }
       );
       setNotification('Offline draft queued into local sync outbox.');
       setTimeout(() => setNotification(''), 3000);
@@ -57,7 +57,7 @@ export default function OfflineSyncView() {
   const getStatusBadge = (status) => {
     switch (status) {
       case SYNC_STATUS.CONFIRMED:
-        return <Badge variant="online">Confirmed Server State</Badge>;
+        return <Badge variant="online">Saved Demo State</Badge>;
       case SYNC_STATUS.PENDING_SYNC:
         return <Badge variant="draft">Pending Reconnect Sync</Badge>;
       case SYNC_STATUS.FAILED_SYNC:
@@ -69,6 +69,7 @@ export default function OfflineSyncView() {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+      {lastSyncResult?.error && <Alert variant="danger" title="Demo Sync Error">{lastSyncResult.error}</Alert>}
       {/* Network Status Banner */}
       <Card
         title="Network Status & PWA Outbox Synchronization"
@@ -95,7 +96,7 @@ export default function OfflineSyncView() {
           </div>
           {lastSyncResult && (
             <div style={{ color: 'var(--color-success-dark)', fontSize: '0.8rem' }}>
-              ✓ Last sync at {new Date(lastSyncResult.timestamp).toLocaleTimeString()} ({lastSyncResult.itemsSynced} records confirmed)
+              ✓ Last sync at {new Date(lastSyncResult.timestamp).toLocaleTimeString()} ({lastSyncResult.itemsSynced} demo records saved)
             </div>
           )}
 
@@ -111,8 +112,8 @@ export default function OfflineSyncView() {
           >
             <strong>Hospital Offline Safety Policy:</strong>
             <ul style={{ paddingLeft: '1.25rem', marginTop: '4px' }}>
-              <li>Patient intake and observation drafts can be captured offline and will auto-sync on reconnect.</li>
-              <li>Clinical triage decisions and shared queue ordering strictly require online server acknowledgement.</li>
+              <li>Patient intake drafts can be captured offline and saved to the local demo registry on reconnect.</li>
+              <li>Clinical triage decisions and shared queue ordering strictly require online connectivity in this demo.</li>
               <li>Offline drafts are never presented to other terminals as confirmed queue state.</li>
             </ul>
           </div>
@@ -165,7 +166,7 @@ export default function OfflineSyncView() {
       {/* Outbox Records Table */}
       <Card
         title="Sync Outbox & Local Queue"
-        subtitle="Chronological list of local drafts and server transmission states"
+        subtitle="Chronological list of local drafts and local demo sync states"
       >
         <div style={{ overflowX: 'auto' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.85rem' }}>
