@@ -4,6 +4,10 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "test": "npm run test:backend && npm run test:frontend",
+    "test:frontend": "npm test --prefix src/frontend",
+    "test:unit": "tsx --test tests/backend/unit.test.ts && npm run test:unit --prefix src/frontend",
+    "test:integration": "tsx --test --test-concurrency=1 tests/backend/workflow.test.ts && npm run test:integration --prefix src/frontend",
     "dev:backend": "tsx src/backend/src/main.ts",
     "dev:db": "tsx scripts/local-postgres.ts",
     "db:migrate": "tsx src/backend/src/database/migrate.ts",

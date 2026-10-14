@@ -211,6 +211,8 @@ No application or external submission has been made from this repository.
 
 ## Development setup
 
+See [TESTING.md](TESTING.md) for unit tests, PostgreSQL/HTTP integration tests, and the commands to run the full suite.
+
 Install root and frontend dependencies, configure `.env`, start PostgreSQL, run `npm run db:migrate` and `npm run db:seed`, then start `npm run dev:backend` and `npm run dev --prefix src/frontend`. The app opens at http://localhost:5173. [Full setup instructions](src/backend/README.md) include the portable local PostgreSQL option and Bedrock configuration.
 
 Dependency versions are locked. The backend and frontend builds and PostgreSQL integration tests have run; EVALS.md distinguishes the model test harness from the real hosted Bedrock run. No AWS hosting infrastructure has been provisioned.

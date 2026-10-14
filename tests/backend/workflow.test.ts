@@ -159,3 +159,94 @@ test('database prevents edits to observation and audit history',async()=>{
   await assert.rejects(database.pool.query("UPDATE observations SET vitals='{}' WHERE visit_id='SYN-PT-8821'"),/append-only/);
   await assert.rejects(database.pool.query("DELETE FROM audit_events WHERE visit_id='SYN-PT-8821'"),/append-only/);
 });
+
+async function loginAs(identifier:string,pin:string) {
+  const response=await fetch(`${base}/api/auth/login`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({identifier,pin})});
+  assert.equal(response.status,201);
+  return response.headers.get('set-cookie')!.split(';')[0];
+}
+async function post(path:string,session:string,body:unknown,key=randomUUID()) {
+  return fetch(`${base}/api${path}`,{method:'POST',headers:{Cookie:session,'Content-Type':'application/json','Idempotency-Key':key},body:JSON.stringify(body)});
+}
+async function get(path:string,session:string) {
+  const response=await fetch(`${base}/api${path}`,{headers:{Cookie:session}});
+  assert.equal(response.status,200);
+  return response.json();
+}
+
+test('HTTP journey connects registration, MCP evidence, clinician approval, routing and audit',async()=>{
+  const session=await loginAs('STAFF-102','2345');
+  const key=randomUUID();
+  const response=await post('/visits',session,intake,key);
+  assert.equal(response.status,201);
+  const registered=await response.json(),visitId=registered.data.id;
+  const repeated=await post('/visits',session,intake,key);
+  assert.equal(repeated.status,201);
+  assert.equal((await repeated.json()).data.id,visitId);
+  assert.equal((await get('/queue',session)).queue.find((v:any)=>v.visitId===visitId).approvedPriority,null);
+  await assess(visitId);
+  const proposal=(await get('/triage/proposals',session)).find((p:any)=>p.patientId===visitId);
+  assert.ok(proposal.toolTrace.toolCalls.some((call:any)=>call.tool==='score_protocol'));
+  const reviewed=await post('/triage/decisions',session,{
+    patientId:visitId,proposalId:proposal.proposalId,observationVersion:proposal.observationVersion,
+    decision:'APPROVED',reason:'Synthetic evidence reviewed through HTTP.',
+  });
+  assert.equal(reviewed.status,201);
+  const approved=await reviewed.json();
+  const candidate=(await get('/routing/candidates',session)).find((v:any)=>v.id===visitId);
+  const departments=await get('/departments',session);
+  const department=departments.find((d:any)=>d.id==='DEP-GOPD');
+  const transfer=await post('/routing/transfers',session,{
+    patientId:visitId,departmentId:department.id,assessmentVersion:candidate.assessmentVersion,
+    departmentVersion:department.version,rationale:'Synthetic department review through HTTP.',
+  });
+  assert.equal(transfer.status,201);
+  const transferred=await transfer.json();
+  const queued=(await get('/queue',session)).queue.find((v:any)=>v.visitId===visitId);
+  assert.equal(queued.approvedPriority.code,approved.data.priority.code);
+  assert.match(queued.assignedDepartment,/General Outpatient/);
+  assert.equal((await get('/triage/proposals',session)).some((p:any)=>p.patientId===visitId),false);
+  const audit=await get('/audit',session);
+  for(const [eventType,reference] of [
+    ['PATIENT_REGISTERED',registered.data.agentRunId],
+    ['CLINICAL_DECISION_COMMITTED',approved.data.decisionId],
+    ['DEPARTMENT_TRANSFERRED',transferred.data.transferId],
+  ]) assert.ok(audit.some((event:any)=>event.eventType===eventType && event.details.includes(reference)));
+});
+
+test('HTTP rejects missing retry headers and conflicting retries without duplicate visits',async()=>{
+  const session=await loginAs('STAFF-101','1234');
+  const before=(await get('/visits',session)).length;
+  const missing=await fetch(`${base}/api/visits`,{method:'POST',headers:{Cookie:session,'Content-Type':'application/json'},body:JSON.stringify(intake)});
+  assert.equal(missing.status,400);
+  assert.equal((await missing.json()).code,'IDEMPOTENCY_KEY_REQUIRED');
+  const key=randomUUID();
+  assert.equal((await post('/visits',session,intake,key)).status,201);
+  const conflict=await post('/visits',session,{...intake,name:'Different Synthetic Patient'},key);
+  assert.equal(conflict.status,409);
+  assert.equal((await conflict.json()).code,'IDEMPOTENCY_CONFLICT');
+  assert.equal((await get('/visits',session)).length,before+1);
+});
+
+test('HTTP observation updates invalidate evidence and ignore forged clinical identity',async()=>{
+  const session=await loginAs('STAFF-101','1234'),clerkSession=await loginAs('STAFF-103','3456');
+  const response=await post('/visits',session,intake);
+  assert.equal(response.status,201);
+  const visitId=(await response.json()).data.id,proposal=await assess(visitId);
+  const body={patientId:visitId,proposalId:proposal.proposalId,observationVersion:1,
+    decision:'OVERRIDDEN',overridePriority:'ORANGE',reason:'Synthetic HTTP override.'};
+  // An extra header cannot change the role from the authenticated cookie.
+  const denied=await fetch(`${base}/api/triage/decisions`,{method:'POST',headers:{Cookie:clerkSession,
+    'Content-Type':'application/json','Idempotency-Key':randomUUID(),'X-Staff-Id':'STAFF-101'},body:JSON.stringify(body)});
+  assert.equal(denied.status,403);
+  assert.equal((await denied.json()).code,'PERMISSION_DENIED');
+  const changed=await post(`/visits/${visitId}/observations`,session,{expectedVersion:1,vitals:{heartRate:100}});
+  assert.equal(changed.status,201);
+  assert.equal((await changed.json()).data.observationVersion,2);
+  assert.equal((await post('/triage/decisions',session,body)).status,409);
+  assert.equal((await post(`/visits/${visitId}/observations`,session,{expectedVersion:1,vitals:{heartRate:101}})).status,409);
+  const visit=(await get('/visits',session)).find((v:any)=>v.id===visitId);
+  assert.equal(visit.approvedPriority,null);
+  assert.equal(visit.observationVersion,2);
+  assert.equal((await database.pool.query('SELECT count(*) FROM decisions WHERE visit_id=$1',[visitId])).rows[0].count,'0');
+});
