@@ -25,7 +25,7 @@ Department proposals and clinician routing decisions.
 Routing contracts and department definitions in `src/shared/contracts/routing.js`.
 Primary UI location: `src/frontend/src/features/routing/`.
 
-## Verification results
+Primary UI location: `src/frontend/src/features/routing/`. Use src/frontend/src/pages for React page components and src/frontend/public for non-sensitive assets. Client routing will be selected during contract review. Import browser-safe schemas from src/shared/contracts; never import backend/database/model credentials into browser code.
 
 Automated test verification:
 - `FE-DEPARTMENT-ROUTING-01`: Verified department availability snapshots displaying bed occupancy and service status.

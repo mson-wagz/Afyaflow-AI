@@ -21,7 +21,7 @@ As a triage nurse, I can review a protocol-based proposed priority with its reco
 - [ ] Agree proposal, tool, trace and approval contracts with mson-wagz: APP-04 and AGENT-02.
 - [ ] Implement deterministic scorer and distinct custom MCP tools; integrate borrowed protocol retrieval: AGENT-01 through AGENT-03.
 - [ ] Implement local model execution, LangGraph review pause and recovery: AGENT-04/05.
-- [ ] Implement evidence and decision UI in src/frontend/features/triage/.
+- [ ] Implement evidence and decision UI in src/frontend/src/features/triage/.
 - [ ] Verify TRIAGE-01 through TRIAGE-06 and record actual repeated-run evidence: AGENT-06, with APP-06.
 
 ## Review questions and completion gate
