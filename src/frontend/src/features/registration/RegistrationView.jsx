@@ -16,11 +16,12 @@ export default function RegistrationView({ currentStaff }) {
     formData,
     validationErrors,
     missingObservations,
+    measurementValidation,
     submissionStatus,
     submittedRecord,
     errorMessage,
     handleChange,
-    validate,
+    validateMeasurements,
     submitRegistration,
     resetForm,
     units,
@@ -270,11 +271,31 @@ export default function RegistrationView({ currentStaff }) {
             </div>
           </div>
 
+          {measurementValidation && (
+            <div style={{ marginTop: '1rem' }}>
+              <Alert
+                variant={!measurementValidation.valid ? 'danger' : measurementValidation.missingFields.length ? 'warning' : 'success'}
+                title={!measurementValidation.valid ? 'Please correct the measurements' : measurementValidation.missingFields.length ? 'Measurements are incomplete' : 'Measurement checks passed'}
+              >
+                {!measurementValidation.valid && (
+                  <ul>{Object.entries(measurementValidation.errors).map(([field, message]) => <li key={field}>{message}</li>)}</ul>
+                )}
+                {measurementValidation.missingFields.length > 0 && (
+                  <p>Not recorded: {measurementValidation.missingFields.join(', ')}. Missing measurements will require staff review.</p>
+                )}
+                {measurementValidation.valid && measurementValidation.missingFields.length === 0 && (
+                  <p>All measurements are recorded and within the supported entry ranges. This does not mean the readings are clinically normal. Clinical review is still required.</p>
+                )}
+                <p>Validation does not save or register this visit. Use Confirm &amp; Register Visit to submit it.</p>
+              </Alert>
+            </div>
+          )}
+
           <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', marginTop: '1.25rem' }}>
             <Button
               type="button"
               variant="outline"
-              onClick={validate}
+              onClick={validateMeasurements}
             >
               Validate Measurements
             </Button>
