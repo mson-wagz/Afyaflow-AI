@@ -10,71 +10,8 @@ import {
   calculateSatsScore,
   CLINICAL_DECISION_TYPES,
 } from '../../../../shared/contracts/triage.js';
-import { isClinicalRole } from '../../../../shared/contracts/auth.js';
 
-let triageDecisionHistory = [
-  {
-    decisionId: 'DEC-7701',
-    patientId: 'SYN-PT-8819',
-    patientName: 'Mary Wanjiku',
-    decision: 'APPROVED',
-    priority: TRIAGE_PRIORITY.ORANGE,
-    reason: 'Verified high SATS score with acute abdominal presentation.',
-    clinicianId: 'STAFF-101',
-    clinicianName: 'Jane Mwangi, RN',
-    clinicianRole: 'nurse',
-    timestamp: new Date(Date.now() - 25 * 60 * 1000).toISOString(),
-    protocolReference: `${PROTOCOL_METADATA.name} v${PROTOCOL_METADATA.version}`,
-    toolTraceId: 'trace-run-8819-01',
-    serverAcknowledged: true,
-  },
-];
-
-// Active synthetic proposals pending clinical review
-let pendingProposals = [
-  {
-    patientId: 'SYN-PT-8821',
-    patientName: 'Kofi Mwangi',
-    age: 34,
-    gender: 'Male',
-    arrivalTime: new Date(Date.now() - 14 * 60 * 1000).toISOString(),
-    presentingComplaint: 'Acute chest tightness, fever, difficulty breathing',
-    observationVersion: 1,
-    observations: {
-      systolicBp: '142',
-      diastolicBp: '88',
-      heartRate: '108',
-      respiratoryRate: '24',
-      temperature: '38.6',
-      spO2: '94',
-      avpu: 'Alert',
-      recordedAt: new Date(Date.now() - 12 * 60 * 1000).toISOString(),
-    },
-    isStale: false,
-    toolFailureSimulated: false,
-  },
-  {
-    patientId: 'SYN-PT-8830',
-    patientName: 'Baraka Mutua (Incomplete Vitals Case)',
-    age: 28,
-    gender: 'Male',
-    arrivalTime: new Date(Date.now() - 5 * 60 * 1000).toISOString(),
-    presentingComplaint: 'Dizziness, general malaise',
-    observationVersion: 1,
-    observations: {
-      systolicBp: '', // Missing
-      diastolicBp: '',
-      heartRate: '82',
-      respiratoryRate: '', // Missing
-      temperature: '36.9',
-      spO2: '98',
-      avpu: 'Alert',
-      recordedAt: new Date(Date.now() - 4 * 60 * 1000).toISOString(),
-    },
-    isStale: false,
-    toolFailureSimulated: false,
-  },
-];
+import { readDemoState, updateDemoState, clinicalActionError } from '../../demo/store.js';
 
 /**
  * Retrieves pending triage proposals with calculated SATS protocol citations and tool traces
@@ -82,13 +19,16 @@ let pendingProposals = [
 export async function apiGetPendingTriageProposals() {
   await new Promise((resolve) => setTimeout(resolve, 100));
 
-  return pendingProposals.map((item) => {
+  return readDemoState().visits.filter(v => v.needsReview).map(v => ({
+    ...v, patientId:v.id, patientName:v.name, observations:v.vitals || {}, isStale:false,
+  })).map((item) => {
     const scoringResult = calculateSatsScore(item.observations);
 
     const toolTrace = {
       runId: `run-${item.patientId}-${item.observationVersion}`,
       timestamp: item.observations.recordedAt,
-      model: 'qwen-2.5-7b-instruct (local open-weights)',
+      simulation: true,
+      model: 'Simulated trace — no model or MCP server executed',
       toolCalls: [
         {
           tool: 'custom_mcp_get_observations',
@@ -132,19 +72,12 @@ export async function apiSubmitClinicalDecision(staff, {
   overridePriority = null,
   reason,
   toolTraceId,
+  observationVersion,
 }) {
   await new Promise((resolve) => setTimeout(resolve, 150));
 
-  if (!staff || !isClinicalRole(staff.role)) {
-    return {
-      success: false,
-      error: {
-        status: 403,
-        code: 'PERMISSION_DENIED',
-        message: `Clinical approval authority required. Role "${staff?.role || 'Guest'}" cannot commit triage decisions.`,
-      },
-    };
-  }
+  const policyError = clinicalActionError(staff);
+  if (policyError) return {success:false,error:policyError};
 
   if ((decision === CLINICAL_DECISION_TYPES.OVERRIDE || decision === CLINICAL_DECISION_TYPES.REJECT) && (!reason || reason.trim().length < 5)) {
     return {
@@ -157,14 +90,24 @@ export async function apiSubmitClinicalDecision(staff, {
     };
   }
 
-  const patient = pendingProposals.find((p) => p.patientId === patientId);
-  const patientName = patient ? patient.patientName : 'Unknown Patient';
+  const patient = readDemoState().visits.find(p => p.id === patientId && p.needsReview);
+  const fail = (code,message) => ({success:false,error:{status:409,code,message}});
+  if (!patient) return fail('PROPOSAL_NOT_FOUND','This proposal was already decided or does not exist.');
+  if (observationVersion !== undefined && observationVersion !== patient.observationVersion)
+    return fail('STALE_PROPOSAL','Observations changed. Refresh the proposal before deciding.');
+  if (!Object.values(CLINICAL_DECISION_TYPES).includes(decision)) return fail('INVALID_DECISION','Invalid decision.');
+  if (decision === CLINICAL_DECISION_TYPES.OVERRIDE && !TRIAGE_PRIORITY[overridePriority?.code])
+    return fail('INVALID_PRIORITY','Select a valid override priority.');
+  const patientName = patient.name;
 
-  const scoring = patient ? calculateSatsScore(patient.observations) : null;
-  const committedPriority = overridePriority || (scoring ? scoring.priority : TRIAGE_PRIORITY.YELLOW);
+  const scoring = calculateSatsScore(patient.vitals || {});
+  if (decision === CLINICAL_DECISION_TYPES.APPROVE && !scoring?.isSufficientEvidence)
+    return fail('INSUFFICIENT_EVIDENCE','Record missing observations or use a justified manual override.');
+  const committedPriority = decision === CLINICAL_DECISION_TYPES.REJECT ? patient.approvedPriority :
+    (decision === CLINICAL_DECISION_TYPES.OVERRIDE ? TRIAGE_PRIORITY[overridePriority.code] : scoring.priority);
 
   const decisionRecord = {
-    decisionId: `DEC-${Date.now()}`,
+    decisionId: `DEC-${crypto.randomUUID()}`,
     patientId,
     patientName,
     decision,
@@ -176,13 +119,17 @@ export async function apiSubmitClinicalDecision(staff, {
     timestamp: new Date().toISOString(),
     protocolReference: `${PROTOCOL_METADATA.name} v${PROTOCOL_METADATA.version}`,
     toolTraceId: toolTraceId || `trace-${patientId}`,
-    serverAcknowledged: true,
+    serverAcknowledged: false, simulation: true,
   };
 
-  triageDecisionHistory.unshift(decisionRecord);
-
-  // Remove or update pending proposal
-  pendingProposals = pendingProposals.filter((p) => p.patientId !== patientId);
+  updateDemoState(state => {
+    const visit = state.visits.find(v => v.id === patientId);
+    visit.approvedPriority = committedPriority;
+    visit.needsReview = false;
+    visit.assessmentStatus = decision === CLINICAL_DECISION_TYPES.REJECT ? 'REJECTED_REQUIRES_REASSESSMENT' : 'APPROVED';
+    visit.clinicianAssigned = staff.name;
+    state.decisions.unshift(decisionRecord);
+  });
 
   return {
     success: true,
@@ -194,5 +141,5 @@ export async function apiSubmitClinicalDecision(staff, {
  * Retrieves the full authorised decision audit history
  */
 export function apiGetTriageDecisionHistory() {
-  return [...triageDecisionHistory];
+  return readDemoState().decisions;
 }

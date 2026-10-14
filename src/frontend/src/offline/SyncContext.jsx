@@ -1,145 +1,103 @@
-import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
-import {
-  SYNC_STATUS,
-  SYNC_ITEM_TYPES,
-  checkOfflineActionPolicy,
-} from '../../../shared/contracts/offline.js';
+import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
+import { SYNC_STATUS, SYNC_ITEM_TYPES } from '../../../shared/contracts/offline.js';
+import { setDemoOffline, isDemoOnline } from '../demo/store.js';
+import { apiRegisterPatient } from '../features/registration/apiAdapter.js';
 
 const SYNC_STORAGE_KEY = 'afyaflow_sync_outbox_v1';
-
 export const SyncContext = createContext(null);
 
 export function SyncProvider({ children }) {
-  const [isOnline, setIsOnline] = useState(() => (typeof navigator !== 'undefined' ? navigator.onLine : true));
-  const [simulatedOffline, setSimulatedOffline] = useState(false);
+  const [isOnline, setIsOnline] = useState(() => navigator.onLine);
+  const [simulatedOffline, setOffline] = useState(false);
   const [outbox, setOutbox] = useState(() => {
-    try {
-      const stored = localStorage.getItem(SYNC_STORAGE_KEY);
-      return stored ? JSON.parse(stored) : [
-        {
-          syncId: 'SYNC-001',
-          type: SYNC_ITEM_TYPES.REGISTRATION_DRAFT,
-          title: 'Patient Intake: Juma Kiprono',
-          payload: { name: 'Juma Kiprono', age: 39, complaint: 'Acute sprained ankle' },
-          status: SYNC_STATUS.DRAFT,
-          createdAt: new Date(Date.now() - 10 * 60 * 1000).toISOString(),
-          retryCount: 0,
-        },
-      ];
-    } catch {
-      return [];
-    }
+    try { return JSON.parse(localStorage.getItem(SYNC_STORAGE_KEY) || '[]'); }
+    catch { return []; }
   });
-
+  const outboxRef = useRef(outbox);
+  const syncingRef = useRef(false);
   const [isSyncing, setIsSyncing] = useState(false);
   const [lastSyncResult, setLastSyncResult] = useState(null);
-
   const effectiveOnline = isOnline && !simulatedOffline;
 
-  // Listen for browser online/offline events
+  const saveOutbox = useCallback(next => {
+    localStorage.setItem(SYNC_STORAGE_KEY, JSON.stringify(next));
+    outboxRef.current = next;
+    setOutbox(next);
+  }, []);
+
+  const setSimulatedOffline = useCallback(value => {
+    setDemoOffline(value);
+    setOffline(value);
+  }, []);
+
   useEffect(() => {
-    const handleOnline = () => setIsOnline(true);
-    const handleOffline = () => setIsOnline(false);
-
-    window.addEventListener('online', handleOnline);
-    window.addEventListener('offline', handleOffline);
-
+    const online = () => setIsOnline(true);
+    const offline = () => setIsOnline(false);
+    window.addEventListener('online', online);
+    window.addEventListener('offline', offline);
     return () => {
-      window.removeEventListener('online', handleOnline);
-      window.removeEventListener('offline', handleOffline);
+      window.removeEventListener('online', online);
+      window.removeEventListener('offline', offline);
+      setDemoOffline(false);
     };
   }, []);
 
-  // Save outbox to localStorage
-  useEffect(() => {
-    try {
-      localStorage.setItem(SYNC_STORAGE_KEY, JSON.stringify(outbox));
-    } catch {
-      // ignore
-    }
-  }, [outbox]);
-
-  // Synchronize outbox items
   const syncOutbox = useCallback(async () => {
-    if (!effectiveOnline || isSyncing) return;
+    if (!isDemoOnline() || syncingRef.current) return;
+    syncingRef.current = true;
     setIsSyncing(true);
-
-    await new Promise((resolve) => setTimeout(resolve, 300));
-
     let processedCount = 0;
-    setOutbox((prev) =>
-      prev.map((item) => {
-        if (item.status === SYNC_STATUS.PENDING_SYNC || item.status === SYNC_STATUS.DRAFT) {
-          processedCount++;
-          return {
-            ...item,
-            status: SYNC_STATUS.CONFIRMED,
-            syncedAt: new Date().toISOString(),
-          };
-        }
-        return item;
-      })
-    );
+    try {
+      for (const item of [...outboxRef.current]) {
+        if (!isDemoOnline()) break;
+        if (item.status === SYNC_STATUS.CONFIRMED) continue;
+        let result;
+        try {
+          result = item.type === SYNC_ITEM_TYPES.REGISTRATION_DRAFT
+            ? await apiRegisterPatient(item.payload, item.syncId)
+            : {success:false,error:'This draft type has no demo sync adapter.'};
+        } catch (error) { result = {success:false,error:error.message}; }
+        if (result.success) processedCount++;
+        saveOutbox(outboxRef.current.map(current => current.syncId !== item.syncId ? current : {
+          ...current, status:result.success ? SYNC_STATUS.CONFIRMED : SYNC_STATUS.FAILED_SYNC,
+          retryCount:(current.retryCount || 0)+1, error:result.error,
+          syncedAt:result.success ? new Date().toISOString() : undefined,
+          visitId:result.data?.id,
+        }));
+      }
+      setLastSyncResult({timestamp:new Date().toISOString(),itemsSynced:processedCount});
+    } catch (error) {
+      setLastSyncResult({timestamp:new Date().toISOString(),itemsSynced:processedCount,error:error.message});
+    } finally { syncingRef.current = false; setIsSyncing(false); }
+  }, [saveOutbox]);
 
-    setLastSyncResult({
-      timestamp: new Date().toISOString(),
-      itemsSynced: processedCount,
-    });
-    setIsSyncing(false);
-  }, [effectiveOnline, isSyncing]);
+  useEffect(() => { if (effectiveOnline) syncOutbox(); }, [effectiveOnline, syncOutbox]);
 
-  // Auto retry when returning online
-  useEffect(() => {
-    if (effectiveOnline) {
-      syncOutbox();
-    }
-  }, [effectiveOnline, syncOutbox]);
-
-  const queueItem = useCallback((type, title, payload) => {
-    const policy = checkOfflineActionPolicy(type, effectiveOnline);
-    if (!policy.allowedOffline) {
-      throw new Error(policy.reason);
-    }
-
-    const newItem = {
-      syncId: `SYNC-${Date.now()}`,
-      type,
-      title,
-      payload,
-      status: effectiveOnline ? SYNC_STATUS.CONFIRMED : SYNC_STATUS.PENDING_SYNC,
-      createdAt: new Date().toISOString(),
-      retryCount: 0,
-    };
-
-    setOutbox((prev) => [newItem, ...prev]);
-    return newItem;
-  }, [effectiveOnline]);
+  const queueItem = useCallback((type, title, payload, idempotencyKey) => {
+    if (type === SYNC_ITEM_TYPES.CLINICAL_DECISION)
+      throw new Error('Clinical triage approval requires active online connectivity and cannot be deferred to the draft outbox.');
+    const syncId = idempotencyKey || `SYNC-${crypto.randomUUID()}`;
+    const existing = outboxRef.current.find(item => item.syncId === syncId);
+    if (existing) return existing;
+    const item = {syncId,type,title,payload,status:SYNC_STATUS.PENDING_SYNC,
+      createdAt:new Date().toISOString(),retryCount:0};
+    saveOutbox([item,...outboxRef.current]);
+    if (isDemoOnline()) syncOutbox();
+    return item;
+  }, [saveOutbox, syncOutbox]);
 
   const clearConfirmed = useCallback(() => {
-    setOutbox((prev) => prev.filter((item) => item.status !== SYNC_STATUS.CONFIRMED));
-  }, []);
+    saveOutbox(outboxRef.current.filter(item => item.status !== SYNC_STATUS.CONFIRMED));
+  }, [saveOutbox]);
 
-  const value = {
-    isOnline: effectiveOnline,
-    rawBrowserOnline: isOnline,
-    simulatedOffline,
-    setSimulatedOffline,
-    outbox,
-    isSyncing,
-    lastSyncResult,
-    pendingCount: outbox.filter((i) => i.status === SYNC_STATUS.PENDING_SYNC || i.status === SYNC_STATUS.DRAFT).length,
-    syncOutbox,
-    queueItem,
-    clearConfirmed,
-  };
-
-  return <SyncContext.Provider value={value}>{children}</SyncContext.Provider>;
+  return <SyncContext.Provider value={{isOnline:effectiveOnline,rawBrowserOnline:isOnline,
+    simulatedOffline,setSimulatedOffline,outbox,isSyncing,lastSyncResult,
+    pendingCount:outbox.filter(item => item.status !== SYNC_STATUS.CONFIRMED).length,
+    syncOutbox,queueItem,clearConfirmed}}>{children}</SyncContext.Provider>;
 }
 
 export function useOfflineSync() {
   const context = useContext(SyncContext);
-  if (!context) {
-    throw new Error('useOfflineSync must be used within a SyncProvider');
-  }
+  if (!context) throw new Error('useOfflineSync must be used within a SyncProvider');
   return context;
 }

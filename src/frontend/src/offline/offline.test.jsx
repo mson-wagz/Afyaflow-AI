@@ -7,7 +7,7 @@ import {
   SYNC_STATUS,
   SYNC_ITEM_TYPES,
   checkOfflineActionPolicy,
-} from '../../shared/contracts/offline.js';
+} from '../../../shared/contracts/offline.js';
 
 function TestConsumer() {
   const { isOnline, setSimulatedOffline, queueItem, outbox } = useOfflineSync();
