@@ -2,7 +2,7 @@
 
 Owner: JecintaK (frontend developer).
 
-All frontend features are implemented and contract-aligned:
+Keep each feature's components, hooks and API adapters together. Reuse general UI from src/frontend/src/components. Use contract-aligned synthetic mocks while the NestJS backend work is pending.
 
 - **Staff Access (`staff-access/`):** RBAC, shared terminal session locking, draft retention, and server permission denial.
 - **Patient Registration (`registration/`):** Demographics and timestamped vitals capture, schema validation, missing-field alerts without guessing, and idempotency protection.

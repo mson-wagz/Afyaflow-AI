@@ -8,9 +8,9 @@ The project is being prepared for the **African Agentic AI Design Challenge**, i
 
 ## Project status
 
-**Specification phase — application implementation has not started.**
+**Specification phase — React + Vite frontend initialised; NestJS backend implementation has not started.**
 
-This repository contains a documented directory scaffold, a proposed architecture and an evaluation plan. The team will define requirements, data contracts and acceptance criteria before writing application code. Features, infrastructure and commands described as planned are not yet implemented or verified.
+This repository contains the React + Vite frontend starter, a documented NestJS backend scaffold, draft feature specifications and an evaluation plan. Backend requirements, data contracts and acceptance criteria still need review before implementation. Planned hospital features and infrastructure are not yet implemented or verified.
 
 The competition prototype will use synthetic patient data. It is not a clinical deployment or a validated triage product.
 
@@ -58,13 +58,13 @@ The first complete demonstration will cover registration, agent tool use, a sour
 
 ## Technology decisions
 
-**Confirmed by the team:** React frontend and Next.js backend.
+**Confirmed by the team:** React frontend and NestJS backend. NestJS is the backend framework; TypeScript is its planned implementation language.
 
 Proposed implementation:
 
-- **Frontend:** React with TypeScript, responsive layouts and PWA support.
-- **Backend:** Next.js Route Handlers for authenticated APIs and server-side approval checks.
-- **Application structure:** one Next.js project hosting the React interface and backend API, with separate Node.js processes for agent execution and MCP tools where needed.
+- **Frontend:** React + Vite, currently initialised in JavaScript/JSX; responsive layouts and PWA support are planned. A TypeScript migration would be a separate team decision.
+- **Backend:** NestJS with TypeScript, feature modules, HTTP controllers, injectable services, validation and server-side approval checks.
+- **Application structure:** separate frontend and backend projects in one repository, with separate Node.js processes for agent execution and MCP tools where needed.
 - **Agent orchestration:** LangGraph for JavaScript/TypeScript.
 - **Model:** a locally served open-weights model, with Qwen as a candidate pending hardware and evaluation checks.
 - **Custom MCP server:** TypeScript tools for retrieving observations, calculating a protocol-based proposal and saving a pending recommendation.
@@ -91,7 +91,7 @@ The agent may choose tools, check outputs and recover from a bounded tool failur
 
 ### Backend developer 1 — mson-wagz — application and data
 
-Own the Next.js APIs, database schema, authentication, role checks, approval transactions, queue state and synchronisation behaviour. Coordinate shared API types with the frontend developer.
+Own the NestJS controllers and services, database schema, authentication, role checks, approval transactions, queue state and synchronisation behaviour. Coordinate shared API schemas with JecintaK.
 
 ### Backend developer 2 — Mejja — agents and MCP
 
@@ -118,45 +118,48 @@ Afyaflow-AI/
 │   ├── features/             # One specification per product feature
 │   └── frontend/             # JecintaK's UI specs, tasks and branches
 ├── src/
-│   ├── app/                  # Next.js pages and API entry points
-│   │   ├── patients/
-│   │   ├── queue/
-│   │   └── api/
-│   │       ├── patients/
-│   │       ├── observations/
-│   │       └── recommendations/
-│   ├── frontend/
-│   │   ├── features/
-│   │   │   ├── registration/
-│   │   │   ├── triage/
-│   │   │   ├── queue/
-│   │   │   ├── staff-access/
-│   │   │   ├── deterioration/
-│   │   │   └── routing/
-│   │   ├── components/
-│   │   └── offline/
-│   ├── backend/
-│   │   ├── modules/
-│   │   │   ├── patients/
-│   │   │   ├── triage/
-│   │   │   ├── queue/
-│   │   │   └── approvals/
-│   │   ├── auth/
-│   │   └── database/
+│   ├── frontend/             # React + Vite project
+│   │   ├── package.json
+│   │   ├── index.html
+│   │   ├── public/           # Non-sensitive public assets
+│   │   └── src/
+│   │       ├── App.jsx
+│   │       ├── main.jsx
+│   │       ├── pages/
+│   │       │   ├── patients/
+│   │       │   └── queue/
+│   │       ├── features/
+│   │       │   ├── registration/
+│   │       │   ├── triage/
+│   │       │   ├── queue/
+│   │       │   ├── staff-access/
+│   │       │   ├── deterioration/
+│   │       │   └── routing/
+│   │       ├── components/
+│   │       └── offline/
+│   ├── backend/              # NestJS project scaffold
+│   │   └── src/
+│   │       ├── modules/
+│   │       │   ├── patients/
+│   │       │   ├── observations/
+│   │       │   ├── triage/
+│   │       │   ├── queue/
+│   │       │   └── approvals/
+│   │       ├── auth/
+│   │       └── database/
 │   └── shared/
 │       └── contracts/
 ├── services/
 │   ├── agents/
 │   └── mcp/
-├── public/
 ├── tests/
 ├── ARCHITECTURE.md
 └── EVALS.md
 ```
 
-Each scaffold directory contains a README explaining its responsibilities and owner so Git preserves the structure. Pages and API routes stay thin; feature logic belongs in frontend or backend modules. The frontend imports browser-safe contracts, never backend code or credentials.
+Each scaffold directory contains a README explaining its responsibilities and owner so Git preserves the structure. React page components and NestJS controllers stay thin; frontend features and backend services contain the relevant logic. The frontend imports browser-safe contracts, never backend code or credentials.
 
-See [the proposed architecture](ARCHITECTURE.md), [specification workflow](specs/README.md) and [evaluation plan](EVALS.md). Package configuration, runtime entry points and executable tests will be added after specification review.
+See [the proposed architecture](ARCHITECTURE.md), [specification workflow](specs/README.md) and [evaluation plan](EVALS.md). Frontend package configuration and entry points exist. The NestJS package, bootstrap and executable backend tests will be added after specification review.
 
 ## Spec-driven development
 
@@ -208,7 +211,9 @@ No application or external submission has been made from this repository.
 
 ## Development setup
 
-There is no runnable application or setup command yet. After implementation, this section will document prerequisites, pinned versions, environment variables, synthetic seed data and a tested one-command startup. It will distinguish real model runs from mocked UI demonstrations and include the hardware used.
+The frontend package declares `dev`, `build` and `preview` Vite scripts. Run them from src/frontend after installing its dependencies; their execution has not been verified by this documentation correction. There is no NestJS runtime or complete system startup command yet.
+
+After backend implementation, this section will document pinned versions, environment variables, synthetic seeds and a tested one-command full-system startup. It will distinguish real model runs from mocked UI demonstrations and include the hardware used.
 
 ## Sources
 
@@ -218,3 +223,5 @@ There is no runnable application or setup command yet. After implementation, thi
 - [LangGraph JavaScript documentation](https://docs.langchain.com/oss/javascript/langgraph/overview)
 - [Official filesystem MCP reference server](https://github.com/modelcontextprotocol/servers/tree/main/src/filesystem)
 - [Kenya ODPC guidance on processing health data](https://www.odpc.go.ke/wp-content/uploads/2024/02/ODPC-Guidance-Note-on-Processing-of-Health-Data.pdf)
+- [NestJS controllers](https://docs.nestjs.com/controllers)
+- [NestJS modules](https://docs.nestjs.com/modules)

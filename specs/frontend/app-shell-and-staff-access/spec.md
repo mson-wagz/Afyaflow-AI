@@ -22,27 +22,8 @@ Responsive navigation, staff sign-in and shared-device locking.
 
 ## Dependencies and code location
 
-Browser-safe authentication contracts and RBAC schemas in `src/shared/contracts/auth.js`.
-Shared accessible UI components in `src/frontend/src/components/`.
-Feature implementation in `src/frontend/src/features/staff-access/`.
-Automated test suite in `src/frontend/src/features/staff-access/staff-access.test.jsx`.
+Agree request/response and error schemas, synthetic fixtures, role permissions and freshness/retry behaviour with the backend collaborator before implementation. Clinical views reuse the reviewed approval contract. P1 features depend on the verified P0 journey; offline work also requires a reviewed retention/conflict policy and target-browser list.
 
-## Verification results
+Primary UI location: `src/frontend/src/components/`. Use src/frontend/src/pages for React page components and src/frontend/public for non-sensitive assets. Client routing will be selected during contract review. Import browser-safe schemas from src/shared/contracts; never import backend/database/model credentials into browser code.
 
-Automated test run with Vitest (`npm test`):
-- `FE-APP-SHELL-AND-STAFF-ACCESS-01`:
-  - ✓ Renders labelled controls and accessible input fields on sign-in screen
-  - ✓ Renders header with facility branding, staff info, and lock terminal button
-- `FE-APP-SHELL-AND-STAFF-ACCESS-02`:
-  - ✓ Authenticates valid synthetic staff fixtures
-  - ✓ Rejects invalid PIN with descriptive error
-  - ✓ Obscures patient data on shared device lock and restores draft upon unlock
-- `FE-APP-SHELL-AND-STAFF-ACCESS-03`:
-  - ✓ Verifies clinical permissions matrix for roles
-  - ✓ Allows clinical staff to commit clinical decisions with server acknowledgement
-  - ✓ Strictly denies non-clinical roles from clinical approval with standard 403 Forbidden payload
-  - ✓ Displays server permission denial banner when non-clinical user attempts clinical approval in UI
-
-Result: 9 tests passed out of 9.
-Production build with Vite (`npm run build`):
-- ✓ 38 modules transformed, cleanly bundled without warnings or errors.
+Completion requires reviewed contracts, implemented behaviour and recorded passing checks in the feature PR. No test results have been recorded yet.

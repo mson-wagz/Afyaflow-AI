@@ -25,7 +25,7 @@ Recorded changes and pending reassessment review.
 Deterioration observation contracts and delta comparison logic in `src/shared/contracts/deterioration.js`.
 Primary UI location: `src/frontend/src/features/deterioration/`.
 
-## Verification results
+Primary UI location: `src/frontend/src/features/deterioration/`. Use src/frontend/src/pages for React page components and src/frontend/public for non-sensitive assets. Client routing will be selected during contract review. Import browser-safe schemas from src/shared/contracts; never import backend/database/model credentials into browser code.
 
 Automated test verification:
 - `FE-DETERIORATION-MONITORING-01`: Verified side-by-side Before/After vital sign comparison with physiological delta indicators.

@@ -1,10 +1,12 @@
 # AfyaFlow AI architecture
 
-Status: proposed architecture; source directories exist, application services are not implemented.
+Status: proposed architecture; React + Vite starter exists, NestJS backend services are not implemented.
 
 ## Application boundaries
 
-One Next.js application will host React pages and API Route Handlers. src/app contains routing entry points; src/frontend contains UI features and offline draft handling; src/backend contains authenticated domain operations and PostgreSQL access. src/shared/contracts contains browser-safe runtime schemas and types used by both sides.
+The repository contains separate React + Vite and NestJS projects. src/frontend/src contains React pages, features and offline draft handling; src/backend/src contains NestJS feature modules, authentication and PostgreSQL access. NestJS will use TypeScript; the existing frontend uses JavaScript/JSX. src/shared/contracts holds browser-safe runtime schemas and types; cross-project packaging must be configured during implementation.
+
+NestJS controllers handle HTTP boundaries and delegate to injectable services. Feature modules group controllers and providers. Authentication/authorisation guards and validation enforce reviewed contracts. Define the frontend API base URL and permitted origins during deployment planning; a same-origin reverse proxy is an option. Configure cookie/token and CSRF behaviour as part of the staff-session contract.
 
 JecintaK owns all pages, UI features, frontend verification and PWA behaviour, using dedicated frontend feature branches. mson-wagz owns APIs, persistence, server-side staff access and clinical approvals. Mejja owns the TypeScript agent workflow and MCP integration. All three review contracts before implementation.
 
@@ -18,7 +20,7 @@ The clinical protocol, supported population, model version, hardware, hosting lo
 
 ## Approval and data flow
 
-React interface → authenticated Next.js API → backend modules → PostgreSQL.
+React + Vite PWA → authenticated NestJS controller → application service → PostgreSQL. Prisma remains a recommended database-access option pending the reviewed data-model plan.
 
 Assessment request → agent → custom MCP observation retrieval → borrowed MCP protocol retrieval → deterministic scoring tool → validated pending recommendation → clinician review → server-side approval transaction.
 
@@ -28,7 +30,7 @@ The approval transaction checks the clinician's role and current observation ver
 
 The PWA will capture local drafts and show pending sync and stale queue indicators. Shared queue updates require server acknowledgement; offline operation retains a staff escalation path. Polling is the initial update mechanism.
 
-Record tool inputs, outputs, timestamps, run IDs and evidence versions, linking them to the clinician's decision. Synthetic data is the development default. The public asset directory contains no patient data.
+Record tool inputs, outputs, timestamps, run IDs and evidence versions, linking them to the clinician's decision. Synthetic data is the development default. src/frontend/public contains only non-sensitive assets.
 
 ## Next specification work
 

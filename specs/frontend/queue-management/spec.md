@@ -25,7 +25,7 @@ Mobile and desktop approved queue views.
 Queue contracts, sorting algorithms and workload calculations in `src/shared/contracts/queue.js`.
 Primary UI location: `src/frontend/src/features/queue/`.
 
-## Verification results
+Primary UI location: `src/frontend/src/features/queue/`. Use src/frontend/src/pages for React page components and src/frontend/public for non-sensitive assets. Client routing will be selected during contract review. Import browser-safe schemas from src/shared/contracts; never import backend/database/model credentials into browser code.
 
 Automated test verification:
 - `FE-QUEUE-MANAGEMENT-01`: Displays waiting patient list with calculated elapsed wait times and department filtering.

@@ -1,14 +1,11 @@
 # Dependencies and build output
 node_modules/
-.next/
 out/
 dist/
 coverage/
 *.tsbuildinfo
 
 # Local environment and logs
-.env
-.env.*
 !.env.example
 *.log
 
@@ -21,3 +18,4 @@ Thumbs.db
 test-results/
 playwright-report/
 artifacts/local/
+config.bat
