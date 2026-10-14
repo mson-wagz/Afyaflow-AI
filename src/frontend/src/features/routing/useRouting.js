@@ -56,10 +56,21 @@ export default function useRouting(currentStaff) {
       } else {
         setActionError(result.error);
       }
+    } catch (error) {
+      setActionError(error.message);
     } finally {
       setActionInProgress(false);
     }
   };
+
+  useEffect(() => {
+    window.addEventListener('afyaflow-demo-change', loadData);
+    window.addEventListener('storage', loadData);
+    return () => {
+      window.removeEventListener('afyaflow-demo-change', loadData);
+      window.removeEventListener('storage', loadData);
+    };
+  }, [loadData]);
 
   return {
     departments,
