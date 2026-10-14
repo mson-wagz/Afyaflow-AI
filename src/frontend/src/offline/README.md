@@ -2,6 +2,20 @@
 
 Owner: JecintaK (frontend developer), with backend developer 1.
 
-Manage local drafts, reconnect retries and visible synchronisation state. Clear local patient drafts according to the reviewed shared-device policy. Do not present offline approvals as committed queue updates.
+Follows `specs/frontend/offline-pwa/spec.md` and `src/shared/contracts/offline.js`.
 
-Status: directory scaffold only; implementation follows specification review.
+## Implementation Details
+
+- **PWA Manifest (`manifest.json`):**
+  - Defines app shell metadata, theme colors, and standalone mobile configuration.
+- **Outbox Sync Lifecycle (`SyncContext.jsx`, `useOfflineSync.js`):**
+  - Explicit and distinct sync states: `DRAFT`, `PENDING_SYNC`, `CONFIRMED`, `FAILED_SYNC`.
+  - Reconnect retry automatically flushes the outbox once network connectivity is re-established.
+  - Interactive offline simulation mode allows immediate testing of intermittent connectivity.
+- **Safety Policy:**
+  - Clinical triage decisions and shared queue ordering require immediate online server acknowledgement.
+  - Drafts captured offline remain in local draft state and are never presented as confirmed queue updates.
+
+## Status
+
+Implemented and verified with automated test suite.

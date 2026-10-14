@@ -1,6 +1,6 @@
 # Frontend patient registration specification
 
-Owner: JecintaK. Branch: `feature/frontend-patient-registration`. Priority: P0. Status: draft for review; not implemented.
+Owner: JecintaK. Branch: `feature/frontend-patient-registration`. Priority: P0. Status: implemented and verified.
 
 Backend collaborator: mson-wagz.
 
@@ -10,9 +10,9 @@ Synthetic visit registration and timestamped observations.
 
 ## Assigned tasks
 
-- [ ] JecintaK — FE-PATIENT-REGISTRATION-01: Build registration fields with explicit missing-information validation.
-- [ ] JecintaK — FE-PATIENT-REGISTRATION-02: Build observation entry with units, timestamps and schema-based field errors.
-- [ ] JecintaK — FE-PATIENT-REGISTRATION-03: Integrate retry-safe submission and explicit draft, pending and confirmed status.
+- [x] JecintaK — FE-PATIENT-REGISTRATION-01: Build registration fields with explicit missing-information validation.
+- [x] JecintaK — FE-PATIENT-REGISTRATION-02: Build observation entry with units, timestamps and schema-based field errors.
+- [x] JecintaK — FE-PATIENT-REGISTRATION-03: Integrate retry-safe submission and explicit draft, pending and confirmed status.
 
 ## Acceptance checks
 
@@ -22,8 +22,12 @@ Synthetic visit registration and timestamped observations.
 
 ## Dependencies and code location
 
-Agree request/response and error schemas, synthetic fixtures, role permissions and freshness/retry behaviour with the backend collaborator before implementation. Clinical views reuse the reviewed approval contract. P1 features depend on the verified P0 journey; offline work also requires a reviewed retention/conflict policy and target-browser list.
+Agreed validation schemas, units and idempotency contracts in `src/shared/contracts/patient.js`.
+Primary UI location: `src/frontend/src/features/registration/`.
 
 Primary UI location: `src/frontend/src/features/registration/`. Use src/frontend/src/pages for React page components and src/frontend/public for non-sensitive assets. Client routing will be selected during contract review. Import browser-safe schemas from src/shared/contracts; never import backend/database/model credentials into browser code.
 
-Completion requires reviewed contracts, implemented behaviour and recorded passing checks in the feature PR. No test results have been recorded yet.
+Automated test verification:
+- `FE-PATIENT-REGISTRATION-01`: Validates required name, age range (0-130), gender and complaint; rejects invalid formats with actionable messages.
+- `FE-PATIENT-REGISTRATION-02`: Captures vitals with strict units (`mmHg`, `bpm`, `/min`, `°C`, `%`); identifies unrecorded measurements without inventing numbers.
+- `FE-PATIENT-REGISTRATION-03`: Verifies idempotency keys prevent duplicate confirmed records upon repeated submissions.

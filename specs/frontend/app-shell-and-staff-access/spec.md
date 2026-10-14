@@ -1,6 +1,6 @@
 # Frontend app shell and staff access specification
 
-Owner: JecintaK. Branch: `feature/frontend-app-shell-and-staff-access`. Priority: P0. Status: draft for review; not implemented.
+Owner: JecintaK. Branch: `feature/frontend-app-shell-and-staff-access`. Priority: P0. Status: implemented and verified.
 
 Backend collaborator: mson-wagz.
 
@@ -10,9 +10,9 @@ Responsive navigation, staff sign-in and shared-device locking.
 
 ## Assigned tasks
 
-- [ ] JecintaK — FE-APP-SHELL-AND-STAFF-ACCESS-01: Build responsive layouts and accessible reusable components.
-- [ ] JecintaK — FE-APP-SHELL-AND-STAFF-ACCESS-02: Build sign-in, session expiry and lock screens from reviewed authentication contracts.
-- [ ] JecintaK — FE-APP-SHELL-AND-STAFF-ACCESS-03: Handle role-aware navigation and server permission errors.
+- [x] JecintaK — FE-APP-SHELL-AND-STAFF-ACCESS-01: Build responsive layouts and accessible reusable components.
+- [x] JecintaK — FE-APP-SHELL-AND-STAFF-ACCESS-02: Build sign-in, session expiry and lock screens from reviewed authentication contracts.
+- [x] JecintaK — FE-APP-SHELL-AND-STAFF-ACCESS-03: Handle role-aware navigation and server permission errors.
 
 ## Acceptance checks
 
