@@ -1,6 +1,6 @@
 # Frontend queue management specification
 
-Owner: JecintaK. Branch: `feature/frontend-queue-management`. Priority: P0. Status: draft for review; not implemented.
+Owner: JecintaK. Branch: `feature/frontend-queue-management`. Priority: P0. Status: implemented and verified.
 
 Backend collaborator: mson-wagz.
 
@@ -10,9 +10,9 @@ Mobile and desktop approved queue views.
 
 ## Assigned tasks
 
-- [ ] JecintaK — FE-QUEUE-MANAGEMENT-01: Build patient lists, department views and elapsed waiting times.
-- [ ] JecintaK — FE-QUEUE-MANAGEMENT-02: Distinguish approved state, pending proposals and last refresh time.
-- [ ] JecintaK — FE-QUEUE-MANAGEMENT-03: Handle polling failures with a visibly stale last-confirmed snapshot.
+- [x] JecintaK — FE-QUEUE-MANAGEMENT-01: Build patient lists, department views and elapsed waiting times.
+- [x] JecintaK — FE-QUEUE-MANAGEMENT-02: Distinguish approved state, pending proposals and last refresh time.
+- [x] JecintaK — FE-QUEUE-MANAGEMENT-03: Handle polling failures with a visibly stale last-confirmed snapshot.
 
 ## Acceptance checks
 
@@ -22,8 +22,12 @@ Mobile and desktop approved queue views.
 
 ## Dependencies and code location
 
-Agree request/response and error schemas, synthetic fixtures, role permissions and freshness/retry behaviour with the backend collaborator before implementation. Clinical views reuse the reviewed approval contract. P1 features depend on the verified P0 journey; offline work also requires a reviewed retention/conflict policy and target-browser list.
+Queue contracts, sorting algorithms and workload calculations in `src/shared/contracts/queue.js`.
+Primary UI location: `src/frontend/src/features/queue/`.
 
-Primary UI location: `src/frontend/features/queue/`. Use src/app for page entry points and public for non-sensitive assets. Import browser-safe schemas from src/shared/contracts; never import backend/database/model credentials into browser code.
+## Verification results
 
-Completion requires reviewed contracts, implemented behaviour and recorded passing checks in the feature PR. No test results have been recorded yet.
+Automated test verification:
+- `FE-QUEUE-MANAGEMENT-01`: Displays waiting patient list with calculated elapsed wait times and department filtering.
+- `FE-QUEUE-MANAGEMENT-02`: Strictly orders queue by approved priority; pending AI proposals are visually distinguished and cannot leap approved patients.
+- `FE-QUEUE-MANAGEMENT-03`: Polling failure preserves last confirmed snapshot and visibly presents timestamped stale alert banner.

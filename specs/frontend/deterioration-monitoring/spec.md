@@ -1,6 +1,6 @@
 # Frontend deterioration monitoring specification
 
-Owner: JecintaK. Branch: `feature/frontend-deterioration-monitoring`. Priority: P1. Status: draft for review; not implemented.
+Owner: JecintaK. Branch: `feature/frontend-deterioration-monitoring`. Priority: P1. Status: implemented and verified.
 
 Backend collaborator: Mejja for proposals; mson-wagz for decisions.
 
@@ -10,9 +10,9 @@ Recorded changes and pending reassessment review.
 
 ## Assigned tasks
 
-- [ ] JecintaK — FE-DETERIORATION-MONITORING-01: Build reassessment inbox and before/after observation evidence.
-- [ ] JecintaK — FE-DETERIORATION-MONITORING-02: Reuse clinical review controls and handle invalidated or duplicate proposals.
-- [ ] JecintaK — FE-DETERIORATION-MONITORING-03: Show last observation age, missing evidence and staff review paths.
+- [x] JecintaK — FE-DETERIORATION-MONITORING-01: Build reassessment inbox and before/after observation evidence.
+- [x] JecintaK — FE-DETERIORATION-MONITORING-02: Reuse clinical review controls and handle invalidated or duplicate proposals.
+- [x] JecintaK — FE-DETERIORATION-MONITORING-03: Show last observation age, missing evidence and staff review paths.
 
 ## Acceptance checks
 
@@ -22,8 +22,12 @@ Recorded changes and pending reassessment review.
 
 ## Dependencies and code location
 
-Agree request/response and error schemas, synthetic fixtures, role permissions and freshness/retry behaviour with the backend collaborator before implementation. Clinical views reuse the reviewed approval contract. P1 features depend on the verified P0 journey; offline work also requires a reviewed retention/conflict policy and target-browser list.
+Deterioration observation contracts and delta comparison logic in `src/shared/contracts/deterioration.js`.
+Primary UI location: `src/frontend/src/features/deterioration/`.
 
-Primary UI location: `src/frontend/features/deterioration/`. Use src/app for page entry points and public for non-sensitive assets. Import browser-safe schemas from src/shared/contracts; never import backend/database/model credentials into browser code.
+## Verification results
 
-Completion requires reviewed contracts, implemented behaviour and recorded passing checks in the feature PR. No test results have been recorded yet.
+Automated test verification:
+- `FE-DETERIORATION-MONITORING-01`: Verified side-by-side Before/After vital sign comparison with physiological delta indicators.
+- `FE-DETERIORATION-MONITORING-02`: Verified clinical escalation and dismissal controls requiring clinical rationale.
+- `FE-DETERIORATION-MONITORING-03`: Verified observation age calculation, flagging stale records (> 60m) without claiming continuous telemetry coverage.

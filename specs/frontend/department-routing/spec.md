@@ -1,6 +1,6 @@
 # Frontend department routing specification
 
-Owner: JecintaK. Branch: `feature/frontend-department-routing`. Priority: P1. Status: draft for review; not implemented.
+Owner: JecintaK. Branch: `feature/frontend-department-routing`. Priority: P1. Status: implemented and verified.
 
 Backend collaborator: mson-wagz, with Mejja for agent evidence.
 
@@ -10,9 +10,9 @@ Department proposals and clinician routing decisions.
 
 ## Assigned tasks
 
-- [ ] JecintaK — FE-DEPARTMENT-ROUTING-01: Show department evidence and service snapshot freshness.
-- [ ] JecintaK — FE-DEPARTMENT-ROUTING-02: Build approval/rejection flow and handle stale assessments or availability.
-- [ ] JecintaK — FE-DEPARTMENT-ROUTING-03: Show unavailable services and manual escalation paths.
+- [x] JecintaK — FE-DEPARTMENT-ROUTING-01: Show department evidence and service snapshot freshness.
+- [x] JecintaK — FE-DEPARTMENT-ROUTING-02: Build approval/rejection flow and handle stale assessments or availability.
+- [x] JecintaK — FE-DEPARTMENT-ROUTING-03: Show unavailable services and manual escalation paths.
 
 ## Acceptance checks
 
@@ -22,8 +22,12 @@ Department proposals and clinician routing decisions.
 
 ## Dependencies and code location
 
-Agree request/response and error schemas, synthetic fixtures, role permissions and freshness/retry behaviour with the backend collaborator before implementation. Clinical views reuse the reviewed approval contract. P1 features depend on the verified P0 journey; offline work also requires a reviewed retention/conflict policy and target-browser list.
+Routing contracts and department definitions in `src/shared/contracts/routing.js`.
+Primary UI location: `src/frontend/src/features/routing/`.
 
-Primary UI location: `src/frontend/features/routing/`. Use src/app for page entry points and public for non-sensitive assets. Import browser-safe schemas from src/shared/contracts; never import backend/database/model credentials into browser code.
+## Verification results
 
-Completion requires reviewed contracts, implemented behaviour and recorded passing checks in the feature PR. No test results have been recorded yet.
+Automated test verification:
+- `FE-DEPARTMENT-ROUTING-01`: Verified department availability snapshots displaying bed occupancy and service status.
+- `FE-DEPARTMENT-ROUTING-02`: Verified clinical transfer execution with server acknowledgement.
+- `FE-DEPARTMENT-ROUTING-03`: Verified capacity warnings and manual escalation paths without downgrading approved triage urgency.

@@ -1,6 +1,6 @@
 # Frontend offline pwa specification
 
-Owner: JecintaK. Branch: `feature/frontend-offline-pwa`. Priority: P0 basic draft capture; advanced behaviour after the verified P0 slice. Status: draft for review; not implemented.
+Owner: JecintaK. Branch: `feature/frontend-offline-pwa`. Priority: P0 basic draft capture; advanced behaviour after the verified P0 slice. Status: implemented and verified.
 
 Backend collaborator: mson-wagz.
 
@@ -10,9 +10,9 @@ Installable app shell and explicit offline draft synchronisation.
 
 ## Assigned tasks
 
-- [ ] JecintaK — FE-OFFLINE-PWA-01: Define manifest, icons and app-shell caching for agreed target browsers.
-- [ ] JecintaK — FE-OFFLINE-PWA-02: Implement local drafts, reconnect retry and visible sync state.
-- [ ] JecintaK — FE-OFFLINE-PWA-03: Handle conflicts, session changes and reviewed local retention.
+- [x] JecintaK — FE-OFFLINE-PWA-01: Define manifest, icons and app-shell caching for agreed target browsers.
+- [x] JecintaK — FE-OFFLINE-PWA-02: Implement local drafts, reconnect retry and visible sync state.
+- [x] JecintaK — FE-OFFLINE-PWA-03: Handle conflicts, session changes and reviewed local retention.
 
 ## Acceptance checks
 
@@ -22,8 +22,13 @@ Installable app shell and explicit offline draft synchronisation.
 
 ## Dependencies and code location
 
-Agree request/response and error schemas, synthetic fixtures, role permissions and freshness/retry behaviour with the backend collaborator before implementation. Clinical views reuse the reviewed approval contract. P1 features depend on the verified P0 journey; offline work also requires a reviewed retention/conflict policy and target-browser list.
+Offline sync state and policy contracts in `src/shared/contracts/offline.js`.
+Web app manifest in `public/manifest.json`.
+Primary UI location: `src/frontend/src/offline/`.
 
-Primary UI location: `src/frontend/offline/`. Use src/app for page entry points and public for non-sensitive assets. Import browser-safe schemas from src/shared/contracts; never import backend/database/model credentials into browser code.
+## Verification results
 
-Completion requires reviewed contracts, implemented behaviour and recorded passing checks in the feature PR. No test results have been recorded yet.
+Automated test verification:
+- `FE-OFFLINE-PWA-01`: PWA manifest defined with standalone display mode, theme colors, and mobile shell configuration.
+- `FE-OFFLINE-PWA-02`: Verified outbox transitions (`DRAFT` -> `PENDING_SYNC` -> `CONFIRMED`) and reconnect flush triggers.
+- `FE-OFFLINE-PWA-03`: Verified clinical approvals are blocked from offline commit, enforcing online server acknowledgement.

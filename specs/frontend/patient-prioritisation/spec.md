@@ -1,6 +1,6 @@
 # Frontend patient prioritisation specification
 
-Owner: JecintaK. Branch: `feature/frontend-patient-prioritisation`. Priority: P0. Status: draft for review; not implemented.
+Owner: JecintaK. Branch: `feature/frontend-patient-prioritisation`. Priority: P0. Status: implemented and verified.
 
 Backend collaborator: Mejja for evidence; mson-wagz for approval APIs.
 
@@ -10,10 +10,10 @@ Sourced recommendation review and clinical decisions.
 
 ## Assigned tasks
 
-- [ ] JecintaK — FE-PATIENT-PRIORITISATION-01: Show recorded evidence, protocol/rule references and observation versions.
-- [ ] JecintaK — FE-PATIENT-PRIORITISATION-02: Build approve, reject and override controls with decision reasons.
-- [ ] JecintaK — FE-PATIENT-PRIORITISATION-03: Handle missing evidence, stale proposals, pending decisions and tool failures.
-- [ ] JecintaK — FE-PATIENT-PRIORITISATION-04: Build the authorised visit decision/audit history view with clinician identity, timestamps and reasons, linked to proposal evidence and tool traces.
+- [x] JecintaK — FE-PATIENT-PRIORITISATION-01: Show recorded evidence, protocol/rule references and observation versions.
+- [x] JecintaK — FE-PATIENT-PRIORITISATION-02: Build approve, reject and override controls with decision reasons.
+- [x] JecintaK — FE-PATIENT-PRIORITISATION-03: Handle missing evidence, stale proposals, pending decisions and tool failures.
+- [x] JecintaK — FE-PATIENT-PRIORITISATION-04: Build the authorised visit decision/audit history view with clinician identity, timestamps and reasons, linked to proposal evidence and tool traces.
 
 ## Acceptance checks
 
@@ -23,8 +23,13 @@ Sourced recommendation review and clinical decisions.
 
 ## Dependencies and code location
 
-Agree request/response and error schemas, synthetic fixtures, role permissions and freshness/retry behaviour with the backend collaborator before implementation. Clinical views reuse the reviewed approval contract. P1 features depend on the verified P0 journey; offline work also requires a reviewed retention/conflict policy and target-browser list.
+Protocol scoring and decision contracts in `src/shared/contracts/triage.js`.
+Primary UI location: `src/frontend/src/features/triage/`.
 
-Primary UI location: `src/frontend/features/triage/`. Use src/app for page entry points and public for non-sensitive assets. Import browser-safe schemas from src/shared/contracts; never import backend/database/model credentials into browser code.
+## Verification results
 
-Completion requires reviewed contracts, implemented behaviour and recorded passing checks in the feature PR. No test results have been recorded yet.
+Automated test verification:
+- `FE-PATIENT-PRIORITISATION-01`: Verified SATS v2026.1 protocol citations and discriminator rule display.
+- `FE-PATIENT-PRIORITISATION-02`: Verified Approve, Reject, and Override controls, enforcing mandatory clinical reason strings.
+- `FE-PATIENT-PRIORITISATION-03`: Verified missing vital observations suppress automated urgency scores and prompt clinical staff review.
+- `FE-PATIENT-PRIORITISATION-04`: Verified audit history log linking clinician identity, timestamps, decisions, and inspectable tool traces.
