@@ -25,7 +25,7 @@ Synthetic visit registration and timestamped observations.
 Agreed validation schemas, units and idempotency contracts in `src/shared/contracts/patient.js`.
 Primary UI location: `src/frontend/src/features/registration/`.
 
-## Verification results
+Primary UI location: `src/frontend/src/features/registration/`. Use src/frontend/src/pages for React page components and src/frontend/public for non-sensitive assets. Client routing will be selected during contract review. Import browser-safe schemas from src/shared/contracts; never import backend/database/model credentials into browser code.
 
 Automated test verification:
 - `FE-PATIENT-REGISTRATION-01`: Validates required name, age range (0-130), gender and complaint; rejects invalid formats with actionable messages.
