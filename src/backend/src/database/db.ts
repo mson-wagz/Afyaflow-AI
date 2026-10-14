@@ -11,7 +11,9 @@ export class Database implements OnModuleDestroy {
   readonly pool:Pool;
   constructor() {
     if (!config.databaseUrl) throw new Error('DATABASE_URL is required. See .env.example.');
-    this.pool = new Pool({connectionString:config.databaseUrl,ssl:databaseSsl,max:10});
+    this.pool = new Pool({connectionString:config.databaseUrl,ssl:databaseSsl,max:config.databasePoolMax,
+      connectionTimeoutMillis:5000,idleTimeoutMillis:30000,allowExitOnIdle:true});
+    this.pool.on('error',()=>console.error('An idle database connection failed.'));
   }
   async transaction<T>(operation:(db:PoolClient)=>Promise<T>):Promise<T> {
     const db=await this.pool.connect();

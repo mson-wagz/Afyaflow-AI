@@ -14,6 +14,46 @@ describe('Patient Registration Feature Specification Tests', () => {
     localStorage.clear();
   });
 
+  describe('Measurement validation feedback', () => {
+    const measurements = {
+      name: '', age: '', gender: 'Female', presentingComplaint: '',
+      systolicBp: '129', diastolicBp: '75', heartRate: '78',
+      respiratoryRate: '18', temperature: '29.2', spO2: '72',
+      avpu: 'Voice', mobility: 'Needs assistance to walk',
+    };
+
+    function openForm(values) {
+      localStorage.setItem('afyaflow_patient_reg_draft_v1', JSON.stringify(values));
+      render(<RegistrationView currentStaff={{ id: 'STAFF-101', name: 'Jane Mwangi' }} />);
+      fireEvent.click(screen.getByRole('button', { name: /Validate Measurements/i }));
+    }
+
+    it('shows success for supported entries without implying clinical normality or registering a visit', () => {
+      const initialCount = apiGetRegisteredVisits().length;
+      openForm(measurements);
+      expect(screen.getByText('Measurement checks passed')).toBeInTheDocument();
+      expect(screen.getByText(/does not mean the readings are clinically normal/i)).toBeInTheDocument();
+      expect(screen.queryByText(/Patient name is required/i)).not.toBeInTheDocument();
+      expect(apiGetRegisteredVisits()).toHaveLength(initialCount);
+      fireEvent.change(screen.getByLabelText(/Temperature/i), { target: { value: '37' } });
+      expect(screen.queryByText('Measurement checks passed')).not.toBeInTheDocument();
+    });
+
+    it('shows out-of-range errors beside the validation button', () => {
+      openForm({ ...measurements, heartRate: '320' });
+      expect(screen.getByText('Please correct the measurements')).toBeInTheDocument();
+      expect(screen.getAllByText(/Heart rate must be between 20 and 260/i)).toHaveLength(2);
+      expect(screen.queryByText('Measurement checks passed')).not.toBeInTheDocument();
+    });
+
+    it('shows missing readings and unrecorded selections without a success message', () => {
+      openForm({ ...measurements, spO2: '', avpu: '', mobility: '' });
+      expect(screen.getByText('Measurements are incomplete')).toBeInTheDocument();
+      expect(screen.getByText(/Not recorded: SpO2, Consciousness \(AVPU\), Mobility Status/i)).toBeInTheDocument();
+      expect(screen.queryByText('Measurement checks passed')).not.toBeInTheDocument();
+    });
+  });
+
   describe('FE-PATIENT-REGISTRATION-01: Explicit Missing-Information Validation', () => {
     it('rejects missing patient name and invalid age without guessing values', () => {
       const invalidPatient = {

@@ -1,227 +1,209 @@
 # AfyaFlow AI
 
-**A mobile-first hospital triage and patient flow assistant for Kenyan healthcare facilities.**
+**A hospital triage and patient flow prototype for Kenyan healthcare facilities.**
 
-AfyaFlow AI helps staff review patient priority, manage waiting queues, identify changes in recorded observations and recommend appropriate departments. AI agents gather evidence and propose actions; a named nurse or clinician reviews consequential decisions before they affect patient flow.
+AfyaFlow connects registration, recorded observations, agent-assisted priority proposals, staff decisions, waiting queues, deterioration review, and department routing. The agent gathers evidence through MCP tools; an authenticated nurse or clinician makes the consequential decision.
 
-The project is being prepared for the **African Agentic AI Design Challenge**, in the Health & Wellbeing track. The proposed primary theme is **symptom-based priority scoring**, supported by queue management. Deterioration monitoring and department routing are planned extensions of the same patient journey.
+**Current status:** the React/NestJS/PostgreSQL app works locally, a real Amazon Bedrock assessment has been verified, and the backend is refactored for AWS Lambda. The SAM template passes validation. No AWS hosting resources have been deployed; the Lambda image still needs a Docker build and staging verification.
 
-## Project status
+The app uses synthetic patients and an **unvalidated scoring fixture**. It is a development demonstration, not a clinically validated triage system. The project is being prepared for the African Agentic AI Design Challenge, Health & Wellbeing track; hosted Nova Lite does not itself satisfy an open-weights evaluation requirement.
 
-**Development prototype — React frontend, NestJS/PostgreSQL backend, and a hosted Bedrock agent workflow implemented.**
+## Documentation
 
-The app supports synthetic registration, versioned observations, an agent-generated proposal, clinician approval and a persistent queue. The agent runs on Amazon Bedrock through LangGraph and real MCP tools. Clinical scoring remains an unvalidated test fixture; this is not a clinical deployment. See [backend setup and verified scope](src/backend/README.md), [implemented API contracts](specs/contracts.md), and [executed evaluations](EVALS.md).
+- [Application user guide](docs/USER_GUIDE.md): sign-in, registration, assessments, decisions, queues, routing, and offline drafts.
+- [Backend setup](src/backend/README.md): local PostgreSQL, Bedrock configuration, and development accounts.
+- [Lambda deployment guide](deploy/lambda/README.md): AWS prerequisites, SAM deployment, migrations, and staging checks.
+- [Testing guide](TESTING.md), [architecture](ARCHITECTURE.md), [API/MCP contracts](specs/contracts.md), and [evaluation evidence](EVALS.md).
+- [Feature specifications](specs/features/README.md), [frontend specifications](specs/frontend/README.md), and [development tasks](specs/tasks.md).
 
-The competition prototype will use synthetic patient data. It is not a clinical deployment or a validated triage product.
+## Implemented features
 
-## The problem
+- **Staff access:** server-backed sign-in, HttpOnly cookie sessions, locking, logout, role checks, and shared authentication throttling.
+- **Registration:** demographic and complaint validation, timestamped observations, staff attribution, draft retention, and retry-safe submission.
+- **Measurement feedback:** visible success, missing-value warnings, and range errors. Passing entry checks does not establish clinical normality or save a visit.
+- **Agent assessments:** durable jobs, versioned evidence, bounded execution, actual model/tool traces, and persisted proposals for human review.
+- **Clinical review:** approve, reject, or override proposals; record reasons; show success or permission errors; reject stale evidence.
+- **Hospital queue:** approved priorities, waiting times, department filtering, workload snapshots, and visible stale-data states.
+- **Deterioration review:** compare observation versions and support authorised, reasoned reassessment. The app does not measure vital signs itself.
+- **Routing:** review synthetic department availability/capacity and explicitly commit a transfer with version checks.
+- **Offline intake:** browser-local registration drafts and reconnect replay. Clinical decisions require online server acknowledgement.
+- **Audit history:** persisted staff decisions and workflow events, with append-only database protection for observations, decisions, transfers, and audit records.
 
-A triage desk needs to coordinate arriving patients, incomplete observations, changing symptoms and available staff. A queue ordered only by arrival time can obscure who needs a prompt assessment. AfyaFlow AI aims to give nurses an evidence-backed review workflow and hospital staff a shared view of approved priorities and waiting times.
+Capacity and staffing figures are synthetic, not live hospital telemetry. The frontend is responsive and includes a web manifest; service-worker caching, reliable offline app loading, and installability across target devices remain to be implemented or verified.
 
-The design will account for differences between Kenyan facilities in connectivity, available devices, staffing and budgets. Facility assumptions will be checked with healthcare staff rather than treated as universal.
+## Technologies used
 
-## Product approach
+### Application and data
 
-One responsive **Progressive Web App (PWA)** will support both mobile and desktop access.
+- **React, JavaScript/JSX, CSS:** responsive interface and reusable components.
+- **Vite:** frontend development server, API proxy, and production build.
+- **Node.js 24, TypeScript, NestJS, Express:** backend runtime, controllers, dependency injection, and services.
+- **dotenv, reflect-metadata, RxJS:** environment configuration and supporting NestJS runtime libraries.
+- **PostgreSQL and `pg`:** records, transactions, row/advisory locks, job leases, retry keys, sessions, and audit events.
+- **Zod:** request validation and MCP tool schemas.
+- **Node.js crypto:** salted scrypt PIN hashes, secure session tokens, and SHA-256 fingerprints.
+- **Browser localStorage:** drafts, registration outbox, and the separate browser-only demonstration store.
+- **embedded-postgres:** portable local PostgreSQL; Docker Compose provides another local database option.
 
-- **Phones:** patient registration, observation capture, recommendation review and reassessment.
-- **Tablets and computers:** department queues, staffing and workload views, approvals and audit history.
-- **Intermittent connectivity:** local draft capture, visible pending synchronisation and explicit stale-data indicators.
-- **Shared devices:** individual staff accounts, role-based access and session locking.
+### Agents and MCP
 
-Offline capture must not imply that other devices have received an update. Clinical approvals and shared queue changes require a successful server acknowledgement. The design must provide a manual escalation workflow when connectivity or the model is unavailable. PWA installation and background capabilities will be tested on the team's target browsers and devices.
+- **Amazon Bedrock Converse and Amazon Nova Lite:** hosted inference. The verified configuration uses `eu-west-1` and `eu.amazon.nova-lite-v1:0`.
+- **LangGraph:** model/tool orchestration and bounded workflow control. Human-review state is persisted in PostgreSQL.
+- **Official MCP TypeScript client/server SDKs:** real tool discovery and dispatch through run-scoped in-memory transports, plus an optional stdio entry point.
+- **Custom MCP tools:** `get_observations`, `read_protocol`, `score_protocol`, and `save_pending_proposal`.
+- **Official filesystem MCP reference server:** a borrowed subprocess retrieves the fixed protocol file. The agent-facing wrapper exposes only that read; deployment protocol files are read-only.
+- **Versioned synthetic protocol JSON:** deterministic scoring and missing-evidence checks. The model cannot invent measurements, choose clinical thresholds, approve a proposal, or update the approved queue.
 
-## Planned MVP
+### Testing and deployment tooling
 
-### 1. Patient registration and observations
+- **Vitest, React Testing Library, jest-dom, jsdom:** browser API, component, and connected frontend workflow tests.
+- **Node.js test runner and `@nestjs/testing`:** backend units and PostgreSQL/HTTP/MCP/Lambda integration tests.
+- **tsx and the TypeScript compiler:** local TypeScript execution and compiled backend builds.
+- **`@codegenie/serverless-express`:** NestJS/Express adaptation to API Gateway events.
+- **AWS SDK for JavaScript:** Bedrock, SQS, and Secrets Manager clients.
+- **Docker, AWS SAM, CloudFormation, AWS CLI:** packaging and deployment configuration.
+- **Git/GitHub:** version control. A GitHub Actions deployment pipeline has not been added.
 
-Capture a synthetic patient identifier, presenting complaint, arrival time and timestamped observations with units and staff attribution. Missing required information must be shown explicitly.
+Dependency versions are recorded in the root and frontend manifests and lockfiles.
 
-### 2. Evidence-backed patient prioritisation
+## AWS services and their roles
 
-Generate a proposed priority using a documented, pre-existing triage protocol. Each recommendation must reference the observations or symptom entries that support it, together with the protocol version and relevant rule.
+**Already used and verified:** Amazon Bedrock hosted inference. The hosting services below are represented in deployment configuration or required as existing resources; they are not yet deployed for this app.
 
-A nurse or clinician can approve, reject or override a proposal. The server records the decision and reason. Unapproved recommendations cannot change the approved queue.
+### Resources described by the SAM template
 
-The protocol and supported patient population remain to be selected during specification. The South African Triage Scale is a candidate; its clinical suitability, source version and resource licence must be reviewed before implementation. The model must not invent thresholds or fill missing measurements with guesses.
+- **AWS Lambda:** separate API, agent worker, scheduled dispatcher, and operator-invoked migration functions.
+- **Amazon API Gateway HTTP API:** routes HTTP requests to the API Lambda.
+- **Amazon SQS:** assessment deliveries, retries, and a dead-letter queue.
+- **Amazon EventBridge:** invokes the outbox dispatcher every minute.
+- **Amazon S3:** private frontend bucket with encryption and versioning.
+- **Amazon CloudFront:** HTTPS frontend delivery, S3 origin access control, and same-origin API forwarding with caching disabled for `/api/*`.
+- **AWS IAM:** scoped execution roles and model, queue, and secret permissions.
+- **Amazon CloudWatch Logs and Alarms:** function logs with retention, dispatcher-error monitoring, and dead-letter queue monitoring. Notification subscriptions need configuration.
+- **AWS CloudFormation:** provisions the infrastructure described through AWS SAM.
 
-### 3. Hospital queue management
+### Existing resources and deployment prerequisites
 
-Display waiting times, assessment status and approved priorities. Recommend changes based on workload and available staff without applying them automatically. Patients awaiting assessment remain visible even when a recommendation cannot be generated.
+- **Amazon RDS for PostgreSQL:** intended private hosted database. The template consumes an existing database; development currently uses local PostgreSQL.
+- **AWS Secrets Manager:** existing database credentials and CloudFront origin token, read at Lambda cold start.
+- **Amazon VPC:** existing subnets, security groups, and private database connectivity.
+- **AWS PrivateLink/interface VPC endpoints:** a no-NAT option for Bedrock Runtime, SQS, and Secrets Manager connectivity. Endpoints are prerequisites for that design and have their own charges.
+- **Amazon ECR:** stores container images published during SAM deployment.
+- **AWS KMS:** optional customer-managed encryption key for the database secret; the template accepts its ARN and grants scoped decryption.
 
-### Planned extensions
+**Optional:** RDS Proxy can help manage database connections, but is not provisioned or required by this template. ECS/Fargate and EC2 are alternative hosts, not components of the selected Lambda deployment. AgentCore Gateway is not required for the current MCP transport.
 
-- **Deterioration monitoring:** compare newly recorded observations or reported symptom changes and propose a reassessment. Software does not measure vital signs by itself.
-- **Department routing:** propose a department using clinical assessment and configured service availability, subject to clinical approval.
+## Assessment workflow
 
-The first complete demonstration will cover registration, agent tool use, a sourced recommendation, nurse approval and an approved queue update. Extensions follow after that journey works reliably.
+1. Staff register a synthetic visit or save new observations.
+2. A transaction records the assessment job and delivery intent.
+3. Locally a polling worker claims the job. On Lambda the scheduled dispatcher sends it through SQS.
+4. LangGraph calls Bedrock, which selects permitted MCP tools to retrieve observations and the protocol, calculate a deterministic score, and save a pending proposal.
+5. Missing evidence or an unsupported population requires staff review instead of a guessed priority.
+6. A nurse or clinician reviews the patient, observation version, protocol, recommendation, and tool trace.
+7. The server checks authority and freshness, then atomically records a separate decision and any approved queue update.
 
-## Technology decisions
+Retry keys, database leases, and delivery generations protect repeated submissions and deliveries. A saved proposal can survive an interrupted worker acknowledgement without repeating inference. Failures remain visible and support explicit retry or a reasoned manual clinical decision.
 
-**Confirmed by the team:** React frontend and NestJS backend. NestJS is the backend framework; TypeScript is its planned implementation language.
+## Run locally
 
-Proposed implementation:
+Use Node.js 24. From the repository root:
 
-- **Frontend:** React + Vite, currently initialised in JavaScript/JSX; responsive layouts and PWA support are planned. A TypeScript migration would be a separate team decision.
-- **Backend:** NestJS with TypeScript, feature modules, HTTP controllers, injectable services, validation and server-side approval checks.
-- **Application structure:** separate frontend and backend projects in one repository, with separate Node.js processes for agent execution and MCP tools where needed.
-- **Agent orchestration:** LangGraph for JavaScript/TypeScript.
-- **Model:** a locally served open-weights model, with Qwen as a candidate pending hardware and evaluation checks.
-- **Custom MCP server:** TypeScript tools for retrieving observations, calculating a protocol-based proposal and saving a pending recommendation.
-- **Borrowed MCP server:** the official filesystem reference server, provisionally used to retrieve locally stored protocol resources. Expose only necessary read tools and mount approved resources read-only; directory restrictions alone do not disable its write capabilities.
-- **Database:** PostgreSQL for patient visits, observations, recommendations, approvals and audit events.
-- **Updates:** polling initially; a persistent event transport can follow if justified by deployment constraints.
-
-Hosting remains undecided. The competition design must keep patient health data in-country. Synthetic-only development does not establish that a future deployment meets clinical or data-protection requirements.
-
-## Proposed agent workflow
-
-1. Receive a request for a patient's assessment.
-2. Retrieve the current observation version through the custom MCP server.
-3. Retrieve the selected protocol resource through the borrowed MCP server.
-4. Check whether the evidence is sufficient; request staff review when it is not.
-5. Call the deterministic protocol-scoring tool and check its evidence references.
-6. Save a pending recommendation and display the tool trace.
-7. Pause for a named nurse or clinician's decision.
-8. Validate that observations have not changed, then atomically record approval and update the approved queue.
-
-The agent may choose tools, check outputs and recover from a bounded tool failure. Clinical scoring belongs in versioned, testable protocol logic. The model explains and coordinates the workflow; it cannot approve its own proposal.
-
-## Team ownership
-
-### Backend developer 1 — mson-wagz — application and data
-
-Own the NestJS controllers and services, database schema, authentication, role checks, approval transactions, queue state and synchronisation behaviour. Coordinate shared API schemas with JecintaK.
-
-### Backend developer 2 — Mejja — agents and MCP
-
-Own LangGraph orchestration, the custom MCP server, borrowed-server integration, local model connection, protocol implementation, tool traces and agent evaluations.
-
-### Frontend developer — JecintaK — React PWA
-
-Own mobile and desktop layouts, registration and observations, queue views, evidence and approval screens, PWA installation, local drafts and connectivity indicators. Use contract-aligned mocks while APIs are being implemented.
-
-All three developers review the shared contracts and demonstrate the complete workflow. Each developer should be able to explain their code during the challenge's live technical review.
-
-Backend feature branches:
-
-- mson-wagz: `feature/backend-queue-management` (P0) and `feature/backend-department-routing` (P1).
-- Mejja: `feature/backend-patient-prioritisation` (P0) and `feature/backend-deterioration-monitoring` (P1).
-
-See [feature specifications and lifecycle](specs/features/README.md), [foundational backend tasks and milestones](specs/tasks.md) and [JecintaK's frontend specs and branches](specs/frontend/README.md). All frontend tasks belong to JecintaK, with one dedicated frontend branch per feature.
-
-## Repository organisation
-
-```text
-Afyaflow-AI/
-├── specs/                    # Shared requirements, contracts and tasks
-│   ├── features/             # One specification per product feature
-│   └── frontend/             # JecintaK's UI specs, tasks and branches
-├── src/
-│   ├── frontend/             # React + Vite project
-│   │   ├── package.json
-│   │   ├── index.html
-│   │   ├── public/           # Non-sensitive public assets
-│   │   └── src/
-│   │       ├── App.jsx
-│   │       ├── main.jsx
-│   │       ├── pages/
-│   │       │   ├── patients/
-│   │       │   └── queue/
-│   │       ├── features/
-│   │       │   ├── registration/
-│   │       │   ├── triage/
-│   │       │   ├── queue/
-│   │       │   ├── staff-access/
-│   │       │   ├── deterioration/
-│   │       │   └── routing/
-│   │       ├── components/
-│   │       └── offline/
-│   ├── backend/              # NestJS project scaffold
-│   │   └── src/
-│   │       ├── modules/
-│   │       │   ├── patients/
-│   │       │   ├── observations/
-│   │       │   ├── triage/
-│   │       │   ├── queue/
-│   │       │   └── approvals/
-│   │       ├── auth/
-│   │       └── database/
-│   └── shared/
-│       └── contracts/
-├── services/
-│   ├── agents/
-│   └── mcp/
-├── tests/
-├── ARCHITECTURE.md
-└── EVALS.md
+```sh
+npm ci
+npm ci --prefix src/frontend
+cp .env.example .env
 ```
 
-Each scaffold directory contains a README explaining its responsibilities and owner so Git preserves the structure. React page components and NestJS controllers stay thin; frontend features and backend services contain the relevant logic. The frontend imports browser-safe contracts, never backend code or credentials.
+PowerShell also supports `Copy-Item .env.example .env`. Configure your own database password in `DATABASE_URL`. Choose PostgreSQL installed locally, Docker Compose, or the portable helper; start only one on the chosen port.
 
-See [the proposed architecture](ARCHITECTURE.md), [specification workflow](specs/README.md) and [evaluation plan](EVALS.md). Frontend package configuration and entry points exist. The NestJS package, bootstrap and executable backend tests will be added after specification review.
+Keep the portable database running in its own terminal:
 
-## Spec-driven development
+```sh
+npm run dev:db
+```
 
-**Workflow: specify → review → plan → implement → verify.**
+Apply migrations and seed synthetic records:
 
-Specification deliverables:
+```sh
+npm run db:migrate
+npm run db:seed
+```
 
-- `specs/requirements.md`: users, scope, requirement IDs and acceptance criteria.
-- `ARCHITECTURE.md`: concise architecture, trust boundaries and built-versus-borrowed MCP decisions.
-- `specs/data-model.md`: entities, timestamps, observation versions and decision history.
-- `specs/contracts.md`: API routes, request and response shapes, MCP schemas and errors.
-- `specs/tasks.md`: dependency-ordered work assigned to the three developers.
-- `EVALS.md`: repeatable test tasks, recorded results and unresolved failures.
+Configure AWS credentials through an AWS CLI profile or the SDK credential chain, and set `AWS_REGION` and `BEDROCK_MODEL_ID` in `.env`. Agent runs require Bedrock invocation permissions. Other server workflows can be tested without model access; agent failures then require review.
 
-ARCHITECTURE.md and EVALS.md exist as planning documents. specs/tasks.md assigns backend work and shared milestones. specs/features/ contains four draft feature specifications with requirement IDs, acceptance criteria and task checklists. Shared requirements, data-model and contract documents remain to be written and reviewed before application implementation begins.
+Start these in separate terminals:
 
-For each feature:
+```sh
+npm run dev:backend
+```
 
-1. Write a user story, requirement ID and observable acceptance criteria.
-2. Agree the data and API/MCP contract before frontend and backend work diverge.
-3. Assign an owner and identify dependencies.
-4. Implement a small end-to-end slice using synthetic fixtures.
-5. Verify behaviour against the acceptance criteria and attach evidence to the pull request.
-6. Update the specification when a product decision changes; do not silently change the contract in code.
+```sh
+npm run dev --prefix src/frontend
+```
 
-An AI coding request should identify the relevant requirements, contracts and bounded task. Generated code receives the same review and verification as manually written code.
+Open **http://localhost:5173**. The backend listens on port 3000 by default, and Vite proxies `/api` to it. See [backend setup](src/backend/README.md) for details.
 
-## Acceptance gates for the first slice
+### Synthetic development accounts
 
-- An unauthorised user cannot approve a recommendation.
-- A recommendation cites actual input records and an identified protocol rule.
-- A pending recommendation leaves the approved queue unchanged.
-- Changed observations invalidate an earlier proposal before approval.
-- Retrying a submission or approval does not create duplicate records or queue changes.
-- A failed approval transaction leaves no partial queue update.
-- Offline drafts and stale queue data are visibly distinguished from confirmed server state.
-- Tool failure produces a visible staff-review path, not a fabricated priority.
-- The audit trail connects agent inputs, outputs, timestamps and the clinician's decision.
+- **Nurse:** `STAFF-101`, PIN `1234` — Jane Mwangi.
+- **Clinician:** `STAFF-102`, PIN `2345` — Kamau Otieno.
+- **Clerk:** `STAFF-103`, PIN `3456` — Faith Achieng.
+- **Administrator:** `STAFF-104`, PIN `4567` — Samuel Mutua.
 
-These are planned checks, not claims of passing tests.
+These public fixture credentials are for synthetic demonstrations only. Clerks can register demographics and complaints; recording measurements and clinical decisions requires a clinical role. Administrative accounts cannot register visits.
 
-## Competition preparation
+### Browser-only demonstration mode
 
-According to the healthcare brief, the submission needs custom MCP tools, a borrowed MCP server, open-source orchestration, an open-weights task run, logged actions and human approval. Deliverables include a public repository with an OSI-approved licence, runnable setup, a short public demo, a project description, `ARCHITECTURE.md` and `EVALS.md` with at least eight tasks and honest results.
+Create `src/frontend/.env.local` containing `VITE_API_MODE=demo` and restart Vite to use simulated adapters without a backend. Remove that override and restart Vite to return to the connected app. This mode uses browser-local records and simulated agent evidence. Frontend tests also use these adapters unless explicitly testing the API client.
 
-The main portal states **15 October 2026** as the final deadline. Its FAQ restricts evaluated implementation to the official build window, while the healthcare rules leave the exact submission-period timestamps unresolved. Confirm the window and cutoff with the organisers before scheduling implementation. The poster says teams of up to six; the healthcare brief says up to three. This project's three-person team fits both published limits.
+## Tests and verification
 
-No application or external submission has been made from this repository.
+```sh
+npm run test:unit
+npm run test:integration
+npm test
+npm run build:backend
+npm run build --prefix src/frontend
+```
 
-## Development setup
+The latest verified suite has **97 passing tests: 39 backend and 58 frontend**. Both builds pass. Integration tests require local PostgreSQL, create an isolated temporary schema, and use a model test double with real MCP tools. They make no paid Bedrock calls. [TESTING.md](TESTING.md) describes scope; [EVALS.md](EVALS.md) separately records the hosted-model run.
 
-Install root and frontend dependencies, configure `.env`, start PostgreSQL, run `npm run db:migrate` and `npm run db:seed`, then start `npm run dev:backend` and `npm run dev --prefix src/frontend`. The app opens at http://localhost:5173. [Full setup instructions](src/backend/README.md) include the portable local PostgreSQL option and Bedrock configuration.
+## Deploy to AWS Lambda
 
-Dependency versions are locked. The backend and frontend builds and PostgreSQL integration tests have run; EVALS.md distinguishes the model test harness from the real hosted Bedrock run. No AWS hosting infrastructure has been provisioned.
+Follow [the deployment guide](deploy/lambda/README.md) for private RDS/VPC prerequisites, secret format, IAM resources, migrations, frontend upload, and verification. The template does not provision the database or VPC endpoints.
 
-## Sources
+```sh
+sam validate --lint --template-file deploy/lambda/template.yaml
+sam build --template-file deploy/lambda/template.yaml
+sam deploy --guided --resolve-image-repos
+```
 
-- [Challenge portal and FAQ](https://agentic-africa-challenge.lovable.app/)
-- [Healthcare track brief](https://agentic-africa-challenge.lovable.app/tracks/healthcare)
-- [EMSSA South African Triage Scale resources](https://emssa.org.za/special-interest-groups/the-south-african-triage-scale-sats/)
-- [LangGraph JavaScript documentation](https://docs.langchain.com/oss/javascript/langgraph/overview)
-- [Official filesystem MCP reference server](https://github.com/modelcontextprotocol/servers/tree/main/src/filesystem)
-- [Kenya ODPC guidance on processing health data](https://www.odpc.go.ke/wp-content/uploads/2024/02/ODPC-Guidance-Note-on-Processing-of-Health-Data.pdf)
-- [NestJS controllers](https://docs.nestjs.com/controllers)
-- [NestJS modules](https://docs.nestjs.com/modules)
+Docker and SAM CLI are required. SAM lint has passed; container execution and actual deployment remain unverified. Public subnets alone do not provide standard VPC-connected Lambda functions internet access. The documented no-NAT design uses suitable service connectivity, such as interface endpoints.
+
+The configuration includes selected Well-Architected practices: repeatable infrastructure, restricted permissions, private database access, TLS, retry-safe jobs, failure alarms, bounded execution, and configurable concurrency. A full assessment, stronger authentication, restore drills, operational notifications, availability targets, and measured costs remain production preparation work.
+
+## Repository layout
+
+```text
+src/frontend/       React application and frontend tests
+src/backend/src/    NestJS API, data, authentication, and Lambda handlers
+src/shared/         Browser-safe contracts and synthetic fixtures
+services/agents/    Bedrock and LangGraph workflow
+services/mcp/       Tools, borrowed server integration, and protocol fixture
+tests/backend/      Backend unit and integration tests
+scripts/            Local PostgreSQL helper
+deploy/lambda/      SAM template and deployment guide
+docs/               Application user guide
+specs/              Requirements, contracts, and feature specifications
+```
+
+`.env`, `.local/`, dependencies, and generated builds are ignored. Never commit the local PostgreSQL cluster or credentials.
+
+## Team and licence
+
+- **mson-wagz:** backend application and data workflows.
+- **Mejja:** agent orchestration and MCP.
+- **JecintaK:** frontend workflows and responsive interface.
+
+Shared ownership and milestones are tracked in [specs/tasks.md](specs/tasks.md). The project uses the [MIT licence](LICENSE).

@@ -40,6 +40,7 @@ export default function useRegistration(currentStaff) {
 
   const [validationErrors, setValidationErrors] = useState({});
   const [missingObservations, setMissingObservations] = useState([]);
+  const [measurementValidation, setMeasurementValidation] = useState(null);
   const [submissionStatus, setSubmissionStatus] = useState('idle'); // idle | submitting | confirmed | duplicate | error
   const [submittedRecord, setSubmittedRecord] = useState(null);
   const [errorMessage, setErrorMessage] = useState('');
@@ -56,6 +57,8 @@ export default function useRegistration(currentStaff) {
   }, [formData, submissionStatus]);
 
   const handleChange = (field, value) => {
+    setMeasurementValidation(null);
+    setMissingObservations([]);
     if (['confirmed','duplicate','pending'].includes(submissionStatus)) {
       setSubmissionStatus('idle'); setSubmittedRecord(null);
       setIdempotencyKey(generateSubmissionIdempotencyKey('new_reg'));
@@ -74,6 +77,16 @@ export default function useRegistration(currentStaff) {
       });
     }
   };
+
+  const validateMeasurements = useCallback(() => {
+    const result = validateObservationData(formData);
+    const missingFields = [...result.missingFields];
+    if (!formData.avpu) missingFields.push('Consciousness (AVPU)');
+    if (!formData.mobility) missingFields.push('Mobility Status');
+    setValidationErrors(result.errors);
+    setMissingObservations(missingFields);
+    setMeasurementValidation({ ...result, missingFields });
+  }, [formData]);
 
   const validate = useCallback(() => {
     const patientValidation = validatePatientRegistration(formData);
@@ -158,6 +171,7 @@ export default function useRegistration(currentStaff) {
     });
     setValidationErrors({});
     setMissingObservations([]);
+    setMeasurementValidation(null);
     setSubmissionStatus('idle');
     setSubmittedRecord(null);
     setErrorMessage('');
@@ -169,12 +183,14 @@ export default function useRegistration(currentStaff) {
     formData,
     validationErrors,
     missingObservations,
+    measurementValidation,
     submissionStatus,
     submittedRecord,
     errorMessage,
     idempotencyKey,
     handleChange,
     validate,
+    validateMeasurements,
     submitRegistration,
     resetForm,
     units: OBSERVATION_UNITS,

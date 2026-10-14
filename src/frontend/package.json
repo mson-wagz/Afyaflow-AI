@@ -7,7 +7,9 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "test": "vitest run"
+    "test": "vitest run",
+    "test:unit": "vitest run src/api/client.unit.test.js",
+    "test:integration": "vitest run --exclude **/*.unit.test.js"
   },
   "keywords": [],
   "author": "",

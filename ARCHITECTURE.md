@@ -19,6 +19,16 @@ The scorer is a named unvalidated synthetic fixture, not an approved SATS protoc
 Docker/RDS deployment is prepared but untested; nothing has been hosted on AWS.
 See specs/contracts.md and src/backend/README.md for implemented behavior.
 
+Lambda hosting now has separate NestJS API, SQS worker, scheduled outbox dispatcher,
+and operator-only migration entry points. Run creation and delivery intent share a
+PostgreSQL transaction; worker leases and retry generations fence duplicate or old
+messages. The API retains cookie sessions behind same-origin CloudFront routing;
+shared database throttling uses an authenticated CloudFront viewer address. The SAM
+template includes private S3 frontend hosting and scoped function permissions, and
+uses an existing private database and VPC service connectivity. Local polling is
+retained for development. See deploy/lambda/README.md. SAM lint and local Lambda
+handler tests are distinct from an actual AWS deployment or container smoke test.
+
 ## Original design plan (not a claim of completed clinical validation)
 
 ## Application boundaries

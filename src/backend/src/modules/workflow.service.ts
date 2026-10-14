@@ -18,11 +18,14 @@ export function requestKey(value:unknown) {
   return value;
 }
 export async function enqueue(db:PoolClient,visitId:string,version:number) {
-  return (await db.query(`INSERT INTO agent_runs(id,visit_id,observation_version,model,status) VALUES($1,$2,$3,$4,'QUEUED')
+  const run=(await db.query(`INSERT INTO agent_runs(id,visit_id,observation_version,model,status) VALUES($1,$2,$3,$4,'QUEUED')
     ON CONFLICT(visit_id,observation_version) DO UPDATE SET status=CASE WHEN agent_runs.status='FAILED' THEN 'QUEUED' ELSE agent_runs.status END,
     error=CASE WHEN agent_runs.status='FAILED' THEN null ELSE agent_runs.error END,
     attempts=CASE WHEN agent_runs.status='FAILED' THEN 0 ELSE agent_runs.attempts END,
+    delivery_generation=CASE WHEN agent_runs.status='FAILED' THEN agent_runs.delivery_generation+1 ELSE agent_runs.delivery_generation END,
     model=CASE WHEN agent_runs.status='FAILED' THEN EXCLUDED.model ELSE agent_runs.model END RETURNING *`,[id('RUN'),visitId,version,config.model])).rows[0];
+  if(run.status==='QUEUED') await db.query('INSERT INTO agent_outbox(run_id,generation) VALUES($1,$2) ON CONFLICT DO NOTHING',[run.id,run.delivery_generation]);
+  return run;
 }
 @Injectable()
 export class WorkflowService {
