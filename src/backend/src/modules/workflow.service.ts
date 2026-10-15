@@ -11,6 +11,7 @@ import { compareObservationsForDeterioration, calculateObservationAge } from '..
 import { readProtocol } from '../../../../services/mcp/tools.js';
 import type { PoolClient } from 'pg';
 import { mimicMetadata } from '../database/mimic-data.js';
+import { evidenceChecklist } from '../../../shared/contracts/evidence.js';
 
 const priority=(code:string|null):any => code ? (TRIAGE_PRIORITY as any)[code]:null;
 const iso=(date:any) => date instanceof Date?date.toISOString():date;
@@ -42,12 +43,19 @@ export class WorkflowService {
   async visits() {
     const rows=(await this.database.pool.query(`SELECT v.*,o.id observation_id,o.vitals,o.recorded_at FROM visits v
       JOIN observations o ON o.visit_id=v.id AND o.version=v.observation_version WHERE v.data_source='synthetic' ORDER BY v.arrival_at`)).rows;
+    const protocol=await readProtocol();
     return rows.map(v => ({id:v.id,patientId:v.id,visitId:v.id,name:v.name,patientName:v.name,age:v.age,gender:v.gender,
       waitingTime:calculateElapsedWaitingTime(iso(v.arrival_at)),
       presentingComplaint:v.complaint,arrivalTime:iso(v.arrival_at),approvedPriority:priority(v.approved_priority),
       assessmentVersion:v.assessment_version,observationVersion:v.observation_version,observationId:v.observation_id,
       assessmentStatus:v.assessment_status,assignedDepartment:v.assigned_department,
+      evidenceChecklist:evidenceChecklist({age:v.age,vitals:v.vitals,version:v.observation_version,observationId:v.observation_id},protocol),
       vitals:{...v.vitals,recordedAt:iso(v.recorded_at)}}));
+  }
+  async evidence(visitId:string) {
+    const visit=(await this.visits()).find(v=>v.id===visitId);
+    if(!visit)throw new NotFoundException('Workflow visit not found.');
+    return visit.evidenceChecklist;
   }
   async register(staff:Staff,body:unknown,key:string) {
     const input=parse(registrationSchema,body);

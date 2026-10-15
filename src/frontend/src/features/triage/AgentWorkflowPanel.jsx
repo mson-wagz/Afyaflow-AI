@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { api, mutation } from '../../api/client.js';
 import { Card, Button, Alert, Modal } from '../../components';
 import { isDemoOnline } from '../../demo/store.js';
+import EvidenceChecklist from './EvidenceChecklist.jsx';
 
 const measurements=[['systolicBp','Systolic BP (mmHg)'],['diastolicBp','Diastolic BP (mmHg)'],
   ['heartRate','Heart Rate (bpm)'],['respiratoryRate','Respiratory Rate (/min)'],['temperature','Temperature (°C)'],['spO2','Oxygen Saturation (%)']];
@@ -10,8 +11,12 @@ export default function AgentWorkflowPanel({isClinical}) {
   const [visits,setVisits]=useState([]),[runs,setRuns]=useState([]),[selected,setSelected]=useState('');
   const [error,setError]=useState(''),[message,setMessage]=useState(''),[busy,setBusy]=useState(false);
   const [trace,setTrace]=useState(null),[editing,setEditing]=useState(false),[vitals,setVitals]=useState({});
+  const [editingVersion,setEditingVersion]=useState(null);
+  const [editingVisitId,setEditingVisitId]=useState(null);
   const [reason,setReason]=useState(''),[manualPriority,setManualPriority]=useState('RED');
   const visit=visits.find(v=>v.id===selected) || visits[0];
+  const staleEdit=editing && (visit?.observationVersion!==editingVersion || visit?.id!==editingVisitId);
+  const startEditing=()=>{setVitals(visit.vitals || {});setEditingVisitId(visit.id);setEditingVersion(visit.observationVersion);setEditing(true);};
   const load=async () => {
     try {const [v,r]=await Promise.all([api('/visits'),api('/agents/runs')]);setVisits(v);setRuns(r);setError('');}
     catch(e){setError(e.message);}
@@ -33,11 +38,14 @@ export default function AgentWorkflowPanel({isClinical}) {
       <Button disabled={!isClinical || busy} onClick={()=>perform(async()=>{
         await mutation(`/visits/${visit.id}/assessment`,{});setMessage('Assessment queued. The agent will gather evidence and pause for your review.');
       })}>Request Agent Assessment</Button>
-      <Button variant="outline" disabled={!isClinical || busy} onClick={()=>{setVitals(visit.vitals || {});setEditing(!editing);}}>Record New Observations</Button>
+      <Button variant="outline" disabled={!isClinical || busy} onClick={startEditing}>Record New Observations</Button>
     </div>}
+    {visit && <EvidenceChecklist report={visit.evidenceChecklist} isClinical={isClinical && !busy} onRecord={startEditing} />}
+    {staleEdit && <Alert variant="warning" title="Observations changed">This form was opened at version {editingVersion}. Select Record New Observations again to load the latest values before saving.</Alert>}
     {editing && visit && <form onSubmit={e=>{e.preventDefault();perform(async()=>{
+      if(staleEdit)throw new Error('Reload the latest observations before saving.');
       const clean=Object.fromEntries([...measurements.map(([key])=>key),'avpu','mobility'].map(key=>[key,vitals[key] ?? '']));
-      await mutation(`/visits/${visit.id}/observations`,{expectedVersion:visit.observationVersion,vitals:clean});
+      await mutation(`/visits/${visit.id}/observations`,{expectedVersion:editingVersion,vitals:clean});
       setEditing(false);setMessage('New observation version saved. Earlier proposals are invalidated and a new assessment is queued.');
     });}}>
       <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(180px,1fr))',gap:'0.75rem',marginTop:'0.75rem'}}>
@@ -49,7 +57,7 @@ export default function AgentWorkflowPanel({isClinical}) {
           <option value="">Not Recorded</option>{['Walking normally','Needs assistance to walk','Immobile / Stretcher'].map(v=><option key={v}>{v}</option>)}
         </select></label>
       </div>
-      <Button type="submit" disabled={busy || !isClinical}>Save Observation Version</Button>
+      <Button type="submit" disabled={busy || !isClinical || staleEdit}>Save Observation Version</Button>
     </form>}
     {visit && isClinical && <details style={{marginTop:'0.75rem'}}>
       <summary>Manual assessment when the agent is unavailable</summary>
