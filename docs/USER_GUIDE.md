@@ -147,6 +147,21 @@ Open **Staff Access & Audit** for permitted events. Nurses and clerks see their 
 
 ## Troubleshooting
 
+### Missing-evidence assistant
+
+In **Triage & Prioritisation**, select a visit in **Agent Assessment & Observation Capture**.
+The checklist shows recorded, missing and unsupported core evidence for that exact observation
+version. Each item cites the synthetic fixture ID, version and JSON rule location. Additional
+observations remain explicitly unknown when absent. This checklist is a deterministic evidence
+inventory; it does not diagnose or choose measurements.
+
+Clinical staff can select **Record Missing Evidence**, enter measured values, and save a new
+observation version. Existing recorded values are shown for review; empty fields are never
+estimated. Saving invalidates old proposals and queues a fresh agent assessment. If another
+staff member saves observations while the form is open, saving is disabled until you select
+**Record New Observations** again to reload the latest snapshot. Clerks can read the checklist
+but cannot record clinical observations. Missing or unsupported age requires manual review.
+
 ### Competition edition
 
 The competition edition uses fictional records and a model running on the same computer.

@@ -5,6 +5,7 @@ import { readFile } from 'node:fs/promises';
 import { performance } from 'node:perf_hooks';
 import { Database, id, hash } from '../../src/backend/src/database/db.js';
 import { calculateSatsScore } from '../../src/shared/contracts/triage.js';
+import { evidenceChecklist } from '../../src/shared/contracts/evidence.js';
 import { readProtocolThroughFilesystem } from './borrowed-protocol.js';
 import { config } from '../../src/backend/src/config.js';
 import { assertCompetitionRun } from '../../src/backend/src/runtime-policy.js';
@@ -13,7 +14,7 @@ export const protocolPath='services/mcp/protocols/synthetic-adult-v1.json';
 export async function readProtocol() {return JSON.parse(await readFile(protocolPath,'utf8'));}
 export function scoreEvidence(evidence:any,protocol:any) {
   const vitals=Object.fromEntries(Object.entries(evidence.vitals).map(([key,value]) => [key,value ?? '']));
-  const result=calculateSatsScore(vitals);
+  const result={...calculateSatsScore(vitals),evidenceChecklist:evidenceChecklist(evidence,protocol)};
   const missing=protocol.requiredFields.filter((key:string) => vitals[key] === '' || vitals[key] === undefined);
   const ageMissing=!Number.isInteger(evidence.age);
   if(ageMissing)missing.push('age');
