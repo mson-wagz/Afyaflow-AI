@@ -1,7 +1,7 @@
 # Run-scoped patient tools
 
-The custom MCP server exposes `get_observations`, `read_protocol`, `score_protocol`
-and `save_pending_proposal`. Every server instance is bound to one active run and
+The custom MCP server exposes `get_observations`, `read_protocol`, `score_protocol`,
+`get_reassessment_context` and `save_pending_proposal`. Every server instance is bound to one active run and
 its immutable observation version; model arguments cannot select another patient,
 write observations, set a priority, approve a decision or transfer a visit.
 
@@ -24,3 +24,11 @@ and deterministic score are stored in the proposal. It is not an approved SATS
 resource. Missing required values and unsupported ages produce staff review with
 no guessed urgency. The model may add a summary, but that summary cannot change
 the score or evidence persisted by the tool.
+
+Synthetic observation reads include a bound reassessment context: latest/previous snapshot
+IDs and versions, recorded-change flags, and explicit limits. The dedicated context tool
+can retrieve the same evidence. Historical records receive no follow-up context. Saving
+an incomplete or changed synthetic assessment atomically saves a pending follow-up with
+its immutable evidence and an audit event. It cannot set an owner or due time. Scheduling,
+acknowledgement, reassignment, cancellation and completion belong to authenticated clinical
+HTTP actions, outside the model's MCP allowlist. Completion requires newer observations.

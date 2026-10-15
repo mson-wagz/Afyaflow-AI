@@ -13,6 +13,7 @@ __pycache__/
 # Local environment and logs
 .env
 .env.*
+temp_auto_push.bat
 !.env.example
 *.log
 
@@ -28,3 +29,5 @@ artifacts/local/
 .local/
 .aws-sam/
 samconfig.toml
+.gitignore
+branch_structure.json

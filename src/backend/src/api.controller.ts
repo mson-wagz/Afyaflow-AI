@@ -4,12 +4,14 @@ import { AuthService, SessionGuard, StaffRequest } from './auth/auth.js';
 import { WorkflowService, requestKey } from './modules/workflow.service.js';
 import { Database, audit } from './database/db.js';
 import { config } from './config.js';
+import { FollowupService } from './modules/followup.service.js';
 
 @Controller('api')
 export class ApiController {
   constructor(@Inject(AuthService) private readonly auth:AuthService,
     @Inject(WorkflowService) private readonly workflow:WorkflowService,
-    @Inject(Database) private readonly database:Database) {}
+    @Inject(Database) private readonly database:Database,
+    @Inject(FollowupService) private readonly followups:FollowupService) {}
   @Get('health') async health() {await this.database.pool.query('SELECT 1');return {status:'ok',database:'postgresql',mode:config.mode,agentProvider:config.provider,clinicalValidated:false};}
   @Post('auth/login') async login(@Body()body:unknown,@Res({passthrough:true})res:Response) {
     const result=await this.auth.signIn(body);
@@ -54,4 +56,8 @@ export class ApiController {
   @Get('deterioration') @UseGuards(SessionGuard) deterioration() {return this.workflow.deterioration();}
   @Post('deterioration/decisions') @UseGuards(SessionGuard) reassess(@Req()req:StaffRequest,@Body()body:unknown,@Headers('idempotency-key')key:string) {return this.workflow.reassess(req.staff,body,requestKey(key));}
   @Get('audit') @UseGuards(SessionGuard) audit(@Req()req:StaffRequest) {return this.workflow.audit(req.staff);}
+  @Get('followups') @UseGuards(SessionGuard) followupList(@Req()req:StaffRequest) {return this.followups.list(req.staff);}
+  @Get('followups/staff') @UseGuards(SessionGuard) followupStaff(@Req()req:StaffRequest) {return this.followups.staff(req.staff);}
+  @Get('followups/:id/history') @UseGuards(SessionGuard) followupHistory(@Req()req:StaffRequest,@Param('id')taskId:string) {return this.followups.history(req.staff,taskId);}
+  @Post('followups/:id/actions') @UseGuards(SessionGuard) followupAction(@Req()req:StaffRequest,@Param('id')taskId:string,@Body()body:unknown,@Headers('idempotency-key')key:string) {return this.followups.act(req.staff,taskId,body,requestKey(key));}
 }

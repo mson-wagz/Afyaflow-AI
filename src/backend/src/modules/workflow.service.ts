@@ -83,6 +83,8 @@ export class WorkflowService {
       const version=visit.observation_version+1;
       await db.query('INSERT INTO observations(id,visit_id,version,vitals,recorded_by) VALUES($1,$2,$3,$4,$5)',[id('OBS'),visitId,version,JSON.stringify(input.vitals),staff.id]);
       await db.query("UPDATE proposals SET status='STALE' WHERE visit_id=$1 AND status='PENDING'",[visitId]);
+      const staleFollowups=await db.query("UPDATE followups SET status='STALE',version=version+1 WHERE visit_id=$1 AND status='PROPOSED' RETURNING id",[visitId]);
+      for(const task of staleFollowups.rows)await audit(db,staff.id,'FOLLOWUP_STALE',{followupId:task.id,newObservationVersion:version},visitId);
       await db.query("UPDATE agent_runs SET status='SUPERSEDED' WHERE visit_id=$1 AND status IN ('QUEUED','WAITING_FOR_REVIEW','REVIEW_REQUIRED')",[visitId]);
       await db.query("UPDATE visits SET observation_version=$2,assessment_status='AWAITING_ASSESSMENT',updated_at=now() WHERE id=$1",[visitId,version]);
       const run=await enqueue(db,visitId,version);
