@@ -1,0 +1,241 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1440 1000" width="1440" height="1000" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif">
+  <title>AfyaFlow AI: agents, models, MCP and human-in-the-loop</title>
+  <defs>
+    <marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#0f766e"/>
+    </marker>
+    <marker id="a-h" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#b45309"/>
+    </marker>
+    <marker id="a-m" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#94a3b8"/>
+    </marker>
+    <style>
+      .zone { fill: #f8fafc; stroke: #e2e8f0; }
+      .zone-h { fill: #fffbeb; stroke: #fde68a; }
+      .zl { font-size: 11px; font-weight: 700; letter-spacing: 0.08em; fill: #64748b; }
+      .zl-h { font-size: 11px; font-weight: 700; letter-spacing: 0.08em; fill: #b45309; }
+      .box { fill: #ffffff; stroke: #0f766e; stroke-width: 1.5; }
+      .box-h { fill: #ffffff; stroke: #d97706; stroke-width: 1.5; }
+      .box-x { fill: #ffffff; stroke: #94a3b8; stroke-width: 1.5; stroke-dasharray: 5 4; }
+      .n { font-size: 14.5px; font-weight: 600; fill: #0f172a; }
+      .s { font-size: 11.5px; fill: #475569; }
+      .code { font-size: 12px; fill: #0f172a; font-family: Consolas, 'SF Mono', Menlo, monospace; }
+      .e { stroke: #0f766e; stroke-width: 1.6; fill: none; marker-end: url(#a); }
+      .e-h { stroke: #b45309; stroke-width: 1.6; fill: none; marker-end: url(#a-h); }
+      .e-m { stroke: #94a3b8; stroke-width: 1.5; stroke-dasharray: 5 4; fill: none; marker-end: url(#a-m); }
+      .badge { fill: #0f766e; }
+      .badge-h { fill: #b45309; }
+      .bt { font-size: 11px; font-weight: 700; fill: #ffffff; text-anchor: middle; }
+      .lbl { font-size: 11px; fill: #64748b; paint-order: stroke; stroke: #ffffff; stroke-width: 4px; }
+      .pill { fill: #f0fdfa; stroke: #0f766e; stroke-width: 1; }
+      .pt { font-size: 11px; fill: #0f766e; text-anchor: middle; }
+      .step { font-size: 12.5px; fill: #1e293b; }
+    </style>
+  </defs>
+
+  <rect width="1440" height="1000" fill="#ffffff"/>
+  <text x="30" y="42" font-size="22" font-weight="700" fill="#0f172a">AfyaFlow AI: agents, models, MCP and human-in-the-loop</text>
+  <text x="30" y="64" class="s">The AI only proposes. Every priority, follow-up and transfer is committed by authenticated clinical staff. Numbers follow the overall data flow below.</text>
+
+  <!-- ============ Zones ============ -->
+  <rect class="zone-h" x="30" y="90" width="300" height="470" rx="12"/>
+  <text class="zl-h" x="46" y="114">HUMAN IN THE LOOP</text>
+  <rect class="zone" x="360" y="90" width="300" height="470" rx="12"/>
+  <text class="zl" x="376" y="114">APPLICATION &amp; STORE</text>
+  <rect class="zone" x="690" y="90" width="330" height="470" rx="12"/>
+  <text class="zl" x="706" y="114">AGENT &amp; MCP CLIENT</text>
+  <rect class="zone" x="1050" y="90" width="360" height="470" rx="12"/>
+  <text class="zl" x="1066" y="114">MCP SERVERS, TOOLS &amp; RESOURCES</text>
+
+  <rect class="zone" x="30" y="590" width="500" height="240" rx="12"/>
+  <text class="zl" x="46" y="614">DATA SOURCES</text>
+  <rect class="zone" x="560" y="590" width="400" height="240" rx="12"/>
+  <text class="zl" x="576" y="614">EXTERNAL APIS</text>
+  <rect class="zone" x="990" y="590" width="420" height="240" rx="12"/>
+  <text class="zl" x="1006" y="614">LLMS / MODELS</text>
+
+  <!-- ============ Human in the loop ============ -->
+  <rect class="box-h" x="50" y="130" width="260" height="64" rx="8"/>
+  <text class="n" x="66" y="156">Staff · React PWA</text>
+  <text class="s" x="66" y="176">register visits · record observations</text>
+
+  <rect class="box-h" x="50" y="230" width="260" height="64" rx="8"/>
+  <text class="n" x="66" y="256">Voice intake review</text>
+  <text class="s" x="66" y="276">staff check transcript and each vital</text>
+
+  <rect class="box-h" x="50" y="330" width="260" height="80" rx="8"/>
+  <text class="n" x="66" y="356">Clinician review</text>
+  <text class="s" x="66" y="376">approve · reject · override priority</text>
+  <text class="s" x="66" y="395">sees evidence and full tool trace</text>
+
+  <rect class="box-h" x="50" y="450" width="260" height="64" rx="8"/>
+  <text class="n" x="66" y="476">Follow-ups &amp; transfers</text>
+  <text class="s" x="66" y="496">staff set owner, due time, department</text>
+
+  <!-- ============ Application ============ -->
+  <rect class="box" x="380" y="130" width="260" height="80" rx="8"/>
+  <text class="n" x="396" y="156">NestJS API</text>
+  <text class="s" x="396" y="176">staff sessions · role checks · audit</text>
+  <text class="s" x="396" y="195">only path that commits decisions</text>
+
+  <rect class="box" x="380" y="300" width="260" height="80" rx="8"/>
+  <text class="n" x="396" y="326">PostgreSQL</text>
+  <text class="s" x="396" y="346">visits · observations · proposals</text>
+  <text class="s" x="396" y="365">decisions · tool traces · audit log</text>
+
+  <!-- ============ Agent ============ -->
+  <rect class="box" x="710" y="130" width="290" height="64" rx="8"/>
+  <text class="n" x="726" y="156">Outbox → SQS job queue</text>
+  <text class="s" x="726" y="176">durable, fenced run delivery</text>
+
+  <rect class="box" x="710" y="240" width="290" height="120" rx="8"/>
+  <text class="n" x="726" y="266">LangGraph agent worker</text>
+  <text class="s" x="726" y="286">one run per observation version</text>
+  <rect class="pill" x="728" y="300" width="70" height="24" rx="12"/>
+  <text class="pt" x="763" y="316">model</text>
+  <rect class="pill" x="826" y="300" width="70" height="24" rx="12"/>
+  <text class="pt" x="861" y="316">tools</text>
+  <rect class="pill" x="914" y="300" width="74" height="24" rx="12"/>
+  <text class="pt" x="951" y="316">reminder</text>
+  <path d="M798,308 H824" stroke="#0f766e" stroke-width="1.2" fill="none" marker-end="url(#a)"/>
+  <path d="M826,318 H800" stroke="#0f766e" stroke-width="1.2" fill="none" marker-end="url(#a)"/>
+  <path d="M951,300 C951,288 763,288 763,298" stroke="#0f766e" stroke-width="1.2" fill="none" stroke-dasharray="3 3" marker-end="url(#a)"/>
+  <text class="s" x="726" y="346">ends at PENDING: never approves</text>
+
+  <rect class="box" x="710" y="410" width="290" height="64" rx="8"/>
+  <text class="n" x="726" y="436">MCP client</text>
+  <text class="s" x="726" y="456">afyaflow-agent · in-memory transport</text>
+
+  <!-- ============ MCP ============ -->
+  <rect class="box-x" x="1070" y="130" width="320" height="70" rx="8"/>
+  <text class="n" x="1086" y="155">Filesystem MCP server (borrowed)</text>
+  <text class="s" x="1086" y="174">official reference server · stdio · read-only</text>
+  <text class="s" x="1086" y="191">tool read_text_file → resource: protocol JSON</text>
+
+  <rect class="box" x="1070" y="225" width="320" height="50" rx="8"/>
+  <text class="n" x="1086" y="248">MCP client</text>
+  <text class="s" x="1086" y="266">afyaflow-protocol-reader</text>
+
+  <rect class="box" x="1070" y="300" width="320" height="190" rx="8"/>
+  <text class="n" x="1086" y="326">MCP server · afyaflow-patient-tools</text>
+  <text class="s" x="1086" y="345">bound to one run · every call traced</text>
+  <text class="code" x="1086" y="372">get_observations</text>
+  <text class="code" x="1086" y="394">get_reassessment_context</text>
+  <text class="code" x="1086" y="416">read_protocol</text>
+  <text class="code" x="1086" y="438">score_protocol</text>
+  <text class="s" x="1240" y="438">deterministic</text>
+  <text class="code" x="1086" y="460">save_pending_proposal</text>
+  <text class="s" x="1086" y="480">no approve, owner or queue tools exist</text>
+
+  <!-- ============ Data sources ============ -->
+  <rect class="box" x="50" y="630" width="225" height="64" rx="8"/>
+  <text class="n" x="66" y="656">Synthetic workflow data</text>
+  <text class="s" x="66" y="676">fictional patients · PostgreSQL</text>
+
+  <rect class="box" x="285" y="630" width="225" height="64" rx="8"/>
+  <text class="n" x="301" y="656">MIMIC-IV-ED demo</text>
+  <text class="s" x="301" y="676">PhysioNet · research-only</text>
+
+  <rect class="box" x="50" y="730" width="225" height="64" rx="8"/>
+  <text class="n" x="66" y="756">Triage protocol fixture</text>
+  <text class="s" x="66" y="776">JSON · the filesystem MCP resource</text>
+
+  <rect class="box" x="285" y="730" width="225" height="64" rx="8"/>
+  <text class="n" x="301" y="756">Staff input</text>
+  <text class="s" x="301" y="776">typed + reviewed voice vitals</text>
+
+  <!-- ============ External APIs ============ -->
+  <rect class="box-x" x="580" y="630" width="180" height="64" rx="8"/>
+  <text class="n" x="594" y="656">Bedrock Converse</text>
+  <text class="s" x="594" y="676">AWS · EU inference</text>
+
+  <rect class="box-x" x="770" y="630" width="170" height="64" rx="8"/>
+  <text class="n" x="784" y="656">OpenAI Responses</text>
+  <text class="s" x="784" y="676">optional provider</text>
+
+  <rect class="box-x" x="580" y="730" width="180" height="64" rx="8"/>
+  <text class="n" x="594" y="756">Ollama HTTP</text>
+  <text class="s" x="594" y="776">loopback only</text>
+
+  <rect class="box-x" x="770" y="730" width="170" height="64" rx="8"/>
+  <text class="n" x="784" y="756">Hugging Face Hub</text>
+  <text class="s" x="784" y="776">speech model weights</text>
+
+  <!-- ============ Models ============ -->
+  <rect class="box" x="1010" y="630" width="185" height="64" rx="8"/>
+  <text class="n" x="1026" y="656">Amazon Nova Lite</text>
+  <text class="s" x="1026" y="676">default · research mode</text>
+
+  <rect class="box" x="1205" y="630" width="185" height="64" rx="8"/>
+  <text class="n" x="1221" y="656">GPT-4.1 mini</text>
+  <text class="s" x="1221" y="676">via OpenAI</text>
+
+  <rect class="box" x="1010" y="730" width="185" height="64" rx="8"/>
+  <text class="n" x="1026" y="756">Qwen3 0.6B</text>
+  <text class="s" x="1026" y="776">local · competition mode</text>
+
+  <rect class="box" x="1205" y="730" width="185" height="64" rx="8"/>
+  <text class="n" x="1221" y="756">Whisper tiny</text>
+  <text class="s" x="1221" y="776">speech-to-text in browser</text>
+
+  <!-- ============ Edges ============ -->
+  <!-- voice review feeds the draft -->
+  <path class="e-h" d="M180,230 V196"/>
+
+  <!-- 1 staff -> API -->
+  <path class="e-h" d="M310,162 H378"/>
+  <circle class="badge-h" cx="345" cy="162" r="11"/><text class="bt" x="345" y="166">1</text>
+
+  <!-- 7 clinician review, 8 follow-ups/transfers -> API -->
+  <path class="e-h" d="M310,370 H345 V200 H378"/>
+  <path d="M310,482 H345 V370" stroke="#b45309" stroke-width="1.6" fill="none"/>
+  <circle class="badge-h" cx="345" cy="290" r="11"/><text class="bt" x="345" y="294">7</text>
+  <circle class="badge-h" cx="327" cy="482" r="11"/><text class="bt" x="327" y="486">8</text>
+
+  <!-- 2 API -> PostgreSQL -->
+  <path class="e" d="M510,210 V298"/>
+  <circle class="badge" cx="510" cy="254" r="11"/><text class="bt" x="510" y="258">2</text>
+
+  <!-- 3 PostgreSQL outbox -> SQS -> agent -->
+  <path class="e" d="M640,320 L708,172"/>
+  <circle class="badge" cx="674" cy="246" r="11"/><text class="bt" x="674" y="250">3</text>
+  <path class="e" d="M855,194 V238"/>
+
+  <!-- agent -> MCP client -->
+  <path class="e" d="M855,360 V408"/>
+
+  <!-- 5 MCP client -> patient tools server -->
+  <path class="e" d="M1000,442 H1068" marker-start="url(#a)"/>
+  <circle class="badge" cx="1035" cy="442" r="11"/><text class="bt" x="1035" y="446">5</text>
+
+  <!-- read_protocol -> protocol reader -> filesystem MCP -->
+  <path class="e" d="M1230,300 V277"/>
+  <path class="e" d="M1230,225 V202"/>
+
+  <!-- 6 save_pending_proposal + traces -> PostgreSQL -->
+  <path class="e" d="M1230,490 V535 H560 V382"/>
+  <circle class="badge" cx="880" cy="535" r="11"/><text class="bt" x="880" y="539">6</text>
+  <text class="lbl" x="900" y="528">pending proposal + tool traces</text>
+
+  <!-- 4 agent -> external LLM APIs -> models -->
+  <path class="e" d="M710,330 H700 V628"/>
+  <circle class="badge" cx="700" cy="575" r="11"/><text class="bt" x="700" y="579">4</text>
+  <path class="e" d="M960,710 H1008"/>
+
+  <!-- data sources stored / read -->
+  <path class="e-m" d="M420,382 V628" marker-start="url(#a-m)"/>
+  <text class="lbl" x="428" y="575">stores</text>
+
+  <!-- ============ Overall data flow ============ -->
+  <rect class="zone" x="30" y="850" width="1380" height="135" rx="12"/>
+  <text class="zl" x="46" y="874">OVERALL DATA FLOW</text>
+  <text class="step" x="50" y="900"><tspan font-weight="700">1</tspan>  Staff register a visit and record vitals (voice drafts are reviewed by staff first).</text>
+  <text class="step" x="50" y="922"><tspan font-weight="700">2</tspan>  The API saves the visit, observations and a queued agent run in one transaction.</text>
+  <text class="step" x="50" y="944"><tspan font-weight="700">3</tspan>  The outbox hands the run to SQS, which delivers it to the LangGraph agent.</text>
+  <text class="step" x="50" y="966"><tspan font-weight="700">4</tspan>  The agent asks the configured LLM which MCP tool to call next.</text>
+  <text class="step" x="730" y="900"><tspan font-weight="700">5</tspan>  Its MCP client calls run-scoped tools: observations, protocol (via filesystem MCP), score.</text>
+  <text class="step" x="730" y="922"><tspan font-weight="700">6</tspan>  save_pending_proposal stores a PENDING proposal and every tool call is traced.</text>
+  <text class="step" x="730" y="944"><tspan font-weight="700">7</tspan>  A clinician reviews evidence and trace, then approves, rejects or overrides.</text>
+  <text class="step" x="730" y="966"><tspan font-weight="700">8</tspan>  Approved priority updates the queue; follow-ups and transfers need staff sign-off.</text>
+</svg>
