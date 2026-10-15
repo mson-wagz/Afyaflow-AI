@@ -39,6 +39,18 @@ describe('Browser API client unit tests', () => {
     await expect(api('/queue')).rejects.toBeInstanceOf(ApiError);
     expect(dispatch).toHaveBeenCalledWith(expect.objectContaining({ type: 'afyaflow-session-expired' }));
   });
+  it('keeps an incorrect unlock PIN retryable without expiring the session', async () => {
+    respond({code:'INVALID_PIN',message:'Incorrect PIN.'},401);
+    const dispatch=vi.spyOn(window,'dispatchEvent');
+    await expect(api('/auth/unlock',{method:'POST',body:{pin:'0000'}})).rejects.toMatchObject({code:'INVALID_PIN',status:401});
+    expect(dispatch).not.toHaveBeenCalled();
+  });
+  it('still expires a genuinely expired session during unlock', async () => {
+    respond({code:'SESSION_EXPIRED',message:'Session expired. Sign in again.'},401);
+    const dispatch=vi.spyOn(window,'dispatchEvent');
+    await expect(api('/auth/unlock',{method:'POST',body:{pin:'1234'}})).rejects.toBeInstanceOf(ApiError);
+    expect(dispatch).toHaveBeenCalledWith(expect.objectContaining({type:'afyaflow-session-expired'}));
+  });
 
   it('turns an HTML gateway failure into a usable backend error', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response('<html>Unavailable</html>', { status: 502 })));
