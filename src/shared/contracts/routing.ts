@@ -124,3 +124,45 @@ export function generateRoutingProposal(patient, approvedPriority, departmentLis
     protocolVersion: 'AfyaFlow-Routing-Engine-v2026.1',
   };
 }
+
+export interface Department {
+  id: string;
+  name: string;
+  status: 'OPEN' | 'CLOSED';
+  totalBeds: number;
+  occupiedBeds: number;
+  services: string[];
+  version: number;
+  updatedAt: string;
+}
+
+export interface RoutingProposal {
+  patientId: string;
+  patientName: string;
+  approvedPriority: string;
+  currentDepartment: string | null;
+  proposedDepartment: string;
+  rationale: string;
+  timestamp: string;
+}
+
+export interface GetDepartmentsResponse {
+  departments: Department[];
+}
+
+export interface GetRoutingProposalsResponse {
+  proposals: RoutingProposal[];
+}
+
+export interface UpdateRoutingRequest {
+  patientId: string;
+  departmentId: string;
+  rationale: string;
+  assessmentVersion: number;
+  departmentVersion: number;
+}
+
+export interface UpdateRoutingResponse {
+  success: boolean;
+  transferId: string;
+}
