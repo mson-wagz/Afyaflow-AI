@@ -54,6 +54,8 @@ jobs:
         run: npm ci --prefix src/frontend
       - name: Run backend and frontend tests
         run: npm test
+      - name: Test deployment target and health-check handling
+        run: python -m unittest discover -s tests/deployment -v
       - name: Build backend
         run: npm run build:backend
       - name: Build frontend

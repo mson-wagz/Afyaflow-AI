@@ -8,6 +8,8 @@ backend/frontend test suite and both production builds. A separate job validates
 the SAM template and builds the Lambda container image using Docker on the runner.
 Tests use synthetic data and a model test double; no AWS keys or paid Bedrock
 requests are required. Action dependencies are pinned to commit hashes.
+Five Python deployment tests also check target validation, failed remote commands,
+bundle contents, and database-aware HTTPS health handling without contacting AWS.
 
 The workflow must be pushed to GitHub before it can run. In repository branch
 protection or a ruleset for `main`, require these checks after their first run:

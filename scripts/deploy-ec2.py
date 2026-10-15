@@ -85,7 +85,7 @@ def main():
                     raise RuntimeError("Health endpoint did not return 200")
                 # Refuse the SPA HTML fallback masquerading as a healthy API.
                 health = json.loads(response.read())
-                if not isinstance(health, dict):
+                if not isinstance(health, dict) or health.get("status") != "ok" or health.get("database") != "postgresql":
                     raise ValueError("Unexpected health response")
             print(f"HTTPS health check passed: https://{domain}")
             return
