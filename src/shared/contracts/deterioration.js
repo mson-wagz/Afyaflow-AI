@@ -19,13 +19,14 @@
  *   recommendedAction: string
  * }}
  */
+export const REASSESSMENT_POLICY_VERSION='AfyaFlow-Synthetic-Change-demo-v1';
 export function compareObservationsForDeterioration(baselineObs, latestObs) {
   if (!baselineObs || !latestObs) {
     return {
       hasDeteriorated: false,
       triggers: [],
       deltas: {},
-      ruleVersion: 'Deterioration-Rules-v2026.1',
+      ruleVersion: REASSESSMENT_POLICY_VERSION,
       recommendedAction: 'Insufficient comparison baseline — record repeat observations.',
     };
   }
@@ -91,7 +92,7 @@ export function compareObservationsForDeterioration(baselineObs, latestObs) {
     hasDeteriorated,
     triggers,
     deltas,
-    ruleVersion: 'Deterioration-Rules-v2026.1',
+    ruleVersion: REASSESSMENT_POLICY_VERSION,
     recommendedAction: hasDeteriorated
       ? 'Urgent clinical reassessment proposed: Vital signs indicate physiological deterioration.'
       : 'Observations stable across recorded intervals.',
