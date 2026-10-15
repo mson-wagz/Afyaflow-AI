@@ -1,5 +1,7 @@
 # AfyaFlow AI architecture
 
+![AfyaFlow AI: agents, models, MCP and human-in-the-loop](docs/ai-architecture.svg)
+
 ![AfyaFlow AI architecture: services and how they connect](docs/architecture.svg)
 
 Status: a synthetic development slice is implemented. React talks to NestJS through

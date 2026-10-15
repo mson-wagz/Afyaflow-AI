@@ -4,8 +4,8 @@
   "description": "Owner: JecintaK (frontend developer).",
   "main": "index.js",
   "scripts": {
-    "dev": "vite",
-    "build": "vite build",
+    "dev": "node init && vite",
+    "build": "node init && vite build",
     "preview": "vite preview",
     "test": "vitest run",
     "test:unit": "vitest run src/api/client.unit.test.js",
