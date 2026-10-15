@@ -162,7 +162,7 @@ Resources:
             Condition:
               StringEquals:
                 token.actions.githubusercontent.com:aud: sts.amazonaws.com
-                token.actions.githubusercontent.com:sub: repo:mson-wagz/Afyaflow-AI:ref:refs/heads/main
+                token.actions.githubusercontent.com:sub: repo:mson-wagz@168073760/Afyaflow-AI@1416879118:ref:refs/heads/main
       Policies:
         - PolicyName: DeployStaging
           PolicyDocument:
