@@ -9,6 +9,7 @@ export default function Navigation({
   onNavigate,
   isClinical = false,
   pendingSyncCount = 0,
+  competitionMode = false,
 }) {
   const navItems = [
     {
@@ -70,7 +71,7 @@ export default function Navigation({
   return (
     <nav aria-label="Main application navigation">
       <ul className="nav-list">
-        {navItems.map((item) => {
+        {navItems.filter(item=>!competitionMode || item.id!=='research').map((item) => {
           const isActive = currentView === item.id;
           const isRestrictedForUser = item.requiresClinical && !isClinical;
 
