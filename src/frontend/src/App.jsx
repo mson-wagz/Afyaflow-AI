@@ -146,7 +146,7 @@ function AppShell() {
         </aside>
 
         <main hidden={sessionStatus === SESSION_STATUS.LOCKED} className="app-main" id="main-content" tabIndex={-1}>
-          {currentView === 'research' && <ResearchView isClinical={isClinical} />}
+          {currentView === 'research' && sessionStatus !== SESSION_STATUS.LOCKED && <ResearchView isClinical={isClinical} />}
           {currentView === 'registration' && <RegistrationView key={staff.id} currentStaff={staff} />}
           {currentView === 'triage' && <TriageView currentStaff={staff} isClinical={isClinical} />}
           {currentView === 'queue' && <QueueView />}
