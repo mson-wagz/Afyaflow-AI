@@ -28,7 +28,7 @@ to avoid surplus CPU-credit charges. Sustained load can therefore be throttled.
 ## Provisioning
 
 Review `template.yaml`. It creates a dedicated VPC/subnet, internet gateway,
-security group, encrypted root disk, fixed public IP, ECR repository, EC2 runtime
+security group, encrypted root disk, automatically assigned public IP, ECR repository, EC2 runtime
 role, GitHub OIDC provider, and a deployment role. It creates no NAT gateway,
 load balancer, RDS database, or interface endpoints.
 
@@ -104,5 +104,8 @@ the stack/instance is deleted or replaced. Retained disks/images still incur
 charges; review and remove them explicitly when no longer needed. Replacing the
 instance does not automatically attach or restore the old database disk. Stopping
 the instance stops compute billing, but its disk and allocated public IP remain
-billable. The OIDC provider can be shared, so do not delete it without checking
+billable if retained separately. This template uses an automatic public IP, which
+is released on stop/termination and changes on stop/start; update the domain A
+record after restarting a stopped instance. Routine application releases do not
+change the IP. The OIDC provider can be shared, so do not delete it without checking
 other repositories.
