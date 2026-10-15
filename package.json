@@ -10,6 +10,7 @@
     "test:unit": "tsx --test tests/backend/unit.test.ts tests/backend/lambda.unit.test.ts tests/backend/model.unit.test.ts tests/backend/mimic.unit.test.ts && npm run test:unit --prefix src/frontend",
     "test:integration": "tsx --test --test-concurrency=1 tests/backend/workflow.test.ts && npm run test:integration --prefix src/frontend",
     "dev:backend": "tsx src/backend/src/main.ts",
+    "test:competition:live": "tsx scripts/competition-smoke.ts",
     "dev:db": "tsx scripts/local-postgres.ts",
     "db:migrate": "tsx src/backend/src/database/migrate.ts",
     "db:seed": "tsx src/backend/src/database/seed.ts",

@@ -17,7 +17,7 @@ import { SyncProvider, useOfflineSync, OfflineSyncView } from './offline';
 import { Header, Navigation } from './components';
 import { SESSION_STATUS, SYNTHETIC_STAFF_FIXTURES } from '../../shared/contracts/auth.js';
 
-import { useBackend } from './api/client.js';
+import { useBackend, competitionMode } from './api/client.js';
 import ResearchView from './features/research/ResearchView.jsx';
 
 function AppShell() {
@@ -34,7 +34,7 @@ function AppShell() {
 
   const { isOnline, pendingCount } = useOfflineSync();
 
-  const [currentView, setCurrentView] = useState(useBackend?'research':'registration');
+  const [currentView, setCurrentView] = useState(useBackend && !competitionMode?'research':'registration');
   const [profileOpen, setProfileOpen] = useState(false);
 
   if(restoring)return <div role="status">Restoring staff session…</div>;
@@ -118,6 +118,7 @@ function AppShell() {
             onNavigate={setCurrentView}
             isClinical={isClinical}
             pendingSyncCount={pendingCount}
+            competitionMode={competitionMode}
           />
 
           <div

@@ -81,6 +81,10 @@ jobs:
           cfn-lint deploy/ec2/template.yaml
       - name: Build Lambda image
         run: sam build --template-file deploy/lambda/template.yaml
+      - name: Verify competition image excludes historical source files
+        run: |
+          docker build --target competition --build-arg APP_MODE=competition --tag afyaflow-competition-ci .
+          docker run --rm --entrypoint sh afyaflow-competition-ci -c 'test "$APP_MODE" = competition && test "$AI_PROVIDER" = ollama && test ! -e /app/data/mimic-iv-ed-demo-2.2'
 
   deploy:
     name: Deploy staging

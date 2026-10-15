@@ -1,6 +1,8 @@
 import React from 'react';
 import useDeterioration from './useDeterioration';
 import { Card, Button, Badge, Alert, Modal } from '../../components';
+import {useBackend} from '../../api/client.js';
+import FollowupBoard from './FollowupBoard.jsx';
 
 /**
  * Deterioration Monitoring & Reassessment Review View
@@ -31,6 +33,7 @@ export default function DeteriorationView({ currentStaff, isClinical = false }) 
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+      {useBackend && <FollowupBoard currentStaff={currentStaff} isClinical={isClinical} />}
       {/* Explicit No False Coverage Notice (WATCH-03) */}
       <Alert
         variant="info"

@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-unsafe-assignment */
 import { Injectable, Inject, BadRequestException, ConflictException, NotFoundException } from '@nestjs/common';
 import { z } from 'zod';
 import { Database, audit, id, idempotent, hash } from '../database/db.js';
@@ -12,17 +11,8 @@ import { compareObservationsForDeterioration, calculateObservationAge } from '..
 import { readProtocol } from '../../../../services/mcp/tools.js';
 import type { PoolClient } from 'pg';
 import { mimicMetadata } from '../database/mimic-data.js';
+import { evidenceChecklist } from '../../../shared/contracts/evidence.js';
 
-/* ------------------------------------------------------------------ */
-/* Types                                                              */
-/* ------------------------------------------------------------------ */
-
-/**
- * JSON payload stored in the `data` column of the departments table.
- * NOTE: code, targetPriorities, waitEstimateMinutes and specialty are required
- * by generateRoutingProposal. If they are not stored in this JSON column,
- * source them elsewhere and adjust this type.
- */
 export interface DepartmentData {
   name: string;
   code: string;
@@ -215,13 +205,13 @@ export class WorkflowService {
 
   /** Proposals awaiting clinician review. */
   async pending() {
+<<<<<<< HEAD
     const visits = await this.visits(); const protocol = await readProtocol();
     const rows = (await this.database.pool.query(`SELECT p.*,r.model,r.status run_status FROM proposals p JOIN agent_runs r ON r.id=p.run_id
       JOIN visits v ON v.id=p.visit_id WHERE v.data_source='synthetic' AND p.status='PENDING'
       AND r.status IN ('WAITING_FOR_REVIEW','REVIEW_REQUIRED') ORDER BY p.created_at`)).rows;
     return Promise.all(rows.map(async (p) => {
       const visit = visits.find((v) => v.id === p.visit_id)!;
-      return {
         ...visit, patientId: visit.id, proposalId: p.id, patientName: visit.name, observations: visit.vitals,
         observationVersion: p.observation_version, isStale: p.observation_version !== visit.observationVersion,
         proposal: p.data.proposal, protocol: p.data.protocol || protocol, summary: p.data.summary,
@@ -434,3 +424,10 @@ export class WorkflowService {
     return rows.map((r) => ({ id: r.id, timestamp: iso(r.timestamp), staffId: r.staff_id, staffName: r.staff_name, eventType: r.event_type, details: JSON.stringify(r.details) }));
   }
 }
+=======
+    const visits=await this.visits();const protocol=await readProtocol();
+    const rows=(await this.database.pool.query(`SELECT p.*,r.model,r.status run_status FROM proposals p JOIN agent_runs r ON r.id=p.run_id
+      JOIN visits v ON v.id=p.visit_id WHERE v.data_source='synthetic' AND p.status='PENDING'
+      AND r.status IN ('WAITING_FOR_REVIEW','REVIEW_REQUIRED') ORDER BY p.created_at`)).rows;
+    return Promise.all(rows.map(async p => {
+      const visit=visits.find(v=>v.id===p.visit_id)!;
