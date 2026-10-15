@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import {SPEECH_MODEL} from '../../../../shared/contracts/voice.js';
 const measurement=(min:number,max:number) => z.preprocess(value => {
   if (value === '' || value === null || value === undefined) return undefined;
   return typeof value === 'number' || typeof value === 'string' ? Number(value) : NaN;
@@ -14,6 +15,8 @@ export const registrationSchema=vitalsSchema.extend({
   age:z.union([z.number(),z.string().trim().min(1)]).transform(Number).pipe(z.number().int().min(0).max(130)),
   gender:z.enum(['Male','Female','Other']),presentingComplaint:z.string().trim().min(3).max(2000),
   arrivalTime:z.iso.datetime().optional(),staffId:z.string().optional(),
+  voiceReview:z.object({method:z.literal('LOCAL_SPEECH_REVIEWED'),language:z.enum(['en','sw']),modelId:z.literal(SPEECH_MODEL.id),
+    modelRevision:z.literal(SPEECH_MODEL.revision),reviewed:z.literal(true)}).strict().optional(),
 }).strict();
 export const observationsSchema=z.object({vitals:vitalsSchema.strict(),expectedVersion:z.number().int().positive()}).strict();
 export const decisionSchema=z.object({

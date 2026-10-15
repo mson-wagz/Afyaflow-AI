@@ -179,6 +179,14 @@ export default function useRegistration(currentStaff) {
     setIdempotencyKey(generateSubmissionIdempotencyKey('new_reg'));
   };
 
+  const applyReviewedVoice=(values,voiceReview)=>{
+    setFormData(previous=>({...previous,...values,voiceReview}));
+    setValidationErrors({});setMissingObservations([]);setMeasurementValidation(null);
+    if(['confirmed','duplicate','pending'].includes(submissionStatus)) {
+      setSubmissionStatus('idle');setSubmittedRecord(null);setIdempotencyKey(generateSubmissionIdempotencyKey('new_reg'));
+    }
+  };
+
   return {
     formData,
     validationErrors,
@@ -189,6 +197,7 @@ export default function useRegistration(currentStaff) {
     errorMessage,
     idempotencyKey,
     handleChange,
+    applyReviewedVoice,
     validate,
     validateMeasurements,
     submitRegistration,

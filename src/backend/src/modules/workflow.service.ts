@@ -60,15 +60,15 @@ export class WorkflowService {
   async register(staff:Staff,body:unknown,key:string) {
     const input=parse(registrationSchema,body);
     if (staff.role==='admin') throw new BadRequestException('Administrative accounts cannot register visits.');
-    const {name,age,gender,presentingComplaint,arrivalTime,staffId:_ignored,...vitals}=input;
+    const {name,age,gender,presentingComplaint,arrivalTime,staffId:_ignored,voiceReview,...vitals}=input;
     if (staff.role==='clerk' && Object.values(vitals).some(v=>v!==undefined)) requireClinical(staff);
     return this.database.transaction(db => idempotent(db,staff.id,'registration',key,input,async () => {
       const visitId=id('SYN-PT'),recordedAt=new Date().toISOString();
-      await db.query('INSERT INTO visits(id,name,age,gender,complaint,registered_by,arrival_at) VALUES($1,$2,$3,$4,$5,$6,$7)',
-        [visitId,name,age,gender,presentingComplaint,staff.id,arrivalTime || recordedAt]);
+      await db.query('INSERT INTO visits(id,name,age,gender,complaint,registered_by,arrival_at,source_data) VALUES($1,$2,$3,$4,$5,$6,$7,$8)',
+        [visitId,name,age,gender,presentingComplaint,staff.id,arrivalTime || recordedAt,JSON.stringify(voiceReview?{intake:{...voiceReview,reviewedBy:staff.id}}:{})]);
       await db.query('INSERT INTO observations(id,visit_id,version,vitals,recorded_by) VALUES($1,$2,1,$3,$4)',[id('OBS'),visitId,JSON.stringify(vitals),staff.id]);
       const run=await enqueue(db,visitId,1);
-      await audit(db,staff.id,'PATIENT_REGISTERED',{observationVersion:1,runId:run.id},visitId);
+      await audit(db,staff.id,'PATIENT_REGISTERED',{observationVersion:1,runId:run.id,...(voiceReview?{voiceReview}: {})},visitId);
       return {success:true,isDuplicate:false,data:{id:visitId,name,age,gender,presentingComplaint,
         arrivalTime:arrivalTime || recordedAt,vitals:{...vitals,recordedAt},serverConfirmedAt:recordedAt,agentRunId:run.id}};
     }));
