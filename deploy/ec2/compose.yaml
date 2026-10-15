@@ -1,0 +1,74 @@
+# Low-cost, single-host staging. Supply variables through the host's private .env.
+services:
+  postgres:
+    image: postgres:18.4
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: afyaflow
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Database password required}
+      POSTGRES_DB: afyaflow
+    volumes:
+      - postgres-data:/var/lib/postgresql
+    healthcheck:
+      test: [CMD-SHELL, pg_isready -U afyaflow -d afyaflow]
+      interval: 5s
+      timeout: 5s
+      retries: 24
+    mem_limit: 384m
+    logging: &logging
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: '3'
+  app:
+    image: ${APP_IMAGE:?An immutable application image is required}
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      HOST: 0.0.0.0
+      PORT: '3000'
+      DATABASE_URL: postgresql://afyaflow:${POSTGRES_PASSWORD}@postgres:5432/afyaflow
+      DATABASE_SSL: 'false'
+      DATABASE_POOL_MAX: '5'
+      APP_ORIGIN: https://${APP_DOMAIN:?HTTPS hostname required}
+      AWS_REGION: ${AWS_REGION:-eu-west-1}
+      AI_PROVIDER: ${AI_PROVIDER:-bedrock}
+      OPENAI_MODEL: ${OPENAI_MODEL:-gpt-4.1-mini}
+      OPENAI_API_KEY_FILE: /run/secrets/openai-api-key
+      BEDROCK_MODEL_ID: ${BEDROCK_MODEL_ID:-eu.amazon.nova-lite-v1:0}
+      AGENT_WORKER_DISABLED: 'false'
+      NODE_OPTIONS: --max-old-space-size=384
+    volumes:
+      - ./secrets:/run/secrets:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: [CMD, node, -e, "fetch('http://127.0.0.1:3000/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 15s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
+    mem_limit: 1g
+    logging: *logging
+  proxy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    environment:
+      APP_DOMAIN: ${APP_DOMAIN}
+    ports:
+      - '80:80'
+      - '443:443'
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    depends_on:
+      app:
+        condition: service_healthy
+    mem_limit: 128m
+    logging: *logging
+volumes:
+  postgres-data:
+  caddy-data:
+  caddy-config:
