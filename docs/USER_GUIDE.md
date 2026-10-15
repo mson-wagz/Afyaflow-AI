@@ -1,6 +1,24 @@
 # AfyaFlow application user guide
 
-This guide describes the connected PostgreSQL/Bedrock prototype. Use synthetic patient records. The scoring fixture is not clinically validated, and capacity/staffing figures are simulated. For installation, see the [README](../README.md) and [backend setup](../src/backend/README.md); for hosting, see [Lambda deployment](../deploy/lambda/README.md).
+This guide describes the connected PostgreSQL prototype with configurable OpenAI/Bedrock inference. **Historical Research Cases** contains de-identified MIMIC-IV-ED Demo records. Registration, clinical workflow examples, capacity and staffing remain synthetic demonstrations. The scoring fixture is not clinically validated. Do not enter identifiable real patient information into this public demo. For installation, see the [README](../README.md) and [backend setup](../src/backend/README.md); for hosting, see [EC2 deployment](../deploy/ec2/README.md).
+
+## Historical research cases
+
+After signing in, the connected app opens **Historical Research Cases**. You can return to it from the navigation at any time. Browser-only mode does not load this dataset.
+
+The source is [MIMIC-IV-ED Demo v2.2 on PhysioNet](https://physionet.org/content/mimic-iv-ed-demo/2.2/): de-identified historical emergency-department records from Beth Israel Deaconess Medical Center, Boston, USA. The imported ED files contain **222 encounters from 64 distinct source patients**. Repeated encounters are separate cases. This is a small selected research sample, not a live hospital feed or evidence of suitability for Kenyan clinical care.
+
+1. Search by case ID or complaint and select a historical encounter.
+2. Inspect the source complaint, recorded gender, shifted arrival reference, and normalized observations. “Historical case …” is a display alias, not a patient name.
+3. Read **Recorded source ESI** as the historical nurse-assigned 1–5 label (1 highest urgency). It is not an AfyaFlow colour priority. It may be missing and is not supplied to the AI as an answer.
+4. Temperature is converted from the source's documented Fahrenheit unit to Celsius. Open **Original source rows** to see the unchanged values. Check any **Source data quality warnings**; unsupported values are left out of normalized observations, not silently corrected.
+5. Age, AVPU, and mobility are unavailable in the imported tables and remain missing. Do not fill them by guessing from the complaint or arrival transport. Source dates are shifted for privacy and are not current arrival/waiting times. There is no exact triage observation timestamp.
+6. With a nurse/clinician account, click **Request AI research review**. This explicitly sends the available complaint and normalized evidence to the configured AI provider and may incur API charges. Importing or browsing cases makes no inference calls. The source ESI label, raw rows, outcomes and source identifiers are excluded from model evidence.
+7. Follow the run status. The same four MCP tools retrieve observations, read the demonstration protocol, score evidence, and save a research proposal. With missing age/AVPU, the expected outcome is **REVIEW_REQUIRED**, with no score or assigned priority. Inspect the summary, missing evidence and **Research model and MCP trace**. A failed run can be retried; a saved review is reused.
+
+Historical cases are read-only and kept out of the hospital queue, clinical approval list, deterioration workflow and department routing. They cannot be approved, overridden, edited, escalated or transferred, including through direct API requests. To practice those actions, use the separate synthetic registration workflow described below.
+
+Open **About the data and its limitations** for attribution. **Download adapted dataset (JSON)** exports only the research data and provenance under ODbL 1.0, without staff, sessions, secrets or AI traces. The [data-source documentation](DATA_SOURCES.md) explains the exact source files, transformations, missing fields, licence and citations. Using historical clinical data does not establish clinical validation, and requesting a review does not train or fine-tune the AI.
 
 ## 1. Sign in
 
@@ -118,6 +136,10 @@ Restore connectivity and the correct staff session. Reconnect triggers replay; *
 Clinical decisions, observation updates, manual assessments, and transfers cannot be queued for later clinical commitment. Simulation controls are for demonstration. Offline capture does not guarantee that the app can initially load or reload without connectivity.
 
 ## 10. Lock, sign out, and inspect history
+
+An incorrect unlock PIN keeps the terminal locked and shows an error asking
+you to re-enter it. The PIN field clears and receives focus for another attempt.
+Only a missing or expired session requires signing in again.
 
 Use the header lock control before leaving a shared terminal. Unlock with your PIN. Sign out when finishing or handing over the device. Expired sessions require sign-in; the backend currently issues sessions lasting up to eight hours.
 

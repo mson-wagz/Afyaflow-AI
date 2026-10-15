@@ -13,8 +13,10 @@ export function scoreEvidence(evidence:any,protocol:any) {
   const vitals=Object.fromEntries(Object.entries(evidence.vitals).map(([key,value]) => [key,value ?? '']));
   const result=calculateSatsScore(vitals);
   const missing=protocol.requiredFields.filter((key:string) => vitals[key] === '' || vitals[key] === undefined);
-  if (evidence.age < 18 || missing.length) return {...result,score:null,priority:null,isSufficientEvidence:false,
-    missingEvidence:missing,ruleTriggered:evidence.age < 18 ? 'Unsupported population: manual staff review required' : 'Missing core observations: manual staff review required',
+  const ageMissing=!Number.isInteger(evidence.age);
+  if(ageMissing)missing.push('age');
+  if (ageMissing || evidence.age < 18 || missing.length) return {...result,score:null,priority:null,isSufficientEvidence:false,
+    missingEvidence:missing,ruleTriggered:ageMissing ? 'Age unavailable: population eligibility cannot be established; research/staff review required' : evidence.age < 18 ? 'Unsupported population: manual staff review required' : 'Missing core observations: manual staff review required',
     observationId:evidence.observationId,observationVersion:evidence.version,protocolId:protocol.id};
   return {...result,observationId:evidence.observationId,observationVersion:evidence.version,protocolId:protocol.id};
 }
@@ -26,10 +28,11 @@ export async function createRunTools(database:Database,runId:string) {
   let evidence:any,protocol:any,scoring:any,saved=false,step=0;
   const callbacks:Record<string,(args:any)=>Promise<any>>={
     get_observations:async () => {
-      const row=(await database.pool.query(`SELECT o.*,v.age,v.complaint FROM observations o JOIN visits v ON v.id=o.visit_id
+      const row=(await database.pool.query(`SELECT o.*,v.age,v.complaint,v.data_source FROM observations o JOIN visits v ON v.id=o.visit_id
         WHERE o.visit_id=$1 AND o.version=$2`,[run.visit_id,run.observation_version])).rows[0];
       if (!row) throw new Error('The run observation snapshot does not exist.');
       evidence={visitId:row.visit_id,age:row.age,presentingComplaint:row.complaint,observationId:row.id,
+        dataSource:row.data_source,...(row.data_source==='mimic-iv-ed-demo'?{researchOnly:true,timestampBasis:'Import timestamp, not original observation time. Age, AVPU and mobility are unavailable. Do not infer them.'}:{}),
         version:row.version,recordedAt:row.recorded_at.toISOString(),vitals:row.vitals};
       return evidence;
     },
@@ -75,6 +78,6 @@ export async function createRunTools(database:Database,runId:string) {
   const client=new Client({name:'afyaflow-agent',version:'0.1.0'});
   const [clientTransport,serverTransport]=InMemoryTransport.createLinkedPair();
   await server.connect(serverTransport);await client.connect(clientTransport);
-  return {server,client,attempt:run.attempts,generation:run.delivery_generation,isSaved:()=>saved,isSufficient:()=>Boolean(scoring?.isSufficientEvidence),
+  return {server,client,provider:run.provider,modelId:run.model,attempt:run.attempts,generation:run.delivery_generation,isSaved:()=>saved,isSufficient:()=>Boolean(scoring?.isSufficientEvidence),
     close:async () => {await client.close();await server.close();}};
 }
