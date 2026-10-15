@@ -13,7 +13,9 @@ The app uses synthetic patients and an **unvalidated scoring fixture**. It is a 
 - [Application user guide](docs/USER_GUIDE.md): sign-in, registration, assessments, decisions, queues, routing, and offline drafts.
 - [Backend setup](src/backend/README.md): local PostgreSQL, Bedrock configuration, and development accounts.
 - [Lambda deployment guide](deploy/lambda/README.md): AWS prerequisites, SAM deployment, migrations, and staging checks.
+- [Low-cost EC2 deployment](deploy/ec2/README.md): single-server staging, HTTPS, PostgreSQL, and OIDC deployments.
 - [Testing guide](TESTING.md), [architecture](ARCHITECTURE.md), [API/MCP contracts](specs/contracts.md), and [evaluation evidence](EVALS.md).
+- [CI/CD setup](docs/CI_CD.md): GitHub Actions checks and staging deployment prerequisites.
 - [Feature specifications](specs/features/README.md), [frontend specifications](specs/frontend/README.md), and [development tasks](specs/tasks.md).
 
 ## Implemented features
@@ -62,7 +64,7 @@ Capacity and staffing figures are synthetic, not live hospital telemetry. The fr
 - **`@codegenie/serverless-express`:** NestJS/Express adaptation to API Gateway events.
 - **AWS SDK for JavaScript:** Bedrock, SQS, and Secrets Manager clients.
 - **Docker, AWS SAM, CloudFormation, AWS CLI:** packaging and deployment configuration.
-- **Git/GitHub:** version control. A GitHub Actions deployment pipeline has not been added.
+- **Git/GitHub Actions:** CI checks on pushes and pull requests, with optional OIDC staging deployment from `main` after AWS provisioning and repository variable setup.
 
 Dependency versions are recorded in the root and frontend manifests and lockfiles.
 
