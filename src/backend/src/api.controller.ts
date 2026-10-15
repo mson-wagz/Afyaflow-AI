@@ -33,6 +33,7 @@ export class ApiController {
     res.clearCookie('afyaflow_session',{path:'/api'});return {success:true};
   }
   @Get('visits') @UseGuards(SessionGuard) visits() {return this.workflow.visits();}
+  @Get('visits/:id/evidence') @UseGuards(SessionGuard) evidence(@Param('id')id:string) {return this.workflow.evidence(id);}
   @Get('research/cases') @UseGuards(SessionGuard) researchCases() {return this.workflow.researchCases();}
   @Get('research/export') @UseGuards(SessionGuard) async researchExport(@Res({passthrough:true})res:Response) {
     res.attachment('afyaflow-mimic-iv-ed-demo-2.2.json');return this.workflow.researchExport();
