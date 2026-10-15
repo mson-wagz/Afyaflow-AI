@@ -3,12 +3,13 @@ import { Client } from '@modelcontextprotocol/client';
 import { z } from 'zod';
 import { readFile } from 'node:fs/promises';
 import { performance } from 'node:perf_hooks';
-import { Database, id, hash } from '../../src/backend/src/database/db.js';
+import { Database, id, hash, audit } from '../../src/backend/src/database/db.js';
 import { calculateSatsScore } from '../../src/shared/contracts/triage.js';
 import { evidenceChecklist } from '../../src/shared/contracts/evidence.js';
 import { readProtocolThroughFilesystem } from './borrowed-protocol.js';
 import { config } from '../../src/backend/src/config.js';
 import { assertCompetitionRun } from '../../src/backend/src/runtime-policy.js';
+import { reassessmentContext } from './reassessment.js';
 
 export const protocolPath='services/mcp/protocols/synthetic-adult-v1.json';
 export async function readProtocol() {return JSON.parse(await readFile(protocolPath,'utf8'));}
@@ -30,18 +31,21 @@ export async function createRunTools(database:Database,runId:string) {
   const source=(await database.pool.query('SELECT data_source FROM visits WHERE id=$1',[run.visit_id])).rows[0]?.data_source;
   assertCompetitionRun(config.mode,source,run.provider);
   const server=new McpServer({name:'afyaflow-patient-tools',version:'0.1.0'});
-  let evidence:any,protocol:any,scoring:any,saved=false,step=0;
+  let evidence:any,protocol:any,scoring:any,context:any,saved=false,step=0;
   const callbacks:Record<string,(args:any)=>Promise<any>>={
     get_observations:async () => {
       const row=(await database.pool.query(`SELECT o.*,v.age,v.complaint,v.data_source FROM observations o JOIN visits v ON v.id=o.visit_id
         WHERE o.visit_id=$1 AND o.version=$2`,[run.visit_id,run.observation_version])).rows[0];
       if (!row) throw new Error('The run observation snapshot does not exist.');
+      if(row.data_source==='synthetic')context ||= await reassessmentContext(database.pool,run.visit_id,run.observation_version);
       evidence={visitId:row.visit_id,age:row.age,presentingComplaint:row.complaint,observationId:row.id,
         dataSource:row.data_source,...(row.data_source==='mimic-iv-ed-demo'?{researchOnly:true,timestampBasis:'Import timestamp, not original observation time. Age, AVPU and mobility are unavailable. Do not infer them.'}:{}),
-        version:row.version,recordedAt:row.recorded_at.toISOString(),vitals:row.vitals};
+        version:row.version,recordedAt:row.recorded_at.toISOString(),vitals:row.vitals,
+        ...(row.data_source==='synthetic'?{reassessmentContext:context}:{})};
       return evidence;
     },
     read_protocol:async () => {protocol=await readProtocolThroughFilesystem();return {...protocol,retrievedVia:'official-filesystem-mcp/read_text_file'};},
+    get_reassessment_context:async()=>{context=await reassessmentContext(database.pool,run.visit_id,run.observation_version);return context;},
     score_protocol:async () => {
       if (!evidence || !protocol) throw new Error('Retrieve observations and protocol before scoring.');
       scoring=scoreEvidence(evidence,protocol);return scoring;
@@ -59,8 +63,22 @@ export async function createRunTools(database:Database,runId:string) {
         const inserted=(await db.query(`INSERT INTO proposals(id,run_id,visit_id,observation_version,data)
           VALUES($1,$2,$3,$4,$5) ON CONFLICT(run_id) DO UPDATE SET data=proposals.data RETURNING id`,
           [proposalId,runId,run.visit_id,run.observation_version,JSON.stringify(data)])).rows[0];
+        let followupId:string|null=null;
+        if(visit.data_source==='synthetic') {
+          context ||= await reassessmentContext(db,run.visit_id,run.observation_version);
+          if(!scoring.isSufficientEvidence || context.comparison?.hasDeteriorated) {
+            const basis={kind:!scoring.isSufficientEvidence?'INCOMPLETE_REVIEW':'RECORDED_CHANGE',
+              missingEvidence:scoring.evidenceChecklist.missingRequired,context,summary,clinicalValidated:false,
+              timingPolicy:'Named clinical staff must choose the owner and due time; the model cannot set either.'};
+            const created=await db.query(`INSERT INTO followups(id,run_id,visit_id,observation_version,basis,protocol_checksum)
+              VALUES($1,$2,$3,$4,$5,$6) ON CONFLICT(run_id) DO NOTHING RETURNING id`,
+              [id('FOLLOWUP'),runId,run.visit_id,run.observation_version,JSON.stringify(basis),data.protocolChecksum]);
+            followupId=created.rows[0]?.id || (await db.query('SELECT id FROM followups WHERE run_id=$1',[runId])).rows[0]?.id;
+            if(created.rowCount)await audit(db,null,'FOLLOWUP_PROPOSED',{followupId,runId,observationVersion:run.observation_version,kind:basis.kind},visit.id);
+          }
+        }
         await db.query("UPDATE visits SET assessment_status=$2 WHERE id=$1",[run.visit_id,scoring.isSufficientEvidence ? 'PENDING_CLINICAL_DECISION':'REVIEW_REQUIRED']);
-        return {proposalId:inserted.id,status:'PENDING',priority:scoring.priority,requiresHumanApproval:true,clinicalValidated:false};
+        return {proposalId:inserted.id,followupId,status:'PENDING',priority:scoring.priority,requiresHumanApproval:true,clinicalValidated:false};
       });
       saved=true;return result;
     },
@@ -70,8 +88,9 @@ export async function createRunTools(database:Database,runId:string) {
     server.registerTool(name,{description:{
       get_observations:'Retrieve the actual versioned observations for this assessment. No other patients can be queried.',
       read_protocol:'Retrieve the fixed synthetic scoring fixture and its missing-evidence policy.',
+      get_reassessment_context:'Compare only this synthetic visit’s bound and previous recorded observations. Returns sourced change flags, not continuous monitoring or a schedule.',
       score_protocol:'Calculate a deterministic proposal from retrieved evidence. Never invent measurements or choose a priority yourself.',
-      save_pending_proposal:'Persist the calculated proposal for human review. This does not approve it or change the approved queue.',
+      save_pending_proposal:'Persist the calculated proposal and any evidence-required follow-up proposal for human review. This cannot approve, assign owners, set due times or change the queue.',
     }[name]!,inputSchema:schema},async (args:any) => {
       const started=performance.now();let output:any;
       try {output=await callbacks[name](args);} catch(error) {output={error:error instanceof Error ? error.message:'Tool failed'};}
