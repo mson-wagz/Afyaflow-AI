@@ -1,0 +1,29 @@
+{
+  "compilerOptions": {
+    "module": "NodeNext", 
+    "moduleResolution": "NodeNext", 
+    "resolvePackageJsonExports": true,
+    "esModuleInterop": true,
+    "isolatedModules": true,
+    "declaration": true,
+    "removeComments": true,
+    "emitDecoratorMetadata": true, 
+    "experimentalDecorators": true, 
+    "allowSyntheticDefaultImports": true,
+    "target": "ES2022",
+    "allowJs": true,
+    "checkJs": false,
+    "sourceMap": true,
+    "outDir": "../../dist/backend",
+    "baseUrl": "./",
+    "incremental": true,
+    "skipLibCheck": true, 
+    "strictNullChecks": true,
+    "forceConsistentCasingInFileNames": true,
+    "noImplicitAny": false,
+    "strictBindCallApply": false,
+    "noFallthroughCasesInSwitch": false
+  },
+  "include": ["src/**/*.ts"], 
+  "exclude": ["node_modules", "dist"]
+}

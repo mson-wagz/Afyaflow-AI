@@ -8,6 +8,9 @@ export const id = (prefix:string) => `${prefix}-${randomUUID()}`;
 export const hash = (value:string) => createHash('sha256').update(value).digest('hex');
 @Injectable()
 export class Database implements OnModuleDestroy {
+  query(arg0: string): import("../../../shared/contracts/queue.js").QueueItem[] | PromiseLike<import("../../../shared/contracts/queue.js").QueueItem[]> {
+    throw new Error('Method not implemented.');
+  }
   readonly pool:Pool;
   constructor() {
     if (!config.databaseUrl) throw new Error('DATABASE_URL is required. See .env.example.');

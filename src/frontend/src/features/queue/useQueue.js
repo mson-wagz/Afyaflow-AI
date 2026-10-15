@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { apiFetchQueueData } from './apiAdapter';
-import { calculateElapsedWaitingTime } from '../../../../shared/contracts/queue.js';
+import { calculateElapsedWaitingTime } from '../../../../shared/contracts/queue.ts';
 
 export default function useQueue(initialPollInterval = 15000) {
   const [queue, setQueue] = useState([]);
