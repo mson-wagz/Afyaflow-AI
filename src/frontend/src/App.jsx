@@ -40,7 +40,7 @@ function AppShell() {
   if(restoring)return <div role="status">Restoring staff session…</div>;
   // If unauthenticated, show the Sign-In screen
   if (sessionStatus === SESSION_STATUS.UNAUTHENTICATED || !staff) {
-    return <><div role="note" style={{padding:'0.75rem',backgroundColor:'#fff7ed',color:'#7c2d12'}}>Research demonstration: de-identified MIMIC-IV-ED Demo records and separate synthetic workflows. No live hospital connection.</div><div role="alert">{authError}</div><SignInScreen /></>;
+    return <><div role="alert">{authError}</div><SignInScreen /></>;
   }
 
   // Quick switcher handler for evaluators/demos
@@ -50,10 +50,6 @@ function AppShell() {
 
   return (
     <div className="app-container">
-      <div role="note" style={{padding:'0.6rem 1rem',backgroundColor:'#fff7ed',color:'#7c2d12'}}>
-        {useBackend ? 'Research demonstration • MIMIC historical cases and separate synthetic workflows • Scoring is not clinically validated. No live hospital admissions.'
-          : 'Synthetic demo — browser-local data and simulated tools. Clinical scoring is not validated.'}
-      </div>
       {/* Shared-device lock screen overlay if locked */}
       {sessionStatus === SESSION_STATUS.LOCKED && <LockScreen />}
 
