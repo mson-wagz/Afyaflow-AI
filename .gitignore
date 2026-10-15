@@ -4,6 +4,8 @@ out/
 dist/
 coverage/
 *.tsbuildinfo
+__pycache__/
+*.pyc
 
 # Local environment and logs
 .env

@@ -11,6 +11,8 @@ import { seed } from '../../src/backend/src/database/seed.js';
 import { WorkflowService } from '../../src/backend/src/modules/workflow.service.js';
 import { AppModule } from '../../src/backend/src/app.module.js';
 import { executeAgent } from '../../services/agents/workflow.js';
+import { importMimicDemo } from '../../src/backend/src/database/import-mimic.js';
+import { openaiModel } from '../../services/agents/openai.js';
 import type { Model } from '../../services/agents/bedrock.js';
 import { createRunTools } from '../../services/mcp/tools.js';
 import { processAgentJob, dispatchAgentOutbox, ActiveAgentLeaseError } from '../../src/backend/src/modules/agent-jobs.js';
@@ -422,4 +424,80 @@ test('actual Lambda handler bootstraps NestJS and enforces origin protection aga
     timeout:15000,
   });
   assert.match(result.stdout,/lambda-handler-ok/);
+});
+
+
+test('OpenAI Responses adapter drives real MCP tools and preserves the human approval gate',async()=>{
+  const registered=await register(),visitId=registered.data.id;
+  const run=(await database.pool.query('SELECT * FROM agent_runs WHERE visit_id=$1',[visitId])).rows[0];
+  await database.pool.query("UPDATE agent_runs SET status='RUNNING',provider='openai',model='mock-openai',lease_until=now()+interval '5 minutes' WHERE id=$1",[run.id]);
+  let step=0;
+  const model=openaiModel('mock-openai',{apiKey:'test-key',fetch:async(_url,init)=>{
+    const body=JSON.parse(init?.body as string);
+    assert.equal(body.model,'mock-openai');
+    const name=['get_observations','read_protocol','score_protocol','save_pending_proposal'][step++];
+    assert.ok(body.tools.some((tool:any)=>tool.name===name && tool.strict));
+    return Response.json({status:'completed',output:[{type:'function_call',call_id:`openai-${step}`,name,
+      arguments:JSON.stringify(name==='save_pending_proposal'?{summary:'Synthetic evidence recorded; clinician review required.'}:{})}]});
+  }});
+  await executeAgent(database,run.id,model);
+  const proposal=(await workflow.pending()).find(p=>p.patientId===visitId)!;
+  assert.ok(proposal);assert.equal(step,4);
+  assert.equal(proposal.toolTrace.provider,'openai');assert.equal(proposal.toolTrace.model,'mock-openai');
+  assert.equal(proposal.toolTrace.toolCalls.filter(t=>t.tool==='openai_responses').length,4);
+  assert.equal((await workflow.queue()).queue.find(v=>v.visitId===visitId)?.approvedPriority,null);
+  assert.equal((await database.pool.query('SELECT count(*) FROM decisions WHERE visit_id=$1',[visitId])).rows[0].count,'0');
+});
+
+
+test('Historical import is repeatable, source-labelled, isolated and read-only through API and database',async()=>{
+  const login=await fetch(`${base}/api/auth/login`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({identifier:'STAFF-102',pin:'2345'})});
+  assert.equal(login.status,201);const researchCookie=login.headers.get('set-cookie')!.split(';')[0];
+  const beforeQueue=(await workflow.queue()).queue.length;
+  const first=await importMimicDemo(database),second=await importMimicDemo(database);
+  assert.equal(first.inserted,222);assert.equal(second.inserted,0);assert.equal(first.subjects,64);
+  assert.equal((await workflow.queue()).queue.length,beforeQueue);
+  const library=await workflow.researchCases();assert.equal(library.total,222);assert.equal(library.subjects,64);
+  const caseId=library.cases[0].id;
+  const source=await workflow.researchCase(caseId);
+  assert.equal(source.age,null);assert.equal(source.run,null);assert.equal(source.researchOnly,true);
+  assert.equal(source.vitals.avpu,undefined);assert.equal(source.source.dataset,'mimic-iv-ed-demo');
+  assert.ok(!(await workflow.visits()).some(item=>item.id===caseId));
+  assert.equal((await fetch(`${base}/api/research/cases`)).status,401);
+  assert.equal((await fetch(`${base}/api/research/cases`,{headers:{Cookie:researchCookie}})).status,200);
+  await assert.rejects(workflow.requestAssessment(clerk,caseId),error=>(error as any).getStatus()===403);
+  const requested=await workflow.requestAssessment(nurse,caseId);
+  await database.pool.query("UPDATE agent_runs SET status='RUNNING',lease_until=now()+interval '5 minutes' WHERE id=$1",[requested.data.runId]);
+  await executeAgent(database,requested.data.runId,fakeModel);
+  const reviewed=await workflow.researchCase(caseId);
+  assert.equal(reviewed.run.status,'REVIEW_REQUIRED');assert.equal(reviewed.proposal.proposal.priority,null);
+  assert.equal(reviewed.proposal.proposal.score,null);assert.ok(reviewed.proposal.proposal.missingEvidence.includes('age'));
+  const evidence=reviewed.trace.toolCalls.find(call=>call.tool==='get_observations')!.outputs;
+  assert.equal(evidence.age,null);assert.equal(evidence.researchOnly,true);
+  for(const key of ['sourceAcuity','sourcePain','raw','subjectId','stayId','disposition'])assert.equal(evidence[key],undefined);
+  assert.ok(!(await workflow.pending()).some(item=>item.patientId===caseId));
+  assert.ok(!(await workflow.runs()).some(item=>item.patientId===caseId));
+  assert.ok(!(await workflow.routing()).some(item=>item.id===caseId));
+  assert.ok(!(await workflow.deterioration()).some(item=>item.patientId===caseId));
+  const mutationCases=[
+    [`/visits/${caseId}/observations`,{vitals:{heartRate:90},expectedVersion:1}],
+    ['/triage/decisions',{patientId:caseId,proposalId:reviewed.proposal.id,observationVersion:1,decision:'OVERRIDDEN',overridePriority:'RED',reason:'Research override must be rejected.'}],
+    ['/deterioration/decisions',{patientId:caseId,observationVersion:1,action:'ESCALATE',targetPriority:'RED',reason:'Research escalation must be rejected.'}],
+    ['/routing/transfers',{patientId:caseId,departmentId:'DEP-GOPD',assessmentVersion:0,departmentVersion:1,rationale:'Research transfer must be rejected.'}],
+  ] as const;
+  for(const [path,body] of mutationCases) {
+    const response=await fetch(`${base}/api${path}`,{method:'POST',headers:{Cookie:researchCookie,'Content-Type':'application/json','Idempotency-Key':randomUUID()},body:JSON.stringify(body)});
+    assert.equal(response.status,400);assert.equal((await response.json()).code,'HISTORICAL_READ_ONLY');
+  }
+  await assert.rejects(database.pool.query("UPDATE visits SET approved_priority='RED' WHERE id=$1",[caseId]),/research_not_clinical/);
+  await assert.rejects(database.pool.query("UPDATE visits SET source_data='{}' WHERE id=$1",[caseId]),/read-only/);
+  const downloaded=await fetch(`${base}/api/research/export`,{headers:{Cookie:researchCookie}});
+  assert.equal(downloaded.status,200);assert.match(downloaded.headers.get('content-disposition') || '',/attachment/);
+  assert.equal((await downloaded.json()).cases.length,222);
+  const exported=await workflow.researchExport();assert.equal(exported.cases.length,222);
+  assert.ok(exported.cases.every(item=>item.id.startsWith('MIMIC-ED-')));
+  assert.equal(exported.metadata.version,'2.2');assert.ok(exported.cases[0].source.raw.triage);
+  assert.equal((await workflow.queue()).queue.length,beforeQueue);
+  assert.equal((await importMimicDemo(database)).inserted,0);
+  assert.equal((await workflow.researchCase(caseId)).run.id,requested.data.runId);
 });

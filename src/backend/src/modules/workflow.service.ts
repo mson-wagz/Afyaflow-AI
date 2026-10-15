@@ -27,6 +27,7 @@ import {
 } from '../../../shared/contracts/deterioration.js';
 import { readProtocol } from '../../../../services/mcp/tools.js';
 import type { PoolClient } from 'pg';
+import { mimicMetadata } from '../database/mimic-data.js';
 
 const priority = (code: string | null): any =>
   code ? (TRIAGE_PRIORITY as any)[code] : null;
@@ -60,7 +61,6 @@ export async function enqueue(
       'INSERT INTO agent_outbox(run_id,generation) VALUES($1,$2) ON CONFLICT DO NOTHING',
       [run.id, run.delivery_generation],
     );
-  return run;
 }
 @Injectable()
 export class WorkflowService {
@@ -69,11 +69,6 @@ export class WorkflowService {
     const rows = (
       await this.database.pool.query(`
         SELECT
-          v.*,
-          o.id AS observation_id,
-          o.vitals,
-          o.recorded_at
-        FROM visits v
         JOIN observations o
           ON o.visit_id = v.id
          AND o.version = v.observation_version

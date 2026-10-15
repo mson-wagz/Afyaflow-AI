@@ -18,6 +18,7 @@ import { Header, Navigation } from './components';
 import { SESSION_STATUS, SYNTHETIC_STAFF_FIXTURES } from '../../shared/contracts/auth.js';
 
 import { useBackend } from './api/client.js';
+import ResearchView from './features/research/ResearchView.jsx';
 
 function AppShell() {
   const {
@@ -33,7 +34,7 @@ function AppShell() {
 
   const { isOnline, pendingCount } = useOfflineSync();
 
-  const [currentView, setCurrentView] = useState('registration');
+  const [currentView, setCurrentView] = useState(useBackend?'research':'registration');
   const [profileOpen, setProfileOpen] = useState(false);
 
   if(restoring)return <div role="status">Restoring staff session…</div>;
@@ -49,10 +50,6 @@ function AppShell() {
 
   return (
     <div className="app-container">
-      <div role="note" style={{padding:'0.6rem 1rem',backgroundColor:'#fff7ed',color:'#7c2d12'}}>
-        {useBackend ? 'Connected to PostgreSQL • Synthetic patient data • Amazon Bedrock agent • Clinician approval required. Scoring uses an unvalidated test protocol.'
-          : 'Synthetic demo — browser-local data and simulated tools. Clinical scoring is not validated.'}
-      </div>
       {/* Shared-device lock screen overlay if locked */}
       {sessionStatus === SESSION_STATUS.LOCKED && <LockScreen />}
 
@@ -145,6 +142,7 @@ function AppShell() {
         </aside>
 
         <main hidden={sessionStatus === SESSION_STATUS.LOCKED} className="app-main" id="main-content" tabIndex={-1}>
+          {currentView === 'research' && sessionStatus !== SESSION_STATUS.LOCKED && <ResearchView isClinical={isClinical} />}
           {currentView === 'registration' && <RegistrationView key={staff.id} currentStaff={staff} />}
           {currentView === 'triage' && <TriageView currentStaff={staff} isClinical={isClinical} />}
           {currentView === 'queue' && <QueueView />}

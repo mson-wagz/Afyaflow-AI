@@ -1,0 +1,9 @@
+.research-view { min-width: 0; }
+.research-view p { margin: 0.65rem 0; line-height: 1.6; }
+.research-view h3 { margin: 1rem 0 0.5rem; }
+.research-view li { margin: 0.5rem 0; }
+.research-view ul { padding-left: 1.4rem; }
+.research-view th, .research-view td { padding: 0.6rem 0.25rem; border-bottom: 1px solid var(--color-border); }
+.research-view caption { text-align: left; padding: 0.75rem 0; font-weight: 600; }
+.research-view summary { cursor: pointer; padding: 0.5rem 0; }
+.research-view pre { padding: 0.75rem; background: #f8fafc; border-radius: var(--radius-sm); }
