@@ -22,12 +22,15 @@ import type { Context, APIGatewayProxyEventV2 } from 'aws-lambda';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { config } from '../../src/backend/src/config.js';
+import {FollowupService} from '../../src/backend/src/modules/followup.service.js';
 
 const schema=`afyaflow_test_${randomUUID().replaceAll('-','')}`;
 const database=new Database();
 const workflow=new WorkflowService(database);
 const nurse={id:'STAFF-101',name:'Jane Mwangi, RN',role:'nurse'};
 const clerk={id:'STAFF-103',name:'Faith Achieng',role:'clerk'};
+const clinician={id:'STAFF-102',name:'Synthetic clinician',role:'clinician'};
+const followups=new FollowupService(database);
 const intake={name:'Synthetic API Journey',age:30,gender:'Female',presentingComplaint:'Synthetic headache',
   heartRate:75,systolicBp:120,diastolicBp:80,respiratoryRate:16,temperature:37,spO2:98,avpu:'Alert',mobility:'Walking normally'};
 let app:any,base:string,cookie:string;
@@ -552,4 +555,102 @@ test('missing-evidence guidance is version-bound and new measurements supersede 
   const next=await assess(visitId,2);assert.equal(next.proposal.isSufficientEvidence,true);
   assert.equal(next.proposal.evidenceChecklist.observationVersion,2);
   await assert.rejects(workflow.evidence('unknown'),error=>(error as any).getStatus()===404);
+});
+
+async function proposedFollowup() {
+  const result=await workflow.register(nurse,{name:'Synthetic follow-up case',age:30,gender:'Female',presentingComplaint:'Synthetic complaint with missing observations'},randomUUID());
+  await assess(result.data.id);
+  return (await followups.list(nurse)).tasks.find(t=>t.visit_id===result.data.id)!;
+}
+const approval=(task:any,ownerId=nurse.id)=>({action:'APPROVE',expectedVersion:task.version,ownerId,
+  dueAt:new Date(Date.now()+15*60000).toISOString(),reason:'Synthetic nurse selected an example recheck time, not a clinical recommendation.'});
+
+test('follow-ups persist with agent evidence and require staff ownership, timing and newer observations',async()=>{
+  const task=await proposedFollowup();assert.ok(task);assert.equal(task.status,'PROPOSED');
+  assert.equal(task.due_at,null);assert.equal(task.owner_id,null);assert.ok(task.basis.missingEvidence.includes('heartRate'));
+  const originalPriority=(await workflow.visits()).find(v=>v.id===task.visit_id)!.approvedPriority;
+  const key=randomUUID(),body=approval(task);
+  const first=await followups.act(nurse,task.id,body,key),duplicate=await followups.act(nurse,task.id,body,key);
+  assert.deepEqual(first,duplicate);assert.equal(first.data.status,'OPEN');
+  assert.equal((await new FollowupService(database).list(nurse)).tasks.find(t=>t.id===task.id)?.owner_id,nurse.id);
+  await assert.rejects(followups.act(clinician,task.id,{action:'ACKNOWLEDGE',expectedVersion:2},randomUUID()),e=>(e as any).getStatus()===403);
+  await followups.act(nurse,task.id,{action:'ACKNOWLEDGE',expectedVersion:2},randomUUID());
+  await assert.rejects(followups.act(nurse,task.id,{action:'COMPLETE',expectedVersion:3,observationVersion:1,reason:'No new measurements yet.'},randomUUID()),e=>(e as any).getStatus()===409);
+  const {name,age,gender,presentingComplaint,...vitals}=intake;
+  await workflow.observations(nurse,task.visit_id,{expectedVersion:1,vitals},randomUUID());
+  const completeKey=randomUUID(),completeBody={action:'COMPLETE',expectedVersion:3,observationVersion:2,reason:'Synthetic owner reviewed the new recorded measurements.'};
+  await followups.act(nurse,task.id,completeBody,completeKey);await followups.act(nurse,task.id,completeBody,completeKey);
+  const completed=(await followups.list(nurse)).tasks.find(t=>t.id===task.id)!;
+  assert.equal(completed.status,'COMPLETED');assert.ok(completed.completion_observation_id);
+  assert.equal((await workflow.visits()).find(v=>v.id===task.visit_id)!.approvedPriority,originalPriority);
+  const history=await followups.history(nurse,task.id);
+  assert.deepEqual(history.map(e=>e.event_type),['FOLLOWUP_PROPOSED','FOLLOWUP_APPROVE','FOLLOWUP_ACKNOWLEDGE','FOLLOWUP_COMPLETE']);
+  assert.equal(history.filter(e=>e.event_type==='FOLLOWUP_COMPLETE').length,1);
+});
+
+test('stale follow-up proposals cannot be approved, and scheduling cannot invent staff or due intervals',async()=>{
+  const task=await proposedFollowup();
+  await assert.rejects(followups.act(clerk,task.id,approval(task),randomUUID()),e=>(e as any).getStatus()===403);
+  await assert.rejects(followups.act(nurse,task.id,approval(task,clerk.id),randomUUID()),e=>(e as any).getStatus()===400);
+  await assert.rejects(followups.act(nurse,task.id,{...approval(task),dueAt:new Date(Date.now()-1000).toISOString()},randomUUID()),e=>(e as any).getStatus()===400);
+  await assert.rejects(followups.act(nurse,task.id,{...approval(task),dueAt:new Date(Date.now()+25*3600000).toISOString()},randomUUID()),e=>(e as any).getStatus()===400);
+  const {name,age,gender,presentingComplaint,...vitals}=intake;
+  await workflow.observations(nurse,task.visit_id,{expectedVersion:1,vitals},randomUUID());
+  assert.equal((await followups.list(nurse)).tasks.find(t=>t.id===task.id)?.status,'STALE');
+  await assert.rejects(followups.act(nurse,task.id,approval(task),randomUUID()),e=>(e as any).getStatus()===409);
+});
+
+test('follow-up reassignment, overdue visibility and cancellation retain staff audit',async()=>{
+  const task=await proposedFollowup();await followups.act(nurse,task.id,approval(task),randomUUID());
+  const replay=new FollowupService(database);replay.now=()=>new Date(Date.now()+3600000);
+  assert.equal((await replay.list(nurse)).tasks.find(t=>t.id===task.id)?.overdue,true);
+  await followups.act(nurse,task.id,{action:'ACKNOWLEDGE',expectedVersion:2},randomUUID());
+  await followups.act(nurse,task.id,{action:'REASSIGN',expectedVersion:3,ownerId:clinician.id,reason:'Synthetic shift handover to the clinician.'},randomUUID());
+  const reassigned=(await followups.list(nurse)).tasks.find(t=>t.id===task.id)!;
+  assert.equal(reassigned.status,'OPEN');assert.equal(reassigned.owner_id,clinician.id);assert.equal(reassigned.acknowledged_at,null);
+  await assert.rejects(followups.act(nurse,task.id,{action:'ACKNOWLEDGE',expectedVersion:4},randomUUID()),e=>(e as any).getStatus()===403);
+  await followups.act(clinician,task.id,{action:'CANCEL',expectedVersion:4,reason:'Synthetic reviewer cancelled the duplicate follow-up.'},randomUUID());
+  assert.equal((await followups.list(nurse)).tasks.find(t=>t.id===task.id)?.overdue,false);
+  assert.equal((await followups.history(nurse,task.id)).at(-1).event_type,'FOLLOWUP_CANCEL');
+});
+
+test('MCP context is visit-bound and recorded changes create one follow-up without assigning priority',async()=>{
+  const result=await register();const {name,age,gender,presentingComplaint,...vitals}=intake;
+  await workflow.observations(nurse,result.data.id,{expectedVersion:1,vitals:{...vitals,heartRate:125}},randomUUID());
+  const run=(await database.pool.query('SELECT * FROM agent_runs WHERE visit_id=$1 AND observation_version=2',[result.data.id])).rows[0];
+  await database.pool.query("UPDATE agent_runs SET status='RUNNING',lease_until=now()+interval '5 minutes' WHERE id=$1",[run.id]);
+  const tools=await createRunTools(database,run.id);
+  try {
+    const output=await tools.client.callTool({name:'get_reassessment_context',arguments:{}});
+    const context=JSON.parse((output.content as any)[0].text);
+    assert.equal(context.latest.version,2);assert.equal(context.baseline.version,1);assert.equal(context.comparison.hasDeteriorated,true);
+    assert.equal(context.latest.vitals.heartRate,125);
+  } finally {await tools.close();}
+  await executeAgent(database,run.id,fakeModel);
+  const task=(await followups.list(nurse)).tasks.find(t=>t.run_id===run.id)!;
+  assert.equal(task.basis.kind,'RECORDED_CHANGE');assert.equal(task.owner_id,null);assert.equal(task.due_at,null);
+  assert.equal((await workflow.visits()).find(v=>v.id===result.data.id)?.approvedPriority,null);
+  assert.equal((await database.pool.query('SELECT count(*) FROM followups WHERE run_id=$1',[run.id])).rows[0].count,'1');
+  await assert.rejects(database.pool.query("UPDATE followups SET basis='{}' WHERE id=$1",[task.id]),/immutable/);
+});
+
+test('follow-up API rejects anonymous and nonclinical actions without exposing staff credentials',async()=>{
+  assert.equal((await fetch(`${base}/api/followups`)).status,401);
+  const login=await fetch(`${base}/api/auth/login`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({identifier:'STAFF-102',pin:'2345'})});
+  const clinicalCookie=login.headers.get('set-cookie')!.split(';')[0];
+  const directory=await fetch(`${base}/api/followups/staff`,{headers:{Cookie:clinicalCookie}});
+  assert.equal(directory.status,200);const people=await directory.json();
+  assert.ok(people.every((p:any)=>!p.pin_hash && !p.pin && ['nurse','clinician','doctor'].includes(p.role)));
+  const list=await fetch(`${base}/api/followups`,{headers:{Cookie:clinicalCookie}});assert.equal(list.status,200);
+  assert.ok((await list.json()).tasks.length>0);
+  await assert.rejects(followups.list(clerk),e=>(e as any).getStatus()===403);
+});
+
+test('historical records cannot acquire follow-ups, even through direct database writes',async()=>{
+  await importMimicDemo(database);
+  const visit=(await database.pool.query("SELECT id FROM visits WHERE data_source='mimic-iv-ed-demo' LIMIT 1")).rows[0];
+  const requested=await workflow.requestAssessment(nurse,visit.id);
+  await assert.rejects(database.pool.query(`INSERT INTO followups(id,run_id,visit_id,observation_version,basis,protocol_checksum)
+    VALUES($1,$2,$3,1,'{}','fixture')`,[`FOLLOWUP-${randomUUID()}`,requested.data.runId,visit.id]),/synthetic workflow visits/);
+  assert.equal((await database.pool.query('SELECT count(*) FROM followups WHERE visit_id=$1',[visit.id])).rows[0].count,'0');
 });
