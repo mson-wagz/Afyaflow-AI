@@ -55,11 +55,12 @@ export const CLINICAL_DECISION_TYPES = {
 };
 
 export const PROTOCOL_METADATA = {
-  name: 'South African Triage Scale (SATS)',
-  version: '2026.1',
-  population: 'Adult Emergency Triage',
-  authority: 'Emergency Medicine Society of South Africa (EMSSA) Adaptation',
-  deterministicScoringEngine: 'v1.4-rule-engine',
+  name: 'AfyaFlow synthetic adult scoring fixture',
+  version: 'demo-v1',
+  population: 'Synthetic adults aged 18 and above',
+  authority: 'Project test fixture; not an approved clinical protocol',
+  clinicalValidated: false,
+  deterministicScoringEngine: 'synthetic-demo-v1',
 };
 
 /**

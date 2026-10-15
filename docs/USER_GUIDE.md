@@ -147,6 +147,18 @@ Open **Staff Access & Audit** for permitted events. Nurses and clerks see their 
 
 ## Troubleshooting
 
+### Competition edition
+
+The competition edition uses fictional records and a model running on the same computer.
+It starts in Patient Registration and does not show Historical Research Cases.
+The research website retains its separately labelled MIMIC library. Do not enter real
+patient information in the competition edition. A model outage leaves a case for staff
+review; it never switches to a hosted provider. Both editions require a staff decision
+before an agent proposal can change the approved queue. See [competition setup](COMPETITION.md).
+
+The scoring rules remain an unvalidated synthetic demonstration fixture. A local model
+does not make the scores clinically validated.
+
 - **Sign-in fails:** check identifier/PIN, backend connectivity, and whether demo accounts were seeded. Repeated attempts can trigger temporary throttling.
 - **Validation passes but registration fails:** check demographic/complaint errors and role permissions. Measurement validation checks only that section.
 - **No proposed priority:** inspect run status and missing evidence; ask the developer to check model access. Unsupported populations need staff review.
