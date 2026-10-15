@@ -21,6 +21,7 @@ import { configureApi } from '../../src/backend/src/lambda/api.js';
 import type { Context, APIGatewayProxyEventV2 } from 'aws-lambda';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
+import { config } from '../../src/backend/src/config.js';
 
 const schema=`afyaflow_test_${randomUUID().replaceAll('-','')}`;
 const database=new Database();
@@ -500,4 +501,38 @@ test('Historical import is repeatable, source-labelled, isolated and read-only t
   assert.equal((await workflow.queue()).queue.length,beforeQueue);
   assert.equal((await importMimicDemo(database)).inserted,0);
   assert.equal((await workflow.researchCase(caseId)).run.id,requested.data.runId);
+});
+
+test('competition policy fences historical endpoints, imports, assessments, traces and MCP access',async()=>{
+  const historical=(await database.pool.query("SELECT v.id FROM visits v JOIN agent_runs r ON r.visit_id=v.id WHERE v.data_source='mimic-iv-ed-demo' LIMIT 1")).rows[0].id;
+  const run=(await database.pool.query('SELECT * FROM agent_runs WHERE visit_id=$1',[historical])).rows[0];
+  const previous=config.mode;
+  try {
+    config.mode='competition';
+    await assert.rejects(importMimicDemo(database),/disabled/);
+    for(const operation of [()=>workflow.researchCases(),()=>workflow.researchCase(historical),()=>workflow.researchExport(),()=>workflow.trace(run.id)])
+      await assert.rejects(operation(),error=>(error as any).getStatus()===404);
+    await assert.rejects(workflow.requestAssessment(nurse,historical),error=>(error as any).getStatus()===400);
+    await database.pool.query("UPDATE agent_runs SET status='RUNNING',lease_until=now()+interval '5 minutes' WHERE id=$1",[run.id]);
+    await assert.rejects(createRunTools(database,run.id),/synthetic records/);
+    const synthetic=await register();
+    await database.pool.query("UPDATE agent_runs SET status='RUNNING',provider='openai',lease_until=now()+interval '5 minutes' WHERE id=$1",[synthetic.data.agentRunId]);
+    await assert.rejects(createRunTools(database,synthetic.data.agentRunId),/local Ollama/);
+  } finally {config.mode=previous;}
+});
+
+test('an early model finish receives one bounded reminder and cannot bypass proposal persistence',async()=>{
+  const result=await register();let round=0;
+  const model:Model=async()=>{
+    if(round++===0)return {content:[{text:'I will inspect the observations.'}]};
+    const name=['get_observations','read_protocol','score_protocol','save_pending_proposal'][round-2];
+    return {content:[{toolUse:{toolUseId:`reminder-${round}`,name,input:name==='save_pending_proposal'?{summary:'Synthetic evidence reviewed after a bounded tool reminder.'}:{}}}]};
+  };
+  const proposal=await assess(result.data.id,1,model);
+  assert.ok(proposal);assert.equal(round,5);
+  assert.equal((await workflow.visits()).find(v=>v.id===result.data.id)?.approvedPriority,null);
+  const failed=await register();let attempts=0;
+  await assert.rejects(assess(failed.data.id,1,async()=>{attempts++;return {content:[{text:'No tool action.'}]};}),/without saving/);
+  assert.equal(attempts,2);
+  assert.equal((await database.pool.query('SELECT count(*) FROM proposals WHERE visit_id=$1',[failed.data.id])).rows[0].count,'0');
 });

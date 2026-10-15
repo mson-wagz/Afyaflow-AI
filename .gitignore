@@ -4,6 +4,9 @@ out/
 dist/
 coverage/
 *.tsbuildinfo
+*.js.map
+services/**/*.js
+services/**/*.d.ts
 __pycache__/
 *.pyc
 
