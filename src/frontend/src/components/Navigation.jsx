@@ -12,6 +12,10 @@ export default function Navigation({
 }) {
   const navItems = [
     {
+      id: 'research',label: 'Historical Research Cases',icon: '▤',requiresClinical: false,
+      description: 'MIMIC-IV-ED Demo source records and research reviews',
+    },
+    {
       id: 'registration',
       label: 'Patient Registration',
       icon: '📝',

@@ -1,0 +1,3 @@
+# Preserve upstream bytes so published checksums remain valid on every platform.
+LICENSE.txt -text -whitespace
+*.gz binary

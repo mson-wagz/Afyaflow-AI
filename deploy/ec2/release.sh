@@ -62,6 +62,7 @@ backup="backups/$(date -u +%Y%m%dT%H%M%SZ).dump"
 compose exec -T postgres pg_dump -U afyaflow -d afyaflow -Fc > "$backup"
 chmod 600 "$backup"
 compose run --rm --no-deps app node dist/src/backend/src/database/migrate.js
+compose run --rm --no-deps app node dist/src/backend/src/database/import-mimic.js
 
 # Public fixture PINs are only enabled by an explicit operator request.
 if [[ "${SEED_SYNTHETIC:-false}" == 'true' ]]; then

@@ -33,6 +33,11 @@ export class ApiController {
     res.clearCookie('afyaflow_session',{path:'/api'});return {success:true};
   }
   @Get('visits') @UseGuards(SessionGuard) visits() {return this.workflow.visits();}
+  @Get('research/cases') @UseGuards(SessionGuard) researchCases() {return this.workflow.researchCases();}
+  @Get('research/export') @UseGuards(SessionGuard) async researchExport(@Res({passthrough:true})res:Response) {
+    res.attachment('afyaflow-mimic-iv-ed-demo-2.2.json');return this.workflow.researchExport();
+  }
+  @Get('research/cases/:id') @UseGuards(SessionGuard) researchCase(@Param('id')id:string) {return this.workflow.researchCase(id);}
   @Post('visits') @UseGuards(SessionGuard) register(@Req()req:StaffRequest,@Body()body:unknown,@Headers('idempotency-key')key:string) {return this.workflow.register(req.staff,body,requestKey(key));}
   @Post('visits/:id/observations') @UseGuards(SessionGuard) observations(@Req()req:StaffRequest,@Param('id')visitId:string,@Body()body:unknown,@Headers('idempotency-key')key:string) {return this.workflow.observations(req.staff,visitId,body,requestKey(key));}
   @Get('queue') @UseGuards(SessionGuard) queue() {return this.workflow.queue();}

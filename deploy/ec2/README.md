@@ -10,6 +10,13 @@ This is for light synthetic demonstrations. Updates briefly interrupt requests.
 One server is a single point of failure, and PostgreSQL is self-managed.
 The Lambda/SAM option remains available under `deploy/lambda`.
 
+The image also bundles the open MIMIC-IV-ED Demo v2.2 research data and licence.
+Each release runs the idempotent historical import after migrations, without
+queuing AI calls. It preserves existing synthetic records and saved reviews.
+Historical cases are visible in their own read-only research area. See
+[data sources and transformations](../../docs/DATA_SOURCES.md) and the
+[user guide](../../docs/USER_GUIDE.md#historical-research-cases).
+
 ## Cost basis
 
 On 15 October 2026 the AWS Price List API returned `$0.0184/hour` for a Linux

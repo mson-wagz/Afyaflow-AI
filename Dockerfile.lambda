@@ -14,6 +14,7 @@ RUN npm ci --omit=dev
 COPY --from=build /app/dist ./dist
 COPY src/backend/src/database/*.sql ./src/backend/src/database/
 COPY services/mcp/protocols ./services/mcp/protocols
+COPY data/mimic-iv-ed-demo-2.2 ./data/mimic-iv-ed-demo-2.2
 # RDS certificate bundle; keep TLS verification enabled.
 ADD https://truststore.pki.rds.amazonaws.com/global/global-bundle.pem /opt/rds/global-bundle.pem
 RUN chmod 644 /opt/rds/global-bundle.pem && chmod -R a-w services/mcp/protocols
