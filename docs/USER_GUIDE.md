@@ -147,6 +147,33 @@ Open **Staff Access & Audit** for permitted events. Nurses and clerks see their 
 
 ## Troubleshooting
 
+### Active reassessment and follow-ups
+
+Open **Deterioration Review → Active Reassessment Copilot**. An agent assessment of a
+synthetic visit creates a proposed follow-up when core evidence is incomplete/unsupported
+or the existing synthetic change fixture flags recorded changes. It compares only recorded
+snapshots; it does not monitor patients continuously. No flag does not establish stability.
+
+1. Expand **Review source evidence** and inspect the observation versions, missing fields,
+   change flags and agent summary. The scoring and change fixtures remain unvalidated.
+2. Select a named clinical owner, choose a due date/time yourself, and enter a review reason.
+   Select **Approve Follow-up**. The prototype accepts future times within 24 hours; this
+   technical limit is not a recommended clinical recheck interval. The AI sets no interval.
+3. The assigned owner selects **Acknowledge Ownership**. Only that owner can acknowledge
+   or complete the task. Clinical staff can reassign it with a reason for shift handover;
+   the new owner must acknowledge again. A task can be declined/cancelled with a reason.
+4. Record a new observation version in **Triage & Prioritisation**, then return and refresh
+   the board. Review the new measurements and enter a completion reason. Select
+   **Complete with observation v…**. An acknowledgement alone cannot complete a recheck.
+5. **View Follow-up History** shows the agent proposal, staff approval, owner actions and
+   completion observation reference. Closed tasks remain available via **Show closed follow-ups**.
+
+Proposals become stale when new observations are recorded before scheduling. Scheduled tasks
+remain open until completed or cancelled, and overdue tasks are highlighted. The board polls
+every 10 seconds while open; no SMS, background sensor coverage or external notification is
+provided. Task actions do not change patient priority, route patients or reorder the queue.
+Historical MIMIC cases cannot create follow-ups. Tasks and their audit survive app restarts.
+
 ### Missing-evidence assistant
 
 In **Triage & Prioritisation**, select a visit in **Agent Assessment & Observation Capture**.
