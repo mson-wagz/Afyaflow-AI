@@ -1,4 +1,5 @@
 export const useBackend = import.meta.env.VITE_API_MODE !== 'demo' && import.meta.env.MODE !== 'test';
+export const competitionMode = import.meta.env.VITE_APP_MODE === 'competition';
 export class ApiError extends Error {
   constructor(status,body) {super(body.message || 'Request failed');this.status=status;this.code=body.code || 'API_ERROR';this.body=body;}
 }

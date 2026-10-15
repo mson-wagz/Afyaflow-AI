@@ -1,10 +1,28 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { openaiModel } from '../../services/agents/openai.js';
+import { ollamaModel } from '../../services/agents/ollama.js';
 import type { Message, Tool } from '@aws-sdk/client-bedrock-runtime';
 const tools:Tool[]=[{toolSpec:{name:'get_observations',inputSchema:{json:{type:'object',properties:{},required:[],additionalProperties:false}}}}];
 const signal=AbortSignal.timeout(10000);
 const initial:Message={role:'user',content:[{text:'Synthetic assessment'}]};
+test('local tool calls retain tool names and reject unapproved or truncated output',async()=>{
+  const bodies:any[]=[];
+  const model=ollamaModel('qwen3:4b',async(url,init)=>{
+    assert.equal(url,'http://127.0.0.1:11434/api/chat');assert.equal(init?.redirect,'error');
+    bodies.push(JSON.parse(init?.body as string));
+    return Response.json({done:true,message:{role:'assistant',content:'',tool_calls:[{function:{name:'get_observations',arguments:{}}}]}});
+  });
+  const result=await model([initial],tools,signal);
+  await model([initial,{role:'assistant',content:result.content},{role:'user',content:[{toolResult:{toolUseId:result.content[0].toolUse.toolUseId,content:[{text:'Synthetic evidence'}]}}]}],tools,signal);
+  assert.equal(bodies[1].messages.at(-1).tool_name,'get_observations');
+  assert.equal(bodies[0].think,false);assert.equal(model.traceTool,'ollama_chat');
+  for(const response of [
+    {done:true,done_reason:'length',message:{role:'assistant',content:'partial'}},
+    {done:true,message:{role:'assistant',tool_calls:[{function:{name:'approve',arguments:{}}}]}},
+    {done:true,message:{role:'assistant',tool_calls:[{function:{name:'get_observations',arguments:'{}'}}]}},
+  ])await assert.rejects(ollamaModel('test',async()=>Response.json(response))([initial],tools,signal));
+});
 test('Responses maps strict tools, retains reasoning and pairs tool outputs without remote storage',async()=>{
   const bodies:any[]=[];
   const output=[{type:'reasoning',id:'rs_1',encrypted_content:'opaque',summary:[]},

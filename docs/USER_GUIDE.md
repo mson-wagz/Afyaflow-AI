@@ -147,6 +147,60 @@ Open **Staff Access & Audit** for permitted events. Nurses and clerks see their 
 
 ## Troubleshooting
 
+### Active reassessment and follow-ups
+
+Open **Deterioration Review → Active Reassessment Copilot**. An agent assessment of a
+synthetic visit creates a proposed follow-up when core evidence is incomplete/unsupported
+or the existing synthetic change fixture flags recorded changes. It compares only recorded
+snapshots; it does not monitor patients continuously. No flag does not establish stability.
+
+1. Expand **Review source evidence** and inspect the observation versions, missing fields,
+   change flags and agent summary. The scoring and change fixtures remain unvalidated.
+2. Select a named clinical owner, choose a due date/time yourself, and enter a review reason.
+   Select **Approve Follow-up**. The prototype accepts future times within 24 hours; this
+   technical limit is not a recommended clinical recheck interval. The AI sets no interval.
+3. The assigned owner selects **Acknowledge Ownership**. Only that owner can acknowledge
+   or complete the task. Clinical staff can reassign it with a reason for shift handover;
+   the new owner must acknowledge again. A task can be declined/cancelled with a reason.
+4. Record a new observation version in **Triage & Prioritisation**, then return and refresh
+   the board. Review the new measurements and enter a completion reason. Select
+   **Complete with observation v…**. An acknowledgement alone cannot complete a recheck.
+5. **View Follow-up History** shows the agent proposal, staff approval, owner actions and
+   completion observation reference. Closed tasks remain available via **Show closed follow-ups**.
+
+Proposals become stale when new observations are recorded before scheduling. Scheduled tasks
+remain open until completed or cancelled, and overdue tasks are highlighted. The board polls
+every 10 seconds while open; no SMS, background sensor coverage or external notification is
+provided. Task actions do not change patient priority, route patients or reorder the queue.
+Historical MIMIC cases cannot create follow-ups. Tasks and their audit survive app restarts.
+
+### Missing-evidence assistant
+
+In **Triage & Prioritisation**, select a visit in **Agent Assessment & Observation Capture**.
+The checklist shows recorded, missing and unsupported core evidence for that exact observation
+version. Each item cites the synthetic fixture ID, version and JSON rule location. Additional
+observations remain explicitly unknown when absent. This checklist is a deterministic evidence
+inventory; it does not diagnose or choose measurements.
+
+Clinical staff can select **Record Missing Evidence**, enter measured values, and save a new
+observation version. Existing recorded values are shown for review; empty fields are never
+estimated. Saving invalidates old proposals and queues a fresh agent assessment. If another
+staff member saves observations while the form is open, saving is disabled until you select
+**Record New Observations** again to reload the latest snapshot. Clerks can read the checklist
+but cannot record clinical observations. Missing or unsupported age requires manual review.
+
+### Competition edition
+
+The competition edition uses fictional records and a model running on the same computer.
+It starts in Patient Registration and does not show Historical Research Cases.
+The research website retains its separately labelled MIMIC library. Do not enter real
+patient information in the competition edition. A model outage leaves a case for staff
+review; it never switches to a hosted provider. Both editions require a staff decision
+before an agent proposal can change the approved queue. See [competition setup](COMPETITION.md).
+
+The scoring rules remain an unvalidated synthetic demonstration fixture. A local model
+does not make the scores clinically validated.
+
 - **Sign-in fails:** check identifier/PIN, backend connectivity, and whether demo accounts were seeded. Repeated attempts can trigger temporary throttling.
 - **Validation passes but registration fails:** check demographic/complaint errors and role permissions. Measurement validation checks only that section.
 - **No proposed priority:** inspect run status and missing evidence; ask the developer to check model access. Unsupported populations need staff review.

@@ -5,6 +5,7 @@ import { config } from '../../src/backend/src/config.js';
 import { createRunTools } from '../mcp/tools.js';
 import { bedrockModel, Model } from './bedrock.js';
 import { openaiModel } from './openai.js';
+import { ollamaModel } from './ollama.js';
 import { performance } from 'node:perf_hooks';
 
 // Persistence of the job and human-review pause belongs to PostgreSQL, not model memory.
@@ -13,7 +14,8 @@ export async function executeAgent(database:Database,runId:string,model?:Model) 
   const tools=await createRunTools(database,runId);
   try {
     if(!model) {
-      if(tools.provider==='openai')model=openaiModel(tools.modelId);
+      if(tools.provider==='ollama')model=ollamaModel(tools.modelId);
+      else if(tools.provider==='openai')model=openaiModel(tools.modelId);
       else if(tools.provider==='bedrock')model=bedrockModel(tools.modelId);
       else throw new Error('Unsupported agent provider.');
     }
@@ -21,7 +23,7 @@ export async function executeAgent(database:Database,runId:string,model?:Model) 
     const available=(await tools.client.listTools()).tools;
     const definitions:Tool[]=available.map(tool => ({toolSpec:{name:tool.name,description:tool.description,
       inputSchema:{json:tool.inputSchema as any}}}));
-    const State=Annotation.Root({messages:Annotation<Message[]>(),steps:Annotation<number>(),calls:Annotation<any[]>()});
+    const State=Annotation.Root({messages:Annotation<Message[]>(),steps:Annotation<number>(),calls:Annotation<any[]>(),reminders:Annotation<number>()});
     const graph=new StateGraph(State)
       .addNode('model',async state => {
         if (signal.aborted) throw new Error('Agent deadline exceeded.');
@@ -48,16 +50,22 @@ export async function executeAgent(database:Database,runId:string,model?:Model) 
         }
         return {messages:[...state.messages,{role:'user' as const,content}]};
       })
+      .addNode('reminder',async state=>({reminders:state.reminders+1,messages:[...state.messages,
+        {role:'user' as const,content:[{text:'No proposal has been saved. Use actual tool calls, not descriptions: retrieve get_observations and read_protocol, then score_protocol, then save_pending_proposal with a sourced summary. Use the evidence already retrieved if available. Do not invent values or approve a visit.'}]}]}))
+      .addEdge('reminder','model')
       .addEdge(START,'model')
       .addConditionalEdges('model',state => {
         if (tools.isSaved()) return END;
-        if (!state.calls.length) throw new Error('Model finished without saving a sourced proposal. Staff review required.');
         if (state.steps >= config.maxSteps) throw new Error('Agent tool budget exceeded. Staff review required.');
+        if (!state.calls.length) {
+          if(state.reminders<1)return 'reminder';
+          throw new Error('Model finished without saving a sourced proposal. Staff review required.');
+        }
         return 'tools';
       })
       .addConditionalEdges('tools',() => tools.isSaved()?END:'model')
       .compile();
-    await graph.invoke({messages:[{role:'user',content:[{text:'Assess the bound demonstration record, which may be synthetic or historical research data. Retrieve evidence, read the protocol, calculate a proposal and save it for review. Preserve missing evidence.'}]}],steps:0,calls:[]},{recursionLimit:config.maxSteps*3,signal});
+    await graph.invoke({messages:[{role:'user',content:[{text:'Assess the bound demonstration record, which may be synthetic or historical research data. Call get_observations and read_protocol, then score_protocol, then save_pending_proposal. Use actual tool calls and preserve missing evidence. The saved proposal requires human review.'}]}],steps:0,calls:[],reminders:0},{recursionLimit:config.maxSteps*3,signal});
     if (!tools.isSaved()) throw new Error('No proposal saved.');
     await database.pool.query("UPDATE agent_runs SET status=$2,finished_at=now(),lease_until=null WHERE id=$1 AND status='RUNNING' AND attempts=$3 AND delivery_generation=$4",
       [runId,tools.isSufficient()?'WAITING_FOR_REVIEW':'REVIEW_REQUIRED',tools.attempt,tools.generation]);

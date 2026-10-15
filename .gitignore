@@ -4,12 +4,16 @@ out/
 dist/
 coverage/
 *.tsbuildinfo
+*.js.map
+services/**/*.js
+services/**/*.d.ts
 __pycache__/
 *.pyc
 
 # Local environment and logs
 .env
 .env.*
+temp_auto_push.bat
 !.env.example
 *.log
 
@@ -25,3 +29,5 @@ artifacts/local/
 .local/
 .aws-sam/
 samconfig.toml
+.gitignore
+branch_structure.json
