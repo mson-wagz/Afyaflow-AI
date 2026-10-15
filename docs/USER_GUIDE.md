@@ -137,6 +137,10 @@ Clinical decisions, observation updates, manual assessments, and transfers canno
 
 ## 10. Lock, sign out, and inspect history
 
+An incorrect unlock PIN keeps the terminal locked and shows an error asking
+you to re-enter it. The PIN field clears and receives focus for another attempt.
+Only a missing or expired session requires signing in again.
+
 Use the header lock control before leaving a shared terminal. Unlock with your PIN. Sign out when finishing or handing over the device. Expired sessions require sign-in; the backend currently issues sessions lasting up to eight hours.
 
 Open **Staff Access & Audit** for permitted events. Nurses and clerks see their own staff events; clinicians and administrators see broader history. **Authorised Clinical Decision & Audit History** in the triage screen records patient decisions and reasons. History is not editable through the app.
