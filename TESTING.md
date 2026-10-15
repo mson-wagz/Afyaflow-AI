@@ -13,7 +13,7 @@ Run focused unit tests without starting PostgreSQL, the backend, or AWS services
 npm run test:unit
 ```
 
-These cover PIN hashing and verification, clinical role checks, retry keys, registration and observation schemas, decision evidence requirements, and the browser API client's JSON requests, errors, session expiry, and mutation notifications. Browser unit tests stub `fetch`; they do not contact a running server.
+These cover PIN hashing, role checks, request schemas, provider tool mapping and errors, MIMIC checksum/cohort verification, unit conversion, missing-value handling and source joins, plus the browser API client. Provider tests stub network requests and do not use paid inference.
 
 For integration tests, set `DATABASE_URL` in the root `.env` to a local development PostgreSQL database. The database user needs permission to create and drop schemas. Start PostgreSQL in another terminal if it is not already running:
 
@@ -30,6 +30,15 @@ npm run test:integration
 Backend integration tests create a randomly named `afyaflow_test_<UUID>` schema, apply the actual migrations and synthetic seed data there, launch NestJS on a temporary loopback port, and drop that schema after the suite. They exercise real PostgreSQL transactions, session cookies, HTTP endpoints, and MCP tool dispatch. The agent model is a deterministic test double; these tests make no Bedrock calls and do not validate the clinical protocol.
 
 The HTTP journey registers a visit, verifies retry safety, generates pending evidence, approves it as a clinician, routes the visit, and checks the queue and linked audit events. Additional cases cover conflicting retry payloads, missing retry headers, forged staff identity, stale observations, and rejected clinical mutations. Existing service integration cases also cover concurrency, rollback, missing evidence, forbidden model tools, worker fencing, and append-only history.
+
+The historical research integration imports the real public demo into the
+isolated schema, verifies repeat imports and the 222-stay/64-patient cohort,
+uses real MCP tools with a mocked model, and checks that source ESI/outcomes are
+absent from model evidence. Historical cases must stay out of synthetic lists,
+queues, clinical approvals and routing. Direct HTTP edit/override/escalation/
+transfer attempts and prohibited database updates must fail. Frontend research
+tests check source/missing-value disclosure, licence/export links, explicit
+inference requests, saved reviews and role restrictions.
 
 Frontend integration and component tests run in jsdom. They cover registration feedback, clinical decisions and notifications, queue and routing views, staff access, deterioration, and offline outbox replay. Existing feature files include some contract unit assertions alongside component tests. These are automated DOM tests, not full browser automation against a live server.
 

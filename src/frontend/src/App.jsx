@@ -18,6 +18,7 @@ import { Header, Navigation } from './components';
 import { SESSION_STATUS, SYNTHETIC_STAFF_FIXTURES } from '../../shared/contracts/auth.js';
 
 import { useBackend } from './api/client.js';
+import ResearchView from './features/research/ResearchView.jsx';
 
 function AppShell() {
   const {
@@ -33,13 +34,13 @@ function AppShell() {
 
   const { isOnline, pendingCount } = useOfflineSync();
 
-  const [currentView, setCurrentView] = useState('registration');
+  const [currentView, setCurrentView] = useState(useBackend?'research':'registration');
   const [profileOpen, setProfileOpen] = useState(false);
 
   if(restoring)return <div role="status">Restoring staff session…</div>;
   // If unauthenticated, show the Sign-In screen
   if (sessionStatus === SESSION_STATUS.UNAUTHENTICATED || !staff) {
-    return <><div role="alert">{authError}</div><SignInScreen /></>;
+    return <><div role="note" style={{padding:'0.75rem',backgroundColor:'#fff7ed',color:'#7c2d12'}}>Research demonstration: de-identified MIMIC-IV-ED Demo records and separate synthetic workflows. No live hospital connection.</div><div role="alert">{authError}</div><SignInScreen /></>;
   }
 
   // Quick switcher handler for evaluators/demos
@@ -50,7 +51,7 @@ function AppShell() {
   return (
     <div className="app-container">
       <div role="note" style={{padding:'0.6rem 1rem',backgroundColor:'#fff7ed',color:'#7c2d12'}}>
-        {useBackend ? 'Connected to PostgreSQL • Synthetic patient data • Configurable AI agent • Clinician approval required. Scoring uses an unvalidated test protocol.'
+        {useBackend ? 'Research demonstration • MIMIC historical cases and separate synthetic workflows • Scoring is not clinically validated. No live hospital admissions.'
           : 'Synthetic demo — browser-local data and simulated tools. Clinical scoring is not validated.'}
       </div>
       {/* Shared-device lock screen overlay if locked */}
@@ -145,6 +146,7 @@ function AppShell() {
         </aside>
 
         <main hidden={sessionStatus === SESSION_STATUS.LOCKED} className="app-main" id="main-content" tabIndex={-1}>
+          {currentView === 'research' && <ResearchView isClinical={isClinical} />}
           {currentView === 'registration' && <RegistrationView key={staff.id} currentStaff={staff} />}
           {currentView === 'triage' && <TriageView currentStaff={staff} isClinical={isClinical} />}
           {currentView === 'queue' && <QueueView />}

@@ -4,12 +4,15 @@
 
 AfyaFlow connects registration, recorded observations, agent-assisted priority proposals, staff decisions, waiting queues, deterioration review, and department routing. The agent gathers evidence through MCP tools; an authenticated nurse or clinician makes the consequential decision.
 
-**Current status:** the React/NestJS/PostgreSQL app works locally, a real Amazon Bedrock assessment has been verified, and the backend is refactored for AWS Lambda. The SAM template passes validation. No AWS hosting resources have been deployed; the Lambda image still needs a Docker build and staging verification.
+**Current status:** deployed at [afyaflow.online](https://afyaflow.online) on the low-cost EC2/PostgreSQL/Caddy stack. GitHub Actions tests pushes and pull requests; successful main pushes deploy using AWS OIDC. OpenAI is the active staging inference provider; Bedrock remains configurable.
 
-The app uses synthetic patients and an **unvalidated scoring fixture**. It is a development demonstration, not a clinically validated triage system. The project is being prepared for the African Agentic AI Design Challenge, Health & Wellbeing track; hosted Nova Lite does not itself satisfy an open-weights evaluation requirement.
+**Historical Research Cases** uses the openly available **MIMIC-IV-ED Demo v2.2**: 222 historical ED stays from 64 distinct source patients in the bundled ED files. Original rows and normalized observations have source attribution and ODbL 1.0 licensing. Research cases are read-only and separate from synthetic registration, queue and routing workflows. See [data sources, transformations and limitations](docs/DATA_SOURCES.md).
+
+The scoring fixture remains **unvalidated**. This is a research/development demonstration, not a clinically validated triage system or live hospital service. Missing age, AVPU and mobility in the imported ED tables are never invented. Historical ESI labels are retained separately, without mapping them to AfyaFlow priorities. The project is being prepared for the African Agentic AI Design Challenge, Health & Wellbeing track; hosted inference does not itself satisfy an open-weights evaluation requirement.
 
 ## Documentation
 
+- [Data sources and research use](docs/DATA_SOURCES.md): dataset provenance, licensing, mappings, missing fields, import/export and AI use.
 - [Application user guide](docs/USER_GUIDE.md): sign-in, registration, assessments, decisions, queues, routing, and offline drafts.
 - [Backend setup](src/backend/README.md): local PostgreSQL, Bedrock configuration, and development accounts.
 - [Lambda deployment guide](deploy/lambda/README.md): AWS prerequisites, SAM deployment, migrations, and staging checks.
@@ -19,6 +22,8 @@ The app uses synthetic patients and an **unvalidated scoring fixture**. It is a 
 - [Feature specifications](specs/features/README.md), [frontend specifications](specs/frontend/README.md), and [development tasks](specs/tasks.md).
 
 ## Implemented features
+
+- **Historical research library:** verified public MIMIC-IV-ED Demo import, source inspection, JSON export, explicit MCP-backed AI research reviews and separation from operational demonstrations.
 
 - **Staff access:** server-backed sign-in, HttpOnly cookie sessions, locking, logout, role checks, and shared authentication throttling.
 - **Registration:** demographic and complaint validation, timestamped observations, staff attribution, draft retention, and retry-safe submission.
@@ -49,7 +54,7 @@ Capacity and staffing figures are synthetic, not live hospital telemetry. The fr
 
 ### Agents and MCP
 
-- **Amazon Bedrock Converse and Amazon Nova Lite:** hosted inference. The verified configuration uses `eu-west-1` and `eu.amazon.nova-lite-v1:0`.
+- **OpenAI Responses / Amazon Bedrock Converse:** explicit provider selection, bounded tool calling and per-run provider/model persistence. Staging uses OpenAI `gpt-4.1-mini`; Bedrock configuration is retained.
 - **LangGraph:** model/tool orchestration and bounded workflow control. Human-review state is persisted in PostgreSQL.
 - **Official MCP TypeScript client/server SDKs:** real tool discovery and dispatch through run-scoped in-memory transports, plus an optional stdio entry point.
 - **Custom MCP tools:** `get_observations`, `read_protocol`, `score_protocol`, and `save_pending_proposal`.
@@ -70,7 +75,7 @@ Dependency versions are recorded in the root and frontend manifests and lockfile
 
 ## AWS services and their roles
 
-**Already used and verified:** Amazon Bedrock hosted inference. The hosting services below are represented in deployment configuration or required as existing resources; they are not yet deployed for this app.
+**Active staging:** EC2, EBS, ECR, IAM/OIDC and Systems Manager with PostgreSQL and Caddy on one host. The OpenAI key is stored in SSM SecureString and mounted privately at release time. The Lambda/SAM resources below remain an alternative deployment configuration.
 
 ### Resources described by the SAM template
 
@@ -93,7 +98,7 @@ Dependency versions are recorded in the root and frontend manifests and lockfile
 - **Amazon ECR:** stores container images published during SAM deployment.
 - **AWS KMS:** optional customer-managed encryption key for the database secret; the template accepts its ARN and grants scoped decryption.
 
-**Optional:** RDS Proxy can help manage database connections, but is not provisioned or required by this template. ECS/Fargate and EC2 are alternative hosts, not components of the selected Lambda deployment. AgentCore Gateway is not required for the current MCP transport.
+**Optional:** RDS Proxy can help manage Lambda database connections, but is not provisioned by that template. EC2 is the active low-cost staging host. AgentCore Gateway is not required for the current MCP transport.
 
 ## Assessment workflow
 

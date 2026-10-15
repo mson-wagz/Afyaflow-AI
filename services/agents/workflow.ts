@@ -57,7 +57,7 @@ export async function executeAgent(database:Database,runId:string,model?:Model) 
       })
       .addConditionalEdges('tools',() => tools.isSaved()?END:'model')
       .compile();
-    await graph.invoke({messages:[{role:'user',content:[{text:'Assess the bound synthetic visit. Retrieve evidence, read the protocol, calculate a proposal and save it for human review.'}]}],steps:0,calls:[]},{recursionLimit:config.maxSteps*3,signal});
+    await graph.invoke({messages:[{role:'user',content:[{text:'Assess the bound demonstration record, which may be synthetic or historical research data. Retrieve evidence, read the protocol, calculate a proposal and save it for review. Preserve missing evidence.'}]}],steps:0,calls:[]},{recursionLimit:config.maxSteps*3,signal});
     if (!tools.isSaved()) throw new Error('No proposal saved.');
     await database.pool.query("UPDATE agent_runs SET status=$2,finished_at=now(),lease_until=null WHERE id=$1 AND status='RUNNING' AND attempts=$3 AND delivery_generation=$4",
       [runId,tools.isSufficient()?'WAITING_FOR_REVIEW':'REVIEW_REQUIRED',tools.attempt,tools.generation]);

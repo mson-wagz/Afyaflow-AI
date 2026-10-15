@@ -10,9 +10,14 @@ import { generateRoutingProposal } from '../../../shared/contracts/routing.js';
 import { compareObservationsForDeterioration, calculateObservationAge } from '../../../shared/contracts/deterioration.js';
 import { readProtocol } from '../../../../services/mcp/tools.js';
 import type { PoolClient } from 'pg';
+import { mimicMetadata } from '../database/mimic-data.js';
 
 const priority=(code:string|null):any => code ? (TRIAGE_PRIORITY as any)[code]:null;
 const iso=(date:any) => date instanceof Date?date.toISOString():date;
+function requireWorkflowVisit(visit:any) {
+  if(visit.data_source==='mimic-iv-ed-demo')throw new BadRequestException({code:'HISTORICAL_READ_ONLY',
+    message:'Historical research cases cannot be edited, approved, escalated or transferred.'});
+}
 export function requestKey(value:unknown) {
   if (typeof value !== 'string' || value.length<8 || value.length>150) throw new BadRequestException({code:'IDEMPOTENCY_KEY_REQUIRED',message:'Supply an Idempotency-Key header (8–150 characters).'});
   return value;
@@ -33,7 +38,7 @@ export class WorkflowService {
   constructor(@Inject(Database) readonly database:Database) {}
   async visits() {
     const rows=(await this.database.pool.query(`SELECT v.*,o.id observation_id,o.vitals,o.recorded_at FROM visits v
-      JOIN observations o ON o.visit_id=v.id AND o.version=v.observation_version ORDER BY v.arrival_at`)).rows;
+      JOIN observations o ON o.visit_id=v.id AND o.version=v.observation_version WHERE v.data_source='synthetic' ORDER BY v.arrival_at`)).rows;
     return rows.map(v => ({id:v.id,visitId:v.id,name:v.name,patientName:v.name,age:v.age,gender:v.gender,
       presentingComplaint:v.complaint,arrivalTime:iso(v.arrival_at),approvedPriority:priority(v.approved_priority),
       assessmentVersion:v.assessment_version,observationVersion:v.observation_version,observationId:v.observation_id,
@@ -61,6 +66,7 @@ export class WorkflowService {
     return this.database.transaction(db => idempotent(db,staff.id,`observations:${visitId}`,key,input,async () => {
       const visit=(await db.query('SELECT * FROM visits WHERE id=$1 FOR UPDATE',[visitId])).rows[0];
       if (!visit) throw new NotFoundException('Visit not found.');
+      requireWorkflowVisit(visit);
       if (visit.observation_version!==input.expectedVersion) throw new ConflictException({code:'VERSION_CONFLICT',message:'Observations changed. Reload before submitting.'});
       const version=visit.observation_version+1;
       await db.query('INSERT INTO observations(id,visit_id,version,vitals,recorded_by) VALUES($1,$2,$3,$4,$5)',[id('OBS'),visitId,version,JSON.stringify(input.vitals),staff.id]);
@@ -81,7 +87,8 @@ export class WorkflowService {
   async pending() {
     const visits=await this.visits();const protocol=await readProtocol();
     const rows=(await this.database.pool.query(`SELECT p.*,r.model,r.status run_status FROM proposals p JOIN agent_runs r ON r.id=p.run_id
-      WHERE p.status='PENDING' AND r.status IN ('WAITING_FOR_REVIEW','REVIEW_REQUIRED') ORDER BY p.created_at`)).rows;
+      JOIN visits v ON v.id=p.visit_id WHERE v.data_source='synthetic' AND p.status='PENDING'
+      AND r.status IN ('WAITING_FOR_REVIEW','REVIEW_REQUIRED') ORDER BY p.created_at`)).rows;
     return Promise.all(rows.map(async p => {
       const visit=visits.find(v=>v.id===p.visit_id)!;
       return {...visit,patientId:visit.id,proposalId:p.id,patientName:visit.name,observations:visit.vitals,
@@ -97,7 +104,34 @@ export class WorkflowService {
     return {runId,model:run.model,provider:run.provider,status:run.status,error:run.error,
       timestamp:iso(run.created_at),toolCalls:calls.map(c=>({tool:c.tool,inputs:c.inputs,outputs:c.outputs,durationMs:c.duration_ms,timestamp:iso(c.timestamp)}))};
   }
-  async runs() {return (await this.database.pool.query('SELECT id,visit_id "patientId",observation_version "observationVersion",status,provider,model,error,created_at "createdAt",finished_at "finishedAt" FROM agent_runs ORDER BY created_at DESC LIMIT 100')).rows;}
+  async runs() {return (await this.database.pool.query(`SELECT r.id,r.visit_id "patientId",r.observation_version "observationVersion",r.status,r.provider,r.model,r.error,r.created_at "createdAt",r.finished_at "finishedAt"
+    FROM agent_runs r JOIN visits v ON v.id=r.visit_id WHERE v.data_source='synthetic' ORDER BY r.created_at DESC LIMIT 100`)).rows;}
+  async researchCases() {
+    const rows=(await this.database.pool.query(`SELECT v.id,v.name,v.gender,v.complaint,v.source_data,v.assessment_status,
+      r.status run_status FROM visits v LEFT JOIN agent_runs r ON r.visit_id=v.id AND r.observation_version=v.observation_version
+      WHERE v.data_source='mimic-iv-ed-demo' ORDER BY v.id`)).rows;
+    return {metadata:mimicMetadata,total:rows.length,subjects:new Set(rows.map(row=>row.source_data.subjectId)).size,
+      cases:rows.map(row=>({id:row.id,name:row.name,gender:row.gender,presentingComplaint:row.complaint,
+        sourceAcuity:row.source_data.sourceAcuity,originalArrival:row.source_data.originalArrival,
+        status:row.run_status || row.assessment_status}))};
+  }
+  async researchCase(visitId:string) {
+    const row=(await this.database.pool.query(`SELECT v.*,o.vitals FROM visits v JOIN observations o ON o.visit_id=v.id AND o.version=v.observation_version
+      WHERE v.id=$1 AND v.data_source='mimic-iv-ed-demo'`,[visitId])).rows[0];
+    if(!row)throw new NotFoundException('Historical research case not found.');
+    const run=(await this.database.pool.query('SELECT * FROM agent_runs WHERE visit_id=$1 AND observation_version=$2',[visitId,row.observation_version])).rows[0];
+    const proposal=run?(await this.database.pool.query('SELECT id,data FROM proposals WHERE run_id=$1',[run.id])).rows[0]:null;
+    return {id:row.id,name:row.name,age:row.age,gender:row.gender,presentingComplaint:row.complaint,
+      vitals:row.vitals,source:row.source_data,researchOnly:true,clinicalValidated:false,
+      run:run?{id:run.id,status:run.status,provider:run.provider,model:run.model,error:run.error}:null,
+      proposal:proposal?{id:proposal.id,...proposal.data}:null,trace:run?await this.trace(run.id):null};
+  }
+  async researchExport() {
+    const rows=(await this.database.pool.query(`SELECT v.id,v.age,v.gender,v.complaint,v.source_data,o.vitals FROM visits v JOIN observations o
+      ON o.visit_id=v.id AND o.version=v.observation_version WHERE v.data_source='mimic-iv-ed-demo' ORDER BY v.id`)).rows;
+    return {metadata:mimicMetadata,cases:rows.map(row=>({id:row.id,age:row.age,gender:row.gender,
+      presentingComplaint:row.complaint,vitals:row.vitals,source:row.source_data}))};
+  }
   async requestAssessment(staff:Staff,visitId:string) {
     requireClinical(staff);
     return this.database.transaction(async db => {
@@ -115,6 +149,7 @@ export class WorkflowService {
       const visit=(await db.query('SELECT * FROM visits WHERE id=$1 FOR UPDATE',[input.patientId])).rows[0];
       const proposal=(await db.query('SELECT p.*,r.status run_status FROM proposals p JOIN agent_runs r ON r.id=p.run_id WHERE p.id=$1 FOR UPDATE OF p',[input.proposalId])).rows[0];
       if (!visit || !proposal || proposal.visit_id!==visit.id) throw new NotFoundException('Proposal not found.');
+      requireWorkflowVisit(visit);
       if (proposal.status!=='PENDING' || !['WAITING_FOR_REVIEW','REVIEW_REQUIRED'].includes(proposal.run_status)) throw new ConflictException({code:'PROPOSAL_NOT_PENDING',message:'This proposal has already been decided or is not ready.'});
       if (proposal.observation_version!==visit.observation_version || input.observationVersion!==visit.observation_version)
         throw new ConflictException({code:'STALE_PROPOSAL',message:'Observations changed. Request a new assessment.'});
@@ -149,6 +184,7 @@ export class WorkflowService {
       const visit=(await db.query('SELECT * FROM visits WHERE id=$1 FOR UPDATE',[input.patientId])).rows[0];
       const department=(await db.query('SELECT * FROM departments WHERE id=$1 FOR UPDATE',[input.departmentId])).rows[0];
       if (!visit || !department) throw new NotFoundException('Visit or department not found.');
+      requireWorkflowVisit(visit);
       if (!visit.approved_priority || visit.assessment_version!==input.assessmentVersion || department.version!==input.departmentVersion)
         throw new ConflictException({code:'STALE_ROUTE',message:'Approved assessment or department availability changed. Refresh routing.'});
       if (department.data.status==='CLOSED' || department.data.occupiedBeds>=department.data.totalBeds)
@@ -178,6 +214,7 @@ export class WorkflowService {
     return this.database.transaction(db => idempotent(db,staff.id,'reassessment',key,input,async () => {
       const visit=(await db.query('SELECT * FROM visits WHERE id=$1 FOR UPDATE',[input.patientId])).rows[0];
       if (!visit) throw new NotFoundException('Visit not found.');
+      requireWorkflowVisit(visit);
       if (visit.observation_version!==input.observationVersion) throw new ConflictException('Observation version changed.');
       if (input.action==='ESCALATE' && !input.targetPriority) throw new BadRequestException('A manual escalation priority is required.');
       const code=input.action==='ESCALATE'?input.targetPriority:visit.approved_priority;
