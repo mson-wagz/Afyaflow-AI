@@ -6,6 +6,8 @@ import { performance } from 'node:perf_hooks';
 import { Database, id, hash } from '../../src/backend/src/database/db.js';
 import { calculateSatsScore } from '../../src/shared/contracts/triage.js';
 import { readProtocolThroughFilesystem } from './borrowed-protocol.js';
+import { config } from '../../src/backend/src/config.js';
+import { assertCompetitionRun } from '../../src/backend/src/runtime-policy.js';
 
 export const protocolPath='services/mcp/protocols/synthetic-adult-v1.json';
 export async function readProtocol() {return JSON.parse(await readFile(protocolPath,'utf8'));}
@@ -24,6 +26,8 @@ export function scoreEvidence(evidence:any,protocol:any) {
 export async function createRunTools(database:Database,runId:string) {
   const run=(await database.pool.query('SELECT * FROM agent_runs WHERE id=$1',[runId])).rows[0];
   if (!run || run.status !== 'RUNNING') throw new Error('MCP tools require an active leased agent run.');
+  const source=(await database.pool.query('SELECT data_source FROM visits WHERE id=$1',[run.visit_id])).rows[0]?.data_source;
+  assertCompetitionRun(config.mode,source,run.provider);
   const server=new McpServer({name:'afyaflow-patient-tools',version:'0.1.0'});
   let evidence:any,protocol:any,scoring:any,saved=false,step=0;
   const callbacks:Record<string,(args:any)=>Promise<any>>={

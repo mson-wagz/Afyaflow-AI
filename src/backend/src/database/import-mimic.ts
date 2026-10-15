@@ -2,8 +2,10 @@ import { randomUUID } from 'node:crypto';
 import { Database, audit, id } from './db.js';
 import { pinHash } from '../auth/auth.js';
 import { loadMimicDemo, mimicMetadata } from './mimic-data.js';
+import { config } from '../config.js';
 
 export async function importMimicDemo(database:Database) {
+  if(config.mode==='competition')throw new Error('Historical data import is disabled in competition mode.');
   const cases=await loadMimicDemo();
   return database.transaction(async db=>{
     await db.query('SELECT pg_advisory_xact_lock(741094)');
