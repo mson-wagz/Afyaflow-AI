@@ -18,12 +18,13 @@ export function requestKey(value:unknown) {
   return value;
 }
 export async function enqueue(db:PoolClient,visitId:string,version:number) {
-  const run=(await db.query(`INSERT INTO agent_runs(id,visit_id,observation_version,model,status) VALUES($1,$2,$3,$4,'QUEUED')
+  const run=(await db.query(`INSERT INTO agent_runs(id,visit_id,observation_version,model,provider,status) VALUES($1,$2,$3,$4,$5,'QUEUED')
     ON CONFLICT(visit_id,observation_version) DO UPDATE SET status=CASE WHEN agent_runs.status='FAILED' THEN 'QUEUED' ELSE agent_runs.status END,
     error=CASE WHEN agent_runs.status='FAILED' THEN null ELSE agent_runs.error END,
     attempts=CASE WHEN agent_runs.status='FAILED' THEN 0 ELSE agent_runs.attempts END,
     delivery_generation=CASE WHEN agent_runs.status='FAILED' THEN agent_runs.delivery_generation+1 ELSE agent_runs.delivery_generation END,
-    model=CASE WHEN agent_runs.status='FAILED' THEN EXCLUDED.model ELSE agent_runs.model END RETURNING *`,[id('RUN'),visitId,version,config.model])).rows[0];
+    provider=CASE WHEN agent_runs.status='FAILED' THEN EXCLUDED.provider ELSE agent_runs.provider END,
+    model=CASE WHEN agent_runs.status='FAILED' THEN EXCLUDED.model ELSE agent_runs.model END RETURNING *`,[id('RUN'),visitId,version,config.model,config.provider])).rows[0];
   if(run.status==='QUEUED') await db.query('INSERT INTO agent_outbox(run_id,generation) VALUES($1,$2) ON CONFLICT DO NOTHING',[run.id,run.delivery_generation]);
   return run;
 }
@@ -96,7 +97,7 @@ export class WorkflowService {
     return {runId,model:run.model,provider:run.provider,status:run.status,error:run.error,
       timestamp:iso(run.created_at),toolCalls:calls.map(c=>({tool:c.tool,inputs:c.inputs,outputs:c.outputs,durationMs:c.duration_ms,timestamp:iso(c.timestamp)}))};
   }
-  async runs() {return (await this.database.pool.query('SELECT id,visit_id "patientId",observation_version "observationVersion",status,model,error,created_at "createdAt",finished_at "finishedAt" FROM agent_runs ORDER BY created_at DESC LIMIT 100')).rows;}
+  async runs() {return (await this.database.pool.query('SELECT id,visit_id "patientId",observation_version "observationVersion",status,provider,model,error,created_at "createdAt",finished_at "finishedAt" FROM agent_runs ORDER BY created_at DESC LIMIT 100')).rows;}
   async requestAssessment(staff:Staff,visitId:string) {
     requireClinical(staff);
     return this.database.transaction(async db => {

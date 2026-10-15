@@ -4,13 +4,20 @@ import { Database, id } from '../../src/backend/src/database/db.js';
 import { config } from '../../src/backend/src/config.js';
 import { createRunTools } from '../mcp/tools.js';
 import { bedrockModel, Model } from './bedrock.js';
+import { openaiModel } from './openai.js';
 import { performance } from 'node:perf_hooks';
 
 // Persistence of the job and human-review pause belongs to PostgreSQL, not model memory.
-export async function executeAgent(database:Database,runId:string,model:Model=bedrockModel()) {
+export async function executeAgent(database:Database,runId:string,model?:Model) {
   const signal=AbortSignal.timeout(config.agentTimeout);
   const tools=await createRunTools(database,runId);
   try {
+    if(!model) {
+      if(tools.provider==='openai')model=openaiModel(tools.modelId);
+      else if(tools.provider==='bedrock')model=bedrockModel(tools.modelId);
+      else throw new Error('Unsupported agent provider.');
+    }
+    const selectedModel=model;
     const available=(await tools.client.listTools()).tools;
     const definitions:Tool[]=available.map(tool => ({toolSpec:{name:tool.name,description:tool.description,
       inputSchema:{json:tool.inputSchema as any}}}));
@@ -19,10 +26,10 @@ export async function executeAgent(database:Database,runId:string,model:Model=be
       .addNode('model',async state => {
         if (signal.aborted) throw new Error('Agent deadline exceeded.');
         const started=performance.now();
-        const response=await model(state.messages,definitions,signal);
+        const response=await selectedModel(state.messages,definitions,signal);
         await database.pool.query('UPDATE agent_runs SET steps=$2 WHERE id=$1 AND attempts=$3 AND delivery_generation=$4',[runId,state.steps+1,tools.attempt,tools.generation]);
         await database.pool.query('INSERT INTO tool_traces(id,run_id,step,tool,inputs,outputs,duration_ms) VALUES($1,$2,$3,$4,$5,$6,$7)',
-          [id('TRACE'),runId,1000+state.steps,'bedrock_converse',JSON.stringify({model:config.model,messageCount:state.messages.length}),JSON.stringify({content:response.content,usage:response.usage}),Math.round(performance.now()-started)]);
+          [id('TRACE'),runId,1000+state.steps,selectedModel.traceTool || 'bedrock_converse',JSON.stringify({provider:tools.provider,model:tools.modelId,messageCount:state.messages.length}),JSON.stringify({content:response.content,usage:response.usage}),Math.round(performance.now()-started)]);
         return {messages:[...state.messages,{role:'assistant' as const,content:response.content}],
           steps:state.steps+1,calls:response.content.filter(block => block.toolUse).map(block => block.toolUse)};
       })
