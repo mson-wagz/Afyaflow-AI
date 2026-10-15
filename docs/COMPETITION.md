@@ -10,6 +10,18 @@ The AWS site remains the **research deployment**, including its separately label
 4. Build the frontend with `VITE_APP_MODE=competition` set in your shell: `npm run build --prefix src/frontend`. Run `npm run dev:backend`; the backend serves the built frontend. For frontend development set the same variable before running Vite.
 5. On a local database, run `npm run test:competition:live`. This creates and drops only its own random proof schema, runs the real model and both MCP servers, checks the human approval gate, and writes an ignored trace to `.local/competition-model-proof.json`. It makes no hosted inference requests.
 
+Set `COMPETITION_PROOF_FOLLOWUP=true` for the extended proof: a second real-model assessment
+compares changed synthetic observations and proposes a recheck; staff approve a named owner
+and example due time, acknowledge, record a newer observation version and complete the task.
+The report includes its actual model/tool trace and staff audit. It asserts that those task
+actions leave the previously approved clinical priority unchanged.
+The extended proof passed on 15 October 2026 using the same local Qwen3 digest in 63,437 ms
+for both model assessments and the staff task lifecycle. This is one engineering run, not
+an evaluation of clinical deterioration detection accuracy.
+After including reassessment context in the model-visible observation response, the extended
+proof passed again in 65,318 ms. Browser testing separately completed a fictional missing-evidence
+recheck and verified the four-event audit trail with its completion observation ID.
+
 The model tag must refer to downloaded local weights. Preserve the digest from the proof report with the submission; tags can change. Qwen3-0.6B's upstream weights use Apache-2.0 ([model card](https://huggingface.co/Qwen/Qwen3-0.6B)); the quantized Ollama distribution and runtime have separate notices. Check those notices when redistributing weights. Model download, RAM and CPU time are required; inference has not been benchmarked alongside the database and API on the existing 2 GB AWS host. No additional AWS infrastructure is provisioned.
 
 ## Executed local proof (15 October 2026)
