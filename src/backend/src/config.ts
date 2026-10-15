@@ -1,16 +1,18 @@
 import 'dotenv/config';
 import { readFileSync } from 'node:fs';
-const provider=process.env.AI_PROVIDER || 'bedrock';
-if(!['bedrock','openai'].includes(provider))throw new Error('AI_PROVIDER must be bedrock or openai.');
+import { runtimePolicy } from './runtime-policy.js';
+const policy=runtimePolicy(process.env);
+const {provider}=policy;
 const bedrockModel=process.env.BEDROCK_MODEL_ID || 'eu.amazon.nova-lite-v1:0';
 const openaiModel=process.env.OPENAI_MODEL || 'gpt-4.1-mini';
 export const config = {
+  ...policy,
   databaseUrl:process.env.DATABASE_URL || '',
   databasePoolMax:Number(process.env.DATABASE_POOL_MAX || (process.env.AWS_LAMBDA_FUNCTION_NAME ? 2 : 10)),
   cloudfrontOriginToken:process.env.CLOUDFRONT_ORIGIN_TOKEN || '',
   host:process.env.HOST || '127.0.0.1',port:Number(process.env.PORT || 3000),
   origins:(process.env.APP_ORIGIN || 'http://localhost:5173,http://127.0.0.1:5173').split(','),
-  region:process.env.AWS_REGION || 'eu-west-1',provider,bedrockModel,openaiModel,model:provider==='openai'?openaiModel:bedrockModel,
+  region:process.env.AWS_REGION || 'eu-west-1',provider,bedrockModel,openaiModel,model:provider==='ollama'?policy.ollamaModel:provider==='openai'?openaiModel:bedrockModel,
   agentTimeout:Number(process.env.AGENT_TIMEOUT_MS || 90000),maxSteps:Number(process.env.AGENT_MAX_STEPS || 8),
   secureCookies:process.env.NODE_ENV === 'production',
 };

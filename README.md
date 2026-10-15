@@ -214,3 +214,7 @@ specs/              Requirements, contracts, and feature specifications
 - **JecintaK:** frontend workflows and responsive interface.
 
 Shared ownership and milestones are tracked in [specs/tasks.md](specs/tasks.md). The project uses the [MIT licence](LICENSE).
+
+## Competition feature work
+
+See [competition runtime setup and isolation](docs/COMPETITION.md). The AWS research deployment remains separate. Features are delivered in individual commits and pull requests: competition foundation, missing-evidence assistant, active reassessment, voice intake, and isolated replay/evaluation.
