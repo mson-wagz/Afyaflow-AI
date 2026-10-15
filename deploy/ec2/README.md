@@ -113,3 +113,25 @@ is released on stop/termination and changes on stop/start; update the domain A
 record after restarting a stopped instance. Routine application releases do not
 change the IP. The OIDC provider can be shared, so do not delete it without checking
 other repositories.
+
+## OpenAI inference (optional)
+
+Set `AI_PROVIDER=openai` and `OPENAI_MODEL=gpt-4.1-mini` in the host's
+root-owned `/opt/afyaflow/provider.env`. Default is Bedrock; there is no automatic
+fallback. Store the OpenAI key as a Standard SSM SecureString parameter named
+`/afyaflow/staging/openai-api-key` in the deployment region. Supply it through a
+private local file or the AWS console, never a command argument, GitHub variable,
+or SSM Run Command payload. The existing managed SSM instance policy allows
+parameter retrieval. The default AWS-managed SSM KMS key is used.
+
+On each release, the host fetches the key into a file readable only by the
+container's Node user (UID 1000), then mounts the directory read-only. No key is
+included in the image or browser bundle. The successful release configuration is
+restored if application startup fails. Rotating the SSM value takes effect on
+the next release. The key is never required for Bedrock runs.
+
+New runs persist provider and model; already queued runs keep their selection.
+Responses API requests use `store:false`; tool context is retained only within
+the active run. OpenAI inference is billed separately from AWS. This remains a
+synthetic demonstration with an unvalidated protocol and human approval gate.
+The Lambda template retains its Bedrock defaults; this secret mount is EC2-only.
