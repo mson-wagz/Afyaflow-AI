@@ -11,7 +11,7 @@ One server is a single point of failure, and PostgreSQL is self-managed.
 The Lambda/SAM option remains available under `deploy/lambda`.
 
 The image also bundles the open MIMIC-IV-ED Demo v2.2 research data and licence.
-Each release runs the idempotent historical import after migrations, without
+Each release runs the idempotent historical import after the new API is healthy, without
 queuing AI calls. It preserves existing synthetic records and saved reviews.
 Historical cases are visible in their own read-only research area. See
 [data sources and transformations](../../docs/DATA_SOURCES.md) and the

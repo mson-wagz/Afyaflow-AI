@@ -62,14 +62,15 @@ backup="backups/$(date -u +%Y%m%dT%H%M%SZ).dump"
 compose exec -T postgres pg_dump -U afyaflow -d afyaflow -Fc > "$backup"
 chmod 600 "$backup"
 compose run --rm --no-deps app node dist/src/backend/src/database/migrate.js
-compose run --rm --no-deps app node dist/src/backend/src/database/import-mimic.js
 
 # Public fixture PINs are only enabled by an explicit operator request.
 if [[ "${SEED_SYNTHETIC:-false}" == 'true' ]]; then
   compose run --rm --no-deps -e ALLOW_SYNTHETIC_SEED=true app node dist/src/backend/src/database/seed.js
 fi
 
-if ! compose up -d --wait --wait-timeout 240; then
+# Import only after the new API is healthy and filters historical cases out of
+# operational views. An older image must never see newly imported research rows.
+if ! compose up -d --wait --wait-timeout 240 || ! compose exec -T app node dist/src/backend/src/database/import-mimic.js; then
   if [[ -n "$previous_image" ]]; then
     cp .env .env.deploy
     compose up -d --wait --wait-timeout 240
