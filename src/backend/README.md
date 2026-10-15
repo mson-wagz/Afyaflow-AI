@@ -2,6 +2,10 @@
 
 Run commands from the repository root. Node 24 is the tested runtime.
 
+See [data-source documentation](../../docs/DATA_SOURCES.md) for MIMIC provenance,
+ODbL licensing, mappings, missing values and export instructions. Historical
+research records are read-only and excluded from the synthetic clinical queue.
+
 ## Local setup
 
 1. Run `npm ci` at the root and `npm ci --prefix src/frontend`.
@@ -11,11 +15,14 @@ Run commands from the repository root. Node 24 is the tested runtime.
    cluster through the pinned embedded-postgres development dependency; its data is
    retained in ignored `.local/postgres`. It binds only to 127.0.0.1. Do not run two
    database options on the same port.
-4. Run `npm run db:migrate`, then `npm run db:seed`.
-5. Configure an AWS profile using the AWS CLI or environment credential chain. Set
-   `AWS_REGION` and `BEDROCK_MODEL_ID`. The verified configuration is `eu-west-1`
-   with `eu.amazon.nova-lite-v1:0`. The account must permit Bedrock InvokeModel for
-   that inference profile and its underlying model resources.
+4. Run `npm run db:migrate`, then `npm run db:seed` for synthetic staff/workflow
+   fixtures. Separately run `npm run db:import:mimic` to load historical research
+   cases from the checked-in, checksum-verified public MIMIC-IV-ED Demo files.
+   Importing does not queue inference or overwrite synthetic data.
+5. Choose `AI_PROVIDER=openai` with `OPENAI_MODEL` and a backend-only
+   `OPENAI_API_KEY` in the ignored `.env`, or keep `AI_PROVIDER=bedrock` and
+   configure an AWS profile, `AWS_REGION` and `BEDROCK_MODEL_ID` with model
+   invocation permissions and capacity. Staging currently uses OpenAI.
 6. Run `npm run dev:backend` and, in another terminal,
    `npm run dev --prefix src/frontend`. Open http://localhost:5173.
 

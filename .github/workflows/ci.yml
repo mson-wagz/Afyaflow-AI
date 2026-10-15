@@ -1,0 +1,122 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
+jobs:
+  application:
+    name: Application tests and builds
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:18
+        env:
+          POSTGRES_USER: afyaflow
+          POSTGRES_PASSWORD: ci-only-password
+          POSTGRES_DB: afyaflow_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U afyaflow -d afyaflow_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+    env:
+      DATABASE_URL: postgresql://afyaflow:ci-only-password@127.0.0.1:5432/afyaflow_test
+      DATABASE_SSL: 'false'
+      AGENT_WORKER_DISABLED: 'true'
+      AWS_REGION: eu-west-1
+      AWS_EC2_METADATA_DISABLED: 'true'
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            src/frontend/package-lock.json
+      - name: Install backend dependencies
+        run: npm ci
+      - name: Install frontend dependencies
+        run: npm ci --prefix src/frontend
+      - name: Run backend and frontend tests
+        run: npm test
+      - name: Test deployment target and health-check handling
+        run: python -m unittest discover -s tests/deployment -v
+      - name: Build backend
+        run: npm run build:backend
+      - name: Build frontend
+        run: npm run build --prefix src/frontend
+
+  infrastructure:
+    name: Validate infrastructure and build Lambda image
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    env:
+      AWS_DEFAULT_REGION: eu-west-1
+      AWS_EC2_METADATA_DISABLED: 'true'
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - uses: aws-actions/setup-sam@f84ec7d548307efafe33230528756de3c5841a17 # v2
+      - name: Validate SAM template
+        run: sam validate --lint --template-file deploy/lambda/template.yaml
+      - name: Validate low-cost EC2 template
+        run: |
+          python -m pip install cfn-lint
+          cfn-lint deploy/ec2/template.yaml
+      - name: Build Lambda image
+        run: sam build --template-file deploy/lambda/template.yaml
+
+  deploy:
+    name: Deploy staging
+    needs: [application, infrastructure]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && vars.AWS_DEPLOY_ROLE_ARN != ''
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 45
+    permissions:
+      contents: read
+      id-token: write
+    # Finish a deployment before accepting another; do not interrupt migrations.
+    concurrency:
+      group: afyaflow-staging-deployment
+      cancel-in-progress: false
+    env:
+      AWS_REGION: eu-west-1
+      AWS_STACK_NAME: ${{ vars.AWS_STACK_NAME || 'afyaflow-staging' }}
+      APP_DOMAIN: ${{ vars.APP_DOMAIN }}
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - uses: aws-actions/configure-aws-credentials@cabfdba3510de1431bac9dba27511d97497fc100 # v5
+        with:
+          role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+          role-session-name: afyaflow-${{ github.run_id }}
+      - name: Select immutable image tag
+        run: |
+          repository=$(aws cloudformation describe-stacks --stack-name "$AWS_STACK_NAME" --query 'Stacks[0].Outputs[?OutputKey==`RepositoryUri`].OutputValue' --output text)
+          echo "APP_IMAGE=$repository:$GITHUB_SHA-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT" >> "$GITHUB_ENV"
+      - name: Build and publish ARM application image
+        run: |
+          registry="${APP_IMAGE%%/*}"
+          aws ecr get-login-password | docker login --username AWS --password-stdin "$registry"
+          docker build --pull --tag "$APP_IMAGE" --file Dockerfile .
+          docker push "$APP_IMAGE"
+      - name: Deploy through Systems Manager and check HTTPS
+        run: python scripts/deploy-ec2.py
