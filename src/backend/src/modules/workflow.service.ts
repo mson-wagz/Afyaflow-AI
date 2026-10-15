@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unsafe-assignment */
 import { Injectable, Inject, BadRequestException, ConflictException, NotFoundException } from '@nestjs/common';
 import { z } from 'zod';
 import { Database, audit, id, idempotent, hash } from '../database/db.js';
@@ -13,6 +14,16 @@ import type { PoolClient } from 'pg';
 import { mimicMetadata } from '../database/mimic-data.js';
 import { evidenceChecklist } from '../../../shared/contracts/evidence.js';
 
+/* ------------------------------------------------------------------ */
+/* Types                                                              */
+/* ------------------------------------------------------------------ */
+
+/**
+ * JSON payload stored in the `data` column of the departments table.
+ * NOTE: code, targetPriorities, waitEstimateMinutes and specialty are required
+ * by generateRoutingProposal. If they are not stored in this JSON column,
+ * source them elsewhere and adjust this type.
+ */
 export interface DepartmentData {
   name: string;
   code: string;
@@ -76,19 +87,7 @@ const iso = (date: Date | string | null | undefined): string | null => {
 };
 
 /** Competition mode disables historical research and restricts traces. Off unless APP_MODE=competition. */
-const isCompetitionMode = () => process.env.APP_MODE === 'competition';
-
-/** Maps stored assessment statuses to the values the shared QueueItem contract expects. */
-const queueStatus = (status: string): 'pending' | 'approved' | 'rejected' =>
-  status === 'APPROVED' ? 'approved' : status === 'REJECTED_REQUIRES_REASSESSMENT' ? 'rejected' : 'pending';
-
-/**
- * Numeric rank used by the shared queue contract (lower = more urgent).
- * sortQueueByApprovedPriority sorts ascending and calculateWorkloadSnapshot
- * counts 1 as RED and 2 as ORANGE. BLUE (deceased) ranks last of the triaged.
- */
-const PRIORITY_RANK: Record<string, number> = { RED: 1, ORANGE: 2, YELLOW: 3, GREEN: 4, BLUE: 5 };
-const priorityRank = (p: { code?: string } | null): number | null => (p?.code ? PRIORITY_RANK[p.code] ?? null : null);
+const isCompetitionMode = () => config.mode === 'competition';
 
 /** Historical (MIMIC) cases are read-only in the live workflow. */
 function requireWorkflowVisit(visit: any) {
@@ -138,6 +137,7 @@ export class WorkflowService {
   async visits() {
     const rows = (await this.database.pool.query<VisitRow>(`SELECT v.*,o.id observation_id,o.vitals,o.recorded_at FROM visits v
       JOIN observations o ON o.visit_id=v.id AND o.version=v.observation_version WHERE v.data_source='synthetic' ORDER BY v.arrival_at`)).rows;
+    const protocol = await readProtocol();
     return rows.map((v) => {
       // Invalid or missing arrival time falls back to "now" (0 min wait).
       const arrivalTime = iso(v.arrival_at) ?? new Date().toISOString();
@@ -147,24 +147,32 @@ export class WorkflowService {
         presentingComplaint: v.complaint, arrivalTime, approvedPriority: priority(v.approved_priority),
         assessmentVersion: v.assessment_version, observationVersion: v.observation_version, observationId: v.observation_id,
         assessmentStatus: v.assessment_status, assignedDepartment: v.assigned_department,
+        evidenceChecklist: evidenceChecklist({ age: v.age, vitals: v.vitals, version: v.observation_version, observationId: v.observation_id }, protocol),
         vitals: { ...v.vitals, recordedAt: iso(v.recorded_at) },
       };
     });
+  }
+
+  /** Versioned missing-evidence checklist for one workflow visit. */
+  async evidence(visitId: string) {
+    const visit = (await this.visits()).find((v) => v.id === visitId);
+    if (!visit) throw new NotFoundException('Workflow visit not found.');
+    return visit.evidenceChecklist;
   }
 
   /** Register a new visit and queue its first assessment. */
   async register(staff: Staff, body: unknown, key: string) {
     const input = parse(registrationSchema, body);
     if (staff.role === 'admin') throw new BadRequestException('Administrative accounts cannot register visits.');
-    const { name, age, gender, presentingComplaint, arrivalTime, staffId: _ignored, ...vitals } = input;
+    const { name, age, gender, presentingComplaint, arrivalTime, staffId: _ignored, voiceReview, ...vitals } = input;
     if (staff.role === 'clerk' && Object.values(vitals).some((v) => v !== undefined)) requireClinical(staff);
     return this.database.transaction((db) => idempotent(db, staff.id, 'registration', key, input, async () => {
       const visitId = id('SYN-PT'), recordedAt = new Date().toISOString();
-      await db.query('INSERT INTO visits(id,name,age,gender,complaint,registered_by,arrival_at) VALUES($1,$2,$3,$4,$5,$6,$7)',
-        [visitId, name, age, gender, presentingComplaint, staff.id, arrivalTime || recordedAt]);
+      await db.query('INSERT INTO visits(id,name,age,gender,complaint,registered_by,arrival_at,source_data) VALUES($1,$2,$3,$4,$5,$6,$7,$8)',
+        [visitId, name, age, gender, presentingComplaint, staff.id, arrivalTime || recordedAt, JSON.stringify(voiceReview ? { intake: { ...voiceReview, reviewedBy: staff.id } } : {})]);
       await db.query('INSERT INTO observations(id,visit_id,version,vitals,recorded_by) VALUES($1,$2,1,$3,$4)', [id('OBS'), visitId, JSON.stringify(vitals), staff.id]);
       const run = await enqueue(db, visitId, 1);
-      await audit(db, staff.id, 'PATIENT_REGISTERED', { observationVersion: 1, runId: run.id }, visitId);
+      await audit(db, staff.id, 'PATIENT_REGISTERED', { observationVersion: 1, runId: run.id, ...(voiceReview ? { voiceReview } : {}) }, visitId);
       return {
         success: true, isDuplicate: false, data: {
           id: visitId, name, age, gender, presentingComplaint,
@@ -199,19 +207,20 @@ export class WorkflowService {
   async queue() {
     const visits = await this.visits();
     const proposals = (await this.database.pool.query("SELECT visit_id,data FROM proposals WHERE status='PENDING'")).rows;
-    const queue = sortQueueByApprovedPriority(visits.map((v) => ({ ...v, approvedPriority: priorityRank(v.approvedPriority), priority: v.approvedPriority, assessmentStatus: queueStatus(v.assessmentStatus), pendingProposal: proposals.find((p) => p.visit_id === v.id)?.data.proposal || null })));
+    // The shared sort/workload helpers read approvedPriority.code, so keep the priority object here.
+    const queue = sortQueueByApprovedPriority(visits.map((v) => ({ ...v, pendingProposal: proposals.find((p) => p.visit_id === v.id)?.data.proposal || null })));
     return { queue, snapshotTimestamp: new Date().toISOString(), workload: calculateWorkloadSnapshot(queue, 4) };
   }
 
   /** Proposals awaiting clinician review. */
   async pending() {
-<<<<<<< HEAD
     const visits = await this.visits(); const protocol = await readProtocol();
     const rows = (await this.database.pool.query(`SELECT p.*,r.model,r.status run_status FROM proposals p JOIN agent_runs r ON r.id=p.run_id
       JOIN visits v ON v.id=p.visit_id WHERE v.data_source='synthetic' AND p.status='PENDING'
       AND r.status IN ('WAITING_FOR_REVIEW','REVIEW_REQUIRED') ORDER BY p.created_at`)).rows;
     return Promise.all(rows.map(async (p) => {
       const visit = visits.find((v) => v.id === p.visit_id)!;
+      return {
         ...visit, patientId: visit.id, proposalId: p.id, patientName: visit.name, observations: visit.vitals,
         observationVersion: p.observation_version, isStale: p.observation_version !== visit.observationVersion,
         proposal: p.data.proposal, protocol: p.data.protocol || protocol, summary: p.data.summary,
@@ -424,10 +433,3 @@ export class WorkflowService {
     return rows.map((r) => ({ id: r.id, timestamp: iso(r.timestamp), staffId: r.staff_id, staffName: r.staff_name, eventType: r.event_type, details: JSON.stringify(r.details) }));
   }
 }
-=======
-    const visits=await this.visits();const protocol=await readProtocol();
-    const rows=(await this.database.pool.query(`SELECT p.*,r.model,r.status run_status FROM proposals p JOIN agent_runs r ON r.id=p.run_id
-      JOIN visits v ON v.id=p.visit_id WHERE v.data_source='synthetic' AND p.status='PENDING'
-      AND r.status IN ('WAITING_FOR_REVIEW','REVIEW_REQUIRED') ORDER BY p.created_at`)).rows;
-    return Promise.all(rows.map(async p => {
-      const visit=visits.find(v=>v.id===p.visit_id)!;

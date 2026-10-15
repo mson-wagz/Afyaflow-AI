@@ -73,7 +73,7 @@ export const HOSPITAL_DEPARTMENTS = [
  * @param {Array<object>} departmentList
  * @returns {object} Routing proposal
  */
-export function generateRoutingProposal(patient, approvedPriority, departmentList = HOSPITAL_DEPARTMENTS) {
+export function generateRoutingProposal(patient: any, approvedPriority: any, departmentList = HOSPITAL_DEPARTMENTS) {
   if (!patient || !approvedPriority) {
     return {
       recommendedDepartment: null,

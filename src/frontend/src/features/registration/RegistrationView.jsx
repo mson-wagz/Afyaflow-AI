@@ -2,6 +2,8 @@ import React from 'react';
 import { useBackend } from '../../api/client.js';
 import useRegistration from './useRegistration';
 import { Card, Button, Input, Badge, Alert } from '../../components';
+import VoiceIntake from './VoiceIntake.jsx';
+import {isClinicalRole} from '../../../../shared/contracts/auth.js';
 
 /**
  * Patient Registration & Observation Capture View
@@ -21,6 +23,7 @@ export default function RegistrationView({ currentStaff }) {
     submittedRecord,
     errorMessage,
     handleChange,
+    applyReviewedVoice,
     validateMeasurements,
     submitRegistration,
     resetForm,
@@ -93,6 +96,7 @@ export default function RegistrationView({ currentStaff }) {
         </Alert>
       )}
 
+      <VoiceIntake key={submissionStatus==='confirmed' || submissionStatus==='duplicate'?'confirmed':'draft'} onApply={applyReviewedVoice} allowVitals={isClinicalRole(currentStaff?.role)} />
       <form noValidate onSubmit={handleSubmit}>
         {/* Section 1: Demographics */}
         <Card
