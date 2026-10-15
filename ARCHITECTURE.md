@@ -1,5 +1,7 @@
 # AfyaFlow AI architecture
 
+![AfyaFlow AI architecture: services and how they connect](docs/architecture.svg)
+
 Status: a synthetic development slice is implemented. React talks to NestJS through
 same-origin /api routes; PostgreSQL persists visits, immutable observations, jobs,
 proposals, decisions, transfers, retry keys, sessions and audit events.
