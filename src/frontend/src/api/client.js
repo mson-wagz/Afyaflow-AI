@@ -8,7 +8,10 @@ export async function api(path,options={}) {
     body:options.body === undefined?undefined:JSON.stringify(options.body)});
   const body=await response.json().catch(()=>({message:'The backend is unavailable. Please try again.'}));
   if(!response.ok) {
-    if(response.status===401) window.dispatchEvent(new Event('afyaflow-session-expired'));
+    // A rejected unlock PIN leaves the existing session locked and retryable.
+    // Missing/expired sessions, including on unlock, still require sign-in.
+    const incorrectUnlockPin=path==='/auth/unlock' && body.code==='INVALID_PIN';
+    if(response.status===401 && !incorrectUnlockPin) window.dispatchEvent(new Event('afyaflow-session-expired'));
     throw new ApiError(response.status,body);
   }
   return body;

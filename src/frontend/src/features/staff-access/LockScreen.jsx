@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import useAuth from './useAuth';
 import { Button, Input, Badge, Alert } from '../../components';
 
@@ -22,6 +22,7 @@ export default function LockScreen() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [confirmSwitch, setConfirmSwitch] = useState(false);
+  const pinInputRef=useRef(null);
 
   const handleUnlock = async (e) => {
     if (e) e.preventDefault();
@@ -36,7 +37,9 @@ export default function LockScreen() {
     try {
       const result = await unlockSession(pin.trim());
       if (!result.success) {
-        setError(result.error || 'Incorrect PIN');
+        setError(`${result.error || 'Unable to unlock.'} Please re-enter your PIN.`);
+        setPin('');
+        pinInputRef.current?.focus();
       } else {
         setPin('');
       }
@@ -150,7 +153,7 @@ export default function LockScreen() {
         )}
 
         {error && (
-          <Alert variant="danger" onClose={() => setError('')}>
+          <Alert id="terminal-unlock-error" variant="danger" onClose={() => setError('')}>
             {error}
           </Alert>
         )}
@@ -172,12 +175,15 @@ export default function LockScreen() {
             </label>
             <input
               id="terminal-unlock-pin"
+              ref={pinInputRef}
+              aria-invalid={Boolean(error)}
+              aria-describedby={error?'terminal-unlock-error':undefined}
               type="password"
               inputMode="numeric"
               pattern="[0-9]*"
               maxLength={4}
               value={pin}
-              onChange={(e) => setPin(e.target.value)}
+              onChange={(e) => {setPin(e.target.value);setError('');}}
               placeholder="••••"
               autoFocus
               className="form-input"
@@ -192,7 +198,7 @@ export default function LockScreen() {
               }}
             />
             <div style={{ fontSize: '0.75rem', color: '#64748b', marginTop: '6px' }}>
-              Hint for demo: {staff?.pin || '1234'}
+              Enter the PIN for this staff account.
             </div>
           </div>
 
