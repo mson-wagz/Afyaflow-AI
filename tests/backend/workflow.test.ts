@@ -114,9 +114,9 @@ test('routing enforces clinical permission and assessment/department versions',a
   assert.match((await workflow.queue()).queue.find(v=>v.visitId===visit.id)!.assignedDepartment,/General Outpatient/);
 });
 test('PostgreSQL transaction rollback leaves neither visit change nor audit event',async () => {
-  const before=(await workflow.visits()).find(v=>v.id==='SYN-PT-8821');
+  const before=(await database.pool.query("SELECT * FROM visits WHERE id='SYN-PT-8821'")).rows[0];
   await assert.rejects(database.transaction(async db=>{await db.query("UPDATE visits SET approved_priority='RED' WHERE id='SYN-PT-8821'");throw new Error('intentional rollback');}));
-  assert.deepEqual((await workflow.visits()).find(v=>v.id==='SYN-PT-8821'),before);
+  assert.deepEqual((await database.pool.query("SELECT * FROM visits WHERE id='SYN-PT-8821'")).rows[0],before);
 });
 test('HTTP sessions reject anonymous access, PIN failure, locked access and logout reuse',async () => {
   assert.equal((await fetch(`${base}/api/queue`)).status,401);
@@ -535,4 +535,21 @@ test('an early model finish receives one bounded reminder and cannot bypass prop
   await assert.rejects(assess(failed.data.id,1,async()=>{attempts++;return {content:[{text:'No tool action.'}]};}),/without saving/);
   assert.equal(attempts,2);
   assert.equal((await database.pool.query('SELECT count(*) FROM proposals WHERE visit_id=$1',[failed.data.id])).rows[0].count,'0');
+});
+
+test('missing-evidence guidance is version-bound and new measurements supersede the old proposal',async()=>{
+  const registered=await workflow.register(nurse,{name:'Synthetic evidence checklist',age:30,gender:'Female',presentingComplaint:'Synthetic weakness'},randomUUID());
+  const visitId=registered.data.id,old=await assess(visitId);
+  const before=await workflow.evidence(visitId);
+  assert.ok(before.missingRequired.includes('heartRate'));assert.equal(before.observationVersion,1);
+  assert.deepEqual(old.proposal.evidenceChecklist.missingRequired,before.missingRequired);
+  assert.equal((await fetch(`${base}/api/visits/${visitId}/evidence`)).status,401);
+  const {name,age,gender,presentingComplaint,...vitals}=intake;
+  await workflow.observations(nurse,visitId,{expectedVersion:1,vitals},randomUUID());
+  assert.equal((await workflow.evidence(visitId)).missingRequired.length,0);
+  assert.equal((await workflow.evidence(visitId)).observationVersion,2);
+  await assert.rejects(decision(old),error=>(error as any).getStatus()===409);
+  const next=await assess(visitId,2);assert.equal(next.proposal.isSufficientEvidence,true);
+  assert.equal(next.proposal.evidenceChecklist.observationVersion,2);
+  await assert.rejects(workflow.evidence('unknown'),error=>(error as any).getStatus()===404);
 });
