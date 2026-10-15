@@ -70,12 +70,20 @@ fi
 
 # Import only after the new API is healthy and filters historical cases out of
 # operational views. An older image must never see newly imported research rows.
-if ! compose up -d --wait --wait-timeout 240 || ! compose exec -T app node dist/src/backend/src/database/import-mimic.js; then
+if ! compose up -d --wait --wait-timeout 240; then
   if [[ -n "$previous_image" ]]; then
     cp .env .env.deploy
     compose up -d --wait --wait-timeout 240
   fi
   echo 'Deployment failed. Application rollback attempted; database migrations are retained.' >&2
+  exit 1
+fi
+# An import command can fail after committing (for example, on disconnection).
+# Keep the new API after any import attempt; rolling back could expose research
+# records through a legacy API that predates the source filter.
+if ! compose exec -T app node dist/src/backend/src/database/import-mimic.js; then
+  mv .env.deploy .env
+  echo 'API is healthy, but the dataset import was not confirmed. Retry the release; the import is idempotent.' >&2
   exit 1
 fi
 mv .env.deploy .env

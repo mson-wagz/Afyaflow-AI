@@ -113,6 +113,9 @@ public staff login. Import does not require synthetic seeding or create queues.
 
 EC2 releases import the bundled data after migrations and after the new API is
 healthy, so the old API cannot briefly expose historical rows in its queue.
+If import success cannot be confirmed, the release fails visibly but retains
+the healthy new API; it does not roll back to an older API after an import
+attempt. Retrying the release safely reruns the idempotent import.
 Local installs run the
 command above. The Lambda image includes the same data; importing it into a
 Lambda-backed database requires an operator command with database connectivity.
