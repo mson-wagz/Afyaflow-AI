@@ -1,3 +1,4 @@
+
 services:
   postgres:
     image: postgres:18.4
@@ -5,8 +6,6 @@ services:
       POSTGRES_USER: afyaflow
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in your local environment}
       POSTGRES_DB: afyaflow
-    ports:
-      - "127.0.0.1:5432:5432"
     volumes:
       - postgres-data:/var/lib/postgresql
     healthcheck:
@@ -14,5 +13,23 @@ services:
       interval: 5s
       timeout: 3s
       retries: 10
+
+  app:
+    build: .
+    container_name: afyaflow-app
+    ports:
+      - "3000:3000"
+    environment:
+      DATABASE_URL: postgresql://afyaflow:${POSTGRES_PASSWORD}@postgres:5432/afyaflow
+      PORT: "3000"
+      HOST: 0.0.0.0
+      APP_ORIGIN: http://localhost:5173
+      DATABASE_SSL: "false"
+      NODE_ENV: development
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+
 volumes:
   postgres-data:

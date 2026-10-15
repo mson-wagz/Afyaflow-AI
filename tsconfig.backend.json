@@ -14,5 +14,14 @@
     "skipLibCheck": true,
     "types": ["node"]
   },
-  "include": ["src/backend/src/**/*.ts", "src/shared/contracts/**/*.js", "services/**/*.ts"]
+  "include": [
+    "src/backend/src/**/*.ts",
+    "src/shared/**/*.ts",
+    "src/shared/**/*.js",
+    "services/**/*.ts"
+  ],
+  "exclude": [
+    "node_modules",
+    "dist"
+  ]
 }
