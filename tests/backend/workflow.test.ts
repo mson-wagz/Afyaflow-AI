@@ -11,6 +11,7 @@ import { seed } from '../../src/backend/src/database/seed.js';
 import { WorkflowService } from '../../src/backend/src/modules/workflow.service.js';
 import { AppModule } from '../../src/backend/src/app.module.js';
 import { executeAgent } from '../../services/agents/workflow.js';
+import { openaiModel } from '../../services/agents/openai.js';
 import type { Model } from '../../services/agents/bedrock.js';
 import { createRunTools } from '../../services/mcp/tools.js';
 import { processAgentJob, dispatchAgentOutbox, ActiveAgentLeaseError } from '../../src/backend/src/modules/agent-jobs.js';
@@ -422,4 +423,27 @@ test('actual Lambda handler bootstraps NestJS and enforces origin protection aga
     timeout:15000,
   });
   assert.match(result.stdout,/lambda-handler-ok/);
+});
+
+
+test('OpenAI Responses adapter drives real MCP tools and preserves the human approval gate',async()=>{
+  const registered=await register(),visitId=registered.data.id;
+  const run=(await database.pool.query('SELECT * FROM agent_runs WHERE visit_id=$1',[visitId])).rows[0];
+  await database.pool.query("UPDATE agent_runs SET status='RUNNING',provider='openai',model='mock-openai',lease_until=now()+interval '5 minutes' WHERE id=$1",[run.id]);
+  let step=0;
+  const model=openaiModel('mock-openai',{apiKey:'test-key',fetch:async(_url,init)=>{
+    const body=JSON.parse(init?.body as string);
+    assert.equal(body.model,'mock-openai');
+    const name=['get_observations','read_protocol','score_protocol','save_pending_proposal'][step++];
+    assert.ok(body.tools.some((tool:any)=>tool.name===name && tool.strict));
+    return Response.json({status:'completed',output:[{type:'function_call',call_id:`openai-${step}`,name,
+      arguments:JSON.stringify(name==='save_pending_proposal'?{summary:'Synthetic evidence recorded; clinician review required.'}:{})}]});
+  }});
+  await executeAgent(database,run.id,model);
+  const proposal=(await workflow.pending()).find(p=>p.patientId===visitId)!;
+  assert.ok(proposal);assert.equal(step,4);
+  assert.equal(proposal.toolTrace.provider,'openai');assert.equal(proposal.toolTrace.model,'mock-openai');
+  assert.equal(proposal.toolTrace.toolCalls.filter(t=>t.tool==='openai_responses').length,4);
+  assert.equal((await workflow.queue()).queue.find(v=>v.visitId===visitId)?.approvedPriority,null);
+  assert.equal((await database.pool.query('SELECT count(*) FROM decisions WHERE visit_id=$1',[visitId])).rows[0].count,'0');
 });

@@ -50,7 +50,7 @@ function AppShell() {
   return (
     <div className="app-container">
       <div role="note" style={{padding:'0.6rem 1rem',backgroundColor:'#fff7ed',color:'#7c2d12'}}>
-        {useBackend ? 'Connected to PostgreSQL • Synthetic patient data • Amazon Bedrock agent • Clinician approval required. Scoring uses an unvalidated test protocol.'
+        {useBackend ? 'Connected to PostgreSQL • Synthetic patient data • Configurable AI agent • Clinician approval required. Scoring uses an unvalidated test protocol.'
           : 'Synthetic demo — browser-local data and simulated tools. Clinical scoring is not validated.'}
       </div>
       {/* Shared-device lock screen overlay if locked */}

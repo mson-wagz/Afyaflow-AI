@@ -32,9 +32,14 @@ services:
       DATABASE_POOL_MAX: '5'
       APP_ORIGIN: https://${APP_DOMAIN:?HTTPS hostname required}
       AWS_REGION: ${AWS_REGION:-eu-west-1}
+      AI_PROVIDER: ${AI_PROVIDER:-bedrock}
+      OPENAI_MODEL: ${OPENAI_MODEL:-gpt-4.1-mini}
+      OPENAI_API_KEY_FILE: /run/secrets/openai-api-key
       BEDROCK_MODEL_ID: ${BEDROCK_MODEL_ID:-eu.amazon.nova-lite-v1:0}
       AGENT_WORKER_DISABLED: 'false'
       NODE_OPTIONS: --max-old-space-size=384
+    volumes:
+      - ./secrets:/run/secrets:ro
     depends_on:
       postgres:
         condition: service_healthy

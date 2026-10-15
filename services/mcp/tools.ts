@@ -75,6 +75,6 @@ export async function createRunTools(database:Database,runId:string) {
   const client=new Client({name:'afyaflow-agent',version:'0.1.0'});
   const [clientTransport,serverTransport]=InMemoryTransport.createLinkedPair();
   await server.connect(serverTransport);await client.connect(clientTransport);
-  return {server,client,attempt:run.attempts,generation:run.delivery_generation,isSaved:()=>saved,isSufficient:()=>Boolean(scoring?.isSufficientEvidence),
+  return {server,client,provider:run.provider,modelId:run.model,attempt:run.attempts,generation:run.delivery_generation,isSaved:()=>saved,isSufficient:()=>Boolean(scoring?.isSufficientEvidence),
     close:async () => {await client.close();await server.close();}};
 }

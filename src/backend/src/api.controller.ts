@@ -10,7 +10,7 @@ export class ApiController {
   constructor(@Inject(AuthService) private readonly auth:AuthService,
     @Inject(WorkflowService) private readonly workflow:WorkflowService,
     @Inject(Database) private readonly database:Database) {}
-  @Get('health') async health() {await this.database.pool.query('SELECT 1');return {status:'ok',database:'postgresql',agentProvider:'bedrock',clinicalValidated:false};}
+  @Get('health') async health() {await this.database.pool.query('SELECT 1');return {status:'ok',database:'postgresql',agentProvider:config.provider,clinicalValidated:false};}
   @Post('auth/login') async login(@Body()body:unknown,@Res({passthrough:true})res:Response) {
     const result=await this.auth.signIn(body);
     res.cookie('afyaflow_session',result.token,{httpOnly:true,sameSite:'strict',secure:config.secureCookies,maxAge:8*3600000,path:'/api'});

@@ -21,17 +21,36 @@ fi
 set -a
 source database.env
 set +a
+# Non-secret operator settings persist independently of CI releases.
+if [[ -f provider.env ]]; then source provider.env; fi
+AI_PROVIDER="${AI_PROVIDER:-bedrock}"
+OPENAI_MODEL="${OPENAI_MODEL:-gpt-4.1-mini}"
+[[ "$AI_PROVIDER" == bedrock || "$AI_PROVIDER" == openai ]] || exit 1
+[[ "$OPENAI_MODEL" =~ ^[a-zA-Z0-9._-]+$ ]] || exit 1
+install -d -m 700 -o 1000 -g 1000 secrets
+if [[ "$AI_PROVIDER" == openai ]]; then
+  # Fetch on the host: the key never enters SSM command history or CI logs.
+  secret_tmp="$(mktemp secrets/.openai.XXXXXX)"
+  trap 'rm -f "$secret_tmp"' EXIT
+  aws ssm get-parameter --name "${OPENAI_KEY_PARAMETER:-/afyaflow/staging/openai-api-key}" \
+    --with-decryption --query Parameter.Value --output text --region "$AWS_REGION" > "$secret_tmp"
+  test -s "$secret_tmp"
+  chown 1000:1000 "$secret_tmp"
+  chmod 400 "$secret_tmp"
+  mv "$secret_tmp" secrets/openai-api-key
+  trap - EXIT
+fi
 previous_image=''
 if [[ -f .env ]]; then
   previous_image="$(sed -n 's/^APP_IMAGE=//p' .env)"
 fi
 write_env() {
-  printf 'APP_IMAGE=%s\nAPP_DOMAIN=%s\nAWS_REGION=%s\nPOSTGRES_PASSWORD=%s\n' \
-    "$1" "$APP_DOMAIN" "$AWS_REGION" "$POSTGRES_PASSWORD" > .env.deploy
+  printf 'APP_IMAGE=%s\nAPP_DOMAIN=%s\nAWS_REGION=%s\nPOSTGRES_PASSWORD=%s\nAI_PROVIDER=%s\nOPENAI_MODEL=%s\n' \
+    "$1" "$APP_DOMAIN" "$AWS_REGION" "$POSTGRES_PASSWORD" "$AI_PROVIDER" "$OPENAI_MODEL" > .env.deploy
 }
 write_env "$APP_IMAGE"
 compose() {
-  env -u APP_IMAGE -u APP_DOMAIN -u AWS_REGION -u POSTGRES_PASSWORD \
+  env -u APP_IMAGE -u APP_DOMAIN -u AWS_REGION -u POSTGRES_PASSWORD -u AI_PROVIDER -u OPENAI_MODEL \
     docker compose --env-file .env.deploy --project-name afyaflow --file compose.yaml "$@"
 }
 compose pull
@@ -51,7 +70,7 @@ fi
 
 if ! compose up -d --wait --wait-timeout 240; then
   if [[ -n "$previous_image" ]]; then
-    write_env "$previous_image"
+    cp .env .env.deploy
     compose up -d --wait --wait-timeout 240
   fi
   echo 'Deployment failed. Application rollback attempted; database migrations are retained.' >&2

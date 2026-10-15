@@ -22,7 +22,7 @@ export default function AgentWorkflowPanel({isClinical}) {
     setBusy(true);setError('');setMessage('');
     try {await task();await load();}catch(e){setError(e.message);}finally{setBusy(false);}
   };
-  return <Card title="Agent Assessment & Observation Capture" subtitle="Amazon Bedrock • PostgreSQL-backed jobs • Tool evidence • Human approval gate">
+  return <Card title="Agent Assessment & Observation Capture" subtitle="AI agent • PostgreSQL-backed jobs • Tool evidence • Human approval gate">
     {error && <Alert variant="danger" title="Assessment action failed">{error}</Alert>}
     {message && <Alert variant="info">{message}</Alert>}
     <label htmlFor="agent-visit">Patient visit</label>
