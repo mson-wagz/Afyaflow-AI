@@ -141,15 +141,6 @@ Resources:
           fi
           chmod 700 /opt/afyaflow
           touch /opt/afyaflow/bootstrap-ready
-  PublicIp:
-    Type: AWS::EC2::EIP
-    DependsOn: GatewayAttachment
-    Properties: {Domain: vpc}
-  AddressAssociation:
-    Type: AWS::EC2::EIPAssociation
-    Properties:
-      AllocationId: !GetAtt PublicIp.AllocationId
-      InstanceId: !Ref Host
   GithubProvider:
     Type: AWS::IAM::OIDCProvider
     Condition: CreateGithubProvider
@@ -196,6 +187,6 @@ Resources:
                 Resource: '*'
 Outputs:
   InstanceId: {Value: !Ref Host}
-  PublicIp: {Value: !Ref PublicIp}
+  PublicIp: {Value: !GetAtt Host.PublicIp}
   RepositoryUri: {Value: !GetAtt Repository.RepositoryUri}
   GithubDeployRoleArn: {Value: !GetAtt GithubDeployRole.Arn}
