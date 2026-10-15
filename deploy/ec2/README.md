@@ -59,7 +59,11 @@ Use repository Actions **variables**, not AWS key secrets:
   When omitted, deployment uses `<PublicIp>.sslip.io`, a third-party temporary demo
   DNS name. HTTPS certificate issuance and public DNS must succeed.
 
-The trust policy accepts only `mson-wagz/Afyaflow-AI` on `refs/heads/main`.
+The trust policy accepts only `mson-wagz/Afyaflow-AI` on `refs/heads/main`, using
+the repository's immutable subject prefix
+`repo:mson-wagz@168073760/Afyaflow-AI@1416879118`. Verify the exact prefix with
+GitHub's `GET /repos/mson-wagz/Afyaflow-AI/actions/oidc/customization/sub` API;
+newer repositories include permanent owner/repository IDs in OIDC subjects.
 Protect that branch and require both CI checks. Do not add a GitHub `environment`
 to the deployment job without updating its OIDC subject and protection settings.
 No personal AWS access keys are stored in GitHub or on the server. The instance
