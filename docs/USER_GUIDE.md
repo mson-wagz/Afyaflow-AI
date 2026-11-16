@@ -1,5 +1,7 @@
 # AfyaFlow application user guide
 
+New to the recent changes? Read the short [quick guide](QUICK_GUIDE.md) first.
+
 This guide describes the connected PostgreSQL prototype with configurable OpenAI/Bedrock inference. **Historical Research Cases** contains de-identified MIMIC-IV-ED Demo records. Registration, clinical workflow examples, capacity and staffing remain synthetic demonstrations. The scoring fixture is not clinically validated. Do not enter identifiable real patient information into this public demo. For installation, see the [README](../README.md) and [backend setup](../src/backend/README.md); for hosting, see [EC2 deployment](../deploy/ec2/README.md).
 
 ## Historical research cases
