@@ -3,6 +3,7 @@ import { api, mutation } from '../../api/client.js';
 import { Card, Button, Alert, Modal } from '../../components';
 import { isDemoOnline } from '../../demo/store.js';
 import EvidenceChecklist from './EvidenceChecklist.jsx';
+import RunTrace from './RunTrace.jsx';
 
 const measurements=[['systolicBp','Systolic BP (mmHg)'],['diastolicBp','Diastolic BP (mmHg)'],
   ['heartRate','Heart Rate (bpm)'],['respiratoryRate','Respiratory Rate (/min)'],['temperature','Temperature (°C)'],['spO2','Oxygen Saturation (%)']];
@@ -85,7 +86,7 @@ export default function AgentWorkflowPanel({isClinical}) {
     {trace && <Modal isOpen={true} onClose={()=>setTrace(null)} title={`Agent run ${trace.runId}`} maxWidth="800px">
       <p>{trace.provider} • {trace.model} • {trace.status}</p>
       {trace.error && <Alert variant="danger">{trace.error}</Alert>}
-      <pre style={{whiteSpace:'pre-wrap',overflowWrap:'anywhere',fontSize:'0.8rem'}}>{JSON.stringify(trace.toolCalls,null,2)}</pre>
+      <RunTrace trace={trace} />
     </Modal>}
   </Card>;
 }

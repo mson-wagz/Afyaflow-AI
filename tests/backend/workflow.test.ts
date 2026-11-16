@@ -1183,3 +1183,26 @@ test('FHIR R4 export bundles a closed visit with coded vitals, triage and outcom
   assert.equal((await fetch(`${base}/api/visits/${visitId}/fhir`,{headers:{Cookie:clerkSession}})).status,403);
   assert.equal((await fetch(`${base}/api/visits/SYN-PT-missing/fhir`,{headers:{Cookie:nurseSession}})).status,404);
 });
+
+test('measured token usage and cost per completed outcome come from logged model calls',async()=>{
+  const session=await loginAs('STAFF-101','123456');
+  const summary=async()=>(await get('/operations/summary?period=today',session)).aiCost;
+  const before=await summary();
+  const visitId=(await workflow.register(nurse,intake,randomUUID())).data.id;
+  // A priced run: the same four-call tool sequence, with provider-reported usage like Bedrock's.
+  const priced:Model=async(messages,tools,signal)=>({...(await fakeModel(messages,tools,signal)),usage:{inputTokens:1250,outputTokens:80,totalTokens:1330}});
+  const run=(await database.pool.query('SELECT id FROM agent_runs WHERE visit_id=$1',[visitId])).rows[0];
+  await database.pool.query("UPDATE agent_runs SET status='RUNNING',provider='bedrock',model='eu.amazon.nova-lite-v1:0',lease_until=now()+interval '5 minutes' WHERE id=$1",[run.id]);
+  await executeAgent(database,run.id,priced);
+  await decision((await workflow.pending()).find(p=>p.patientId===visitId)!);
+  const trace=await get(`/agents/runs/${run.id}`,session);
+  assert.equal(trace.usage.modelCalls,4);assert.equal(trace.usage.inputTokens,5000);assert.equal(trace.usage.outputTokens,320);
+  assert.equal(trace.usage.costUsd,0.00043332);   // 5,000 × 0.069/1M + 320 × 0.276/1M
+  assert.match(trace.usage.price.source,/AWS Price List API/);
+  const after=await summary();
+  assert.equal(after.runs,before.runs+1);assert.equal(after.modelCalls,before.modelCalls+4);
+  assert.equal(after.completedOutcomes,before.completedOutcomes+1);
+  assert.ok(Math.abs(after.modelCostUsd-before.modelCostUsd-0.00043332)<1e-6);
+  assert.equal(after.hostingUsdPerMonth,18.84);
+  assert.ok(after.costPerOutcomeUsd>0 && after.models.some((m:any)=>m.model==='eu.amazon.nova-lite-v1:0'));
+});

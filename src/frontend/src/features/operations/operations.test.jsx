@@ -32,6 +32,13 @@ const summary = (overrides = {}) => ({
     underTriage: { numerator: 1, denominator: 7, percent: 14.3 }, overTriage: { numerator: 4, denominator: 10, percent: 40 },
     leftWithoutBeingSeenPercent: 10, closedWithoutApprovedPriority: 0, lengthOfStay: timing(20, 185, 410),
   },
+  aiCost: {
+    runs: 6, completedOutcomes: 4, modelCalls: 24, modelCallsPerRun: { average: 4, max: 6 },
+    tokensPerAnswer: { input: 1258, output: 83 }, tokens: { input: 30192, output: 1992 }, unmeteredModelCalls: 0, unpricedRuns: 0,
+    modelCostUsd: 0.002633, hostingCostUsd: 0.6189, hostingUsdPerMonth: 18.84,
+    costPerRunUsd: { average: 0.000439, max: 0.000702 }, modelCostPerOutcomeUsd: 0.000658, hostingPerOutcomeUsd: 0.154729, costPerOutcomeUsd: 0.155387,
+    models: [{ model: 'eu.amazon.nova-lite-v1:0', provider: 'bedrock', price: { inputUsdPerMillion: 0.069, outputUsdPerMillion: 0.276, source: 'AWS Price List API' } }],
+  },
   seenAgainstTarget: [
     { priority: 'RED', seen: 2, medianMinutes: 1.5, withinTargetPercent: null },
     { priority: 'ORANGE', seen: 4, medianMinutes: 12, withinTargetPercent: 50 },
@@ -56,6 +63,17 @@ describe('operations dashboard', () => {
     expect(screen.getByLabelText('Red: 1 (11%)')).toBeInTheDocument();
     expect(screen.getByText(/Full/)).toBeInTheDocument();
     expect(screen.getByText('Failed')).toBeInTheDocument();
+  });
+
+  it('shows measured AI cost per completed triage, tokens per answer and model calls', async () => {
+    api.mockResolvedValue(summary());
+    render(<OperationsView />);
+    const tile = (await screen.findByText('Cost per completed triage')).closest('.ops-tile');
+    expect(tile).toHaveTextContent('$0.1554');
+    expect(tile).toHaveTextContent('AI $0.000658 + hosting $0.1547 · 4 completed');
+    expect(screen.getByText('Tokens per answer').closest('.ops-tile')).toHaveTextContent('1,341');
+    expect(screen.getByText('Model calls per assessment').closest('.ops-tile')).toHaveTextContent('Worst case 6');
+    expect(screen.getByText(/\$0\.069 \/ \$0\.276 per 1M input \/ output tokens/)).toBeInTheDocument();
   });
 
   it('shows outcome-based triage accuracy against the KNH baseline and SATS target compliance', async () => {
