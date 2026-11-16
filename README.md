@@ -4,7 +4,7 @@
 
 AfyaFlow connects registration, recorded observations, agent-assisted priority proposals, staff decisions, waiting queues, deterioration review, and department routing. The agent gathers evidence through MCP tools; an authenticated nurse or clinician makes the consequential decision.
 
-**Current status:** deployed at [afyaflow.online](https://afyaflow.online) on the low-cost EC2/PostgreSQL/Caddy stack. GitHub Actions tests pushes and pull requests; successful main pushes deploy using AWS OIDC. OpenAI is the active staging inference provider; Bedrock remains configurable.
+**Current status:** deployed at [afyaflow.online](https://afyaflow.online) on the low-cost EC2/PostgreSQL/Caddy stack. GitHub Actions tests pushes and pull requests; successful main pushes deploy using AWS OIDC. Amazon Bedrock (Nova Lite) is the staging inference provider, pinned in the deployment configuration and checked on every release.
 
 **Historical Research Cases** uses the openly available **MIMIC-IV-ED Demo v2.2**: 222 historical ED stays from 64 distinct source patients in the bundled ED files. Original rows and normalized observations have source attribution and ODbL 1.0 licensing. Research cases are read-only and separate from synthetic registration, queue and routing workflows. See [data sources, transformations and limitations](docs/DATA_SOURCES.md).
 
@@ -54,7 +54,7 @@ Capacity and staffing figures are synthetic, not live hospital telemetry. The fr
 
 ### Agents and MCP
 
-- **OpenAI Responses / Amazon Bedrock Converse:** explicit provider selection, bounded tool calling and per-run provider/model persistence. Staging uses OpenAI `gpt-4.1-mini`; Bedrock configuration is retained.
+- **Amazon Bedrock Converse / OpenAI Responses:** explicit provider selection, bounded tool calling and per-run provider/model persistence. Staging uses Bedrock Nova Lite (`eu.amazon.nova-lite-v1:0`) through the EC2 instance role; OpenAI remains available for local development.
 - **LangGraph:** model/tool orchestration and bounded workflow control. Human-review state is persisted in PostgreSQL.
 - **Official MCP TypeScript client/server SDKs:** real tool discovery and dispatch through run-scoped in-memory transports, plus an optional stdio entry point.
 - **Custom MCP tools:** `get_observations`, `read_protocol`, `score_protocol`, and `save_pending_proposal`.
@@ -75,7 +75,7 @@ Dependency versions are recorded in the root and frontend manifests and lockfile
 
 ## AWS services and their roles
 
-**Active staging:** EC2, EBS, ECR, IAM/OIDC and Systems Manager with PostgreSQL and Caddy on one host. The OpenAI key is stored in SSM SecureString and mounted privately at release time. The Lambda/SAM resources below remain an alternative deployment configuration.
+**Active staging:** EC2, EBS, ECR, IAM/OIDC and Systems Manager with PostgreSQL and Caddy on one host. Amazon Bedrock provides inference through the instance role, so no model API key is stored on the host. The Lambda/SAM resources below remain an alternative deployment configuration.
 
 ### Resources described by the SAM template
 

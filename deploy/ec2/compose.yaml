@@ -34,17 +34,15 @@ services:
       # The app publishes no ports; only Caddy reaches it and Caddy sets this header.
       TRUST_PROXY_CLIENT_IP: 'true'
       AWS_REGION: ${AWS_REGION:-eu-west-1}
-      AI_PROVIDER: ${AI_PROVIDER:-bedrock}
-      OPENAI_MODEL: ${OPENAI_MODEL:-gpt-4.1-mini}
-      OPENAI_API_KEY_FILE: /run/secrets/openai-api-key
-      BEDROCK_MODEL_ID: ${BEDROCK_MODEL_ID:-eu.amazon.nova-lite-v1:0}
+      # Pinned in the repository: staging inference is Amazon Bedrock, using the EC2 instance
+      # role (no API key). The model must match the host role's bedrock:InvokeModel grant.
+      AI_PROVIDER: bedrock
+      BEDROCK_MODEL_ID: eu.amazon.nova-lite-v1:0
       AGENT_WORKER_DISABLED: 'false'
       # Public demo accounts are shared, so cap paid model calls per staff account and overall.
       AGENT_RUNS_PER_STAFF_HOUR: ${AGENT_RUNS_PER_STAFF_HOUR:-20}
       AGENT_RUNS_PER_HOUR: ${AGENT_RUNS_PER_HOUR:-100}
       NODE_OPTIONS: --max-old-space-size=384
-    volumes:
-      - ./secrets:/run/secrets:ro
     depends_on:
       postgres:
         condition: service_healthy

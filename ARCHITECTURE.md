@@ -18,9 +18,10 @@ Only an authenticated clinical session can commit a separate approval transactio
 The model never receives an approval tool. Client staff IDs are not authority.
 
 The provider is selected explicitly with `AI_PROVIDER` and recorded per run. Staging
-uses OpenAI Responses (`gpt-4.1-mini`); Amazon Bedrock Converse (Nova Lite through an
-EU inference profile) remains configurable; competition mode requires a local Ollama
-model and a dedicated synthetic-only database. New and retried assessments are
+is pinned to Amazon Bedrock Converse (Nova Lite through an EU inference profile)
+using the EC2 instance role; OpenAI Responses remains available for local
+development; competition mode requires a local Ollama model and a dedicated
+synthetic-only database. New and retried assessments are
 capped per staff account and per deployment each hour to bound paid inference.
 The scorer is a named unvalidated synthetic fixture, not an approved SATS protocol.
 See specs/contracts.md and src/backend/README.md for implemented behavior.

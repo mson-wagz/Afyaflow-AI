@@ -127,24 +127,23 @@ record after restarting a stopped instance. Routine application releases do not
 change the IP. The OIDC provider can be shared, so do not delete it without checking
 other repositories.
 
-## OpenAI inference (optional)
+## Bedrock inference
 
-Set `AI_PROVIDER=openai` and `OPENAI_MODEL=gpt-4.1-mini` in the host's
-root-owned `/opt/afyaflow/provider.env`. Default is Bedrock; there is no automatic
-fallback. Store the OpenAI key as a Standard SSM SecureString parameter named
-`/afyaflow/staging/openai-api-key` in the deployment region. Supply it through a
-private local file or the AWS console, never a command argument, GitHub variable,
-or SSM Run Command payload. The existing managed SSM instance policy allows
-parameter retrieval. The default AWS-managed SSM KMS key is used.
+Staging inference is pinned to Amazon Bedrock in `compose.yaml`
+(`AI_PROVIDER: bedrock`, `BEDROCK_MODEL_ID: eu.amazon.nova-lite-v1:0`). Changing the
+provider therefore requires a reviewed commit; the host's
+`/opt/afyaflow/provider.env` is ignored. The app container uses the EC2 instance
+role through IMDSv2 (hop limit 2), whose `bedrock:InvokeModel` grant covers only
+Nova Lite and its EU inference profile. No API key is fetched, stored or mounted.
 
-On each release, the host fetches the key into a file readable only by the
-container's Node user (UID 1000), then mounts the directory read-only. No key is
-included in the image or browser bundle. The successful release configuration is
-restored if application startup fails. Rotating the SSM value takes effect on
-the next release. The key is never required for Bedrock runs.
+Every release checks that `/api/health` reports `"agentProvider":"bedrock"`, so a
+release on any other provider fails the pipeline. To confirm actual use, check
+CloudWatch metrics under `AWS/Bedrock` (`Invocations` for the model ID) after an
+assessment, and the provider and model recorded on each agent run. Bedrock usage
+is billed to the AWS account. This remains a synthetic demonstration with an
+unvalidated protocol and human approval gate.
 
-New runs persist provider and model; already queued runs keep their selection.
-Responses API requests use `store:false`; tool context is retained only within
-the active run. OpenAI inference is billed separately from AWS. This remains a
-synthetic demonstration with an unvalidated protocol and human approval gate.
-The Lambda template retains its Bedrock defaults; this secret mount is EC2-only.
+The application code still supports OpenAI and local Ollama for development and
+competition runs; only this EC2 deployment is pinned. Releases remove the host
+copy of the previously used OpenAI key. Delete the SSM parameter
+`/afyaflow/staging/openai-api-key` and revoke the key at OpenAI once no longer needed.

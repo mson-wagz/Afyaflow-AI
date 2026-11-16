@@ -51,7 +51,7 @@ class DeploymentTests(unittest.TestCase):
     def test_healthy_release_sends_only_expected_files_and_checks_database(self):
         health = unittest.mock.MagicMock()
         health.__enter__.return_value.status = 200
-        health.__enter__.return_value.read.return_value = b'{"status":"ok","database":"postgresql"}'
+        health.__enter__.return_value.read.return_value = b'{"status":"ok","database":"postgresql","agentProvider":"bedrock"}'
         with patch.object(deployment, "aws", side_effect=[OUTPUTS, {"Command": {"CommandId": "synthetic"}}, {"Status": "Success"}]) as aws, \
              patch.object(deployment.time, "sleep"), \
              patch.object(deployment.urllib.request, "urlopen", return_value=health):
@@ -72,6 +72,21 @@ class DeploymentTests(unittest.TestCase):
              patch.object(deployment.urllib.request, "urlopen", return_value=health):
             with self.assertRaises(ValueError):
                 deployment.main()
+
+    def test_release_on_another_agent_provider_fails(self):
+        health = unittest.mock.MagicMock()
+        health.__enter__.return_value.status = 200
+        health.__enter__.return_value.read.return_value = b'{"status":"ok","database":"postgresql","agentProvider":"openai"}'
+        with patch.object(deployment, "aws", side_effect=[OUTPUTS, {"Command": {"CommandId": "synthetic"}}, {"Status": "Success"}]), \
+             patch.object(deployment.time, "sleep"), \
+             patch.object(deployment.urllib.request, "urlopen", return_value=health):
+            with self.assertRaisesRegex(ValueError, "expected 'bedrock'"):
+                deployment.main()
+
+    def test_compose_pins_the_expected_provider(self):
+        compose = (Path(__file__).resolve().parents[2] / "deploy/ec2/compose.yaml").read_text()
+        self.assertIn(f"AI_PROVIDER: {deployment.EXPECTED_AGENT_PROVIDER}\n", compose)
+        self.assertNotIn("OPENAI", compose)
 
 
 if __name__ == "__main__":
