@@ -52,6 +52,8 @@ async function decision(proposal:any,key=randomUUID()) {
 }
 before(async () => {
   process.env.AGENT_WORKER_DISABLED='true';
+  // The suite registers many visits as one nurse; the quota test lowers these itself.
+  config.agentRunsPerStaffHour=100000;config.agentRunsPerHour=100000;
   await database.pool.query(`CREATE SCHEMA "${schema}"`);
   await database.pool.end();
   Object.defineProperty(database,'pool',{value:new Pool({connectionString:process.env.DATABASE_URL,options:`-c search_path=${schema}`})});
@@ -343,6 +345,39 @@ test('shared auth throttling is atomic and permits a new window after expiry',as
   const {hash}=await import('../../src/backend/src/database/db.js');
   await database.pool.query("UPDATE auth_rate_limits SET expires_at=now()-interval '1 second' WHERE key_hash=$1",[hash(source)]);
   assert.equal(await allowAuthAttempt(database,source),true);
+});
+
+test('model quota keeps clinical writes, records review-required runs and refuses explicit requests',async()=>{
+  const {hash}=await import('../../src/backend/src/database/db.js');
+  const reset=()=>database.pool.query('DELETE FROM auth_rate_limits WHERE key_hash=ANY($1)',[[hash('agent-runs:global'),hash(`agent-runs:staff:${nurse.id}`),hash(`agent-runs:staff:${clinician.id}`)]]);
+  const previous={staff:config.agentRunsPerStaffHour,global:config.agentRunsPerHour};
+  try {
+    await reset();config.agentRunsPerStaffHour=2;
+    const first=await register(),second=await register();
+    for(const visit of [first,second])
+      assert.equal((await database.pool.query('SELECT status FROM agent_runs WHERE id=$1',[visit.data.agentRunId])).rows[0].status,'QUEUED');
+    // Over the per-staff limit, the visit and observations are still saved...
+    const third=await register();
+    const run=(await database.pool.query('SELECT * FROM agent_runs WHERE id=$1',[third.data.agentRunId])).rows[0];
+    assert.equal(run.status,'FAILED');assert.match(run.error,/hourly AI assessment limit/);
+    assert.equal((await database.pool.query('SELECT count(*) FROM agent_outbox WHERE run_id=$1',[run.id])).rows[0].count,'0');
+    assert.equal((await workflow.visits()).find(v=>v.id===third.data.id)!.assessmentStatus,'REVIEW_REQUIRED');
+    // ...an idempotent retry of the same registration is not charged again...
+    const key=randomUUID();
+    config.agentRunsPerStaffHour=100000;
+    const replayed=await workflow.register(nurse,intake,key);
+    assert.deepEqual(await workflow.register(nurse,intake,key),replayed);
+    // ...and an explicit retry over the deployment-wide limit is refused without changing the run.
+    await reset();config.agentRunsPerHour=1;
+    await register();
+    await assert.rejects(workflow.requestAssessment(clinician,third.data.id),(error:any)=>error.getStatus()===429 && error.getResponse().code==='AGENT_QUOTA_EXCEEDED');
+    assert.equal((await database.pool.query('SELECT status FROM agent_runs WHERE id=$1',[run.id])).rows[0].status,'FAILED');
+    // Re-requesting an already queued run reuses it and is not charged.
+    assert.equal((await workflow.requestAssessment(clinician,first.data.id)).data.status,'QUEUED');
+    // A new window allows the retry.
+    await reset();
+    assert.equal((await workflow.requestAssessment(clinician,third.data.id)).data.status,'QUEUED');
+  } finally {config.agentRunsPerStaffHour=previous.staff;config.agentRunsPerHour=previous.global;}
 });
 
 test('failed PINs are throttled per account across identifier forms and shared with unlock',async()=>{

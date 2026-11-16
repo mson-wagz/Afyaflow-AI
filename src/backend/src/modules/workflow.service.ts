@@ -1,5 +1,6 @@
 /* eslint-disable @typescript-eslint/no-unsafe-assignment */
-import { Injectable, Inject, BadRequestException, ConflictException, NotFoundException } from '@nestjs/common';
+import { Injectable, Inject, BadRequestException, ConflictException, NotFoundException, HttpException, HttpStatus } from '@nestjs/common';
+import { consumeWindow } from '../auth/rate-limit.js';
 import { z } from 'zod';
 import { Database, audit, id, idempotent, hash } from '../database/db.js';
 import { Staff, parse, requireClinical } from '../auth/auth.js';
@@ -112,8 +113,31 @@ export function requestKey(value: unknown) {
   return value;
 }
 
-/** Queues an agent run for a visit's observation version (re-queues failed runs). */
-export async function enqueue(db: PoolClient, visitId: string, version: number) {
+export const AGENT_QUOTA_MESSAGE = 'The hourly AI assessment limit has been reached. Retry the assessment later or make a reasoned manual decision.';
+
+/** Counts one model run against the per-staff and deployment-wide hourly limits. */
+async function consumeAgentQuota(db: PoolClient, staffId: string | null) {
+  const hour = 3600;
+  if (staffId && !(await consumeWindow(db, `agent-runs:staff:${staffId}`, { limit: config.agentRunsPerStaffHour, windowSeconds: hour }))) return false;
+  return consumeWindow(db, 'agent-runs:global', { limit: config.agentRunsPerHour, windowSeconds: hour });
+}
+
+/**
+ * Queues an agent run for a visit's observation version (re-queues failed runs).
+ * A new or retried run consumes model quota. When quota is exhausted, `reject` throws 429;
+ * `record` keeps the caller's clinical write and stores a FAILED run that requires staff review.
+ */
+export async function enqueue(db: PoolClient, visitId: string, version: number, staffId: string | null = null, onQuota: 'record' | 'reject' = 'record') {
+  const existing = (await db.query('SELECT status FROM agent_runs WHERE visit_id=$1 AND observation_version=$2', [visitId, version])).rows[0];
+  if ((!existing || existing.status === 'FAILED') && !(await consumeAgentQuota(db, staffId))) {
+    if (onQuota === 'reject') throw new HttpException({ code: 'AGENT_QUOTA_EXCEEDED', message: AGENT_QUOTA_MESSAGE }, HttpStatus.TOO_MANY_REQUESTS);
+    const failed = (await db.query(`INSERT INTO agent_runs(id,visit_id,observation_version,model,provider,status,error,finished_at) VALUES($1,$2,$3,$4,$5,'FAILED',$6,now())
+      ON CONFLICT(visit_id,observation_version) DO UPDATE SET status='FAILED',error=EXCLUDED.error,finished_at=now(),lease_until=null RETURNING *`,
+      [id('RUN'), visitId, version, config.model, config.provider, AGENT_QUOTA_MESSAGE])).rows[0];
+    await db.query("UPDATE visits SET assessment_status='REVIEW_REQUIRED' WHERE id=$1 AND observation_version=$2", [visitId, version]);
+    await audit(db, staffId, 'AGENT_QUOTA_EXCEEDED', { runId: failed.id, observationVersion: version }, visitId);
+    return failed;
+  }
   const run = (await db.query(`INSERT INTO agent_runs(id,visit_id,observation_version,model,provider,status) VALUES($1,$2,$3,$4,$5,'QUEUED')
     ON CONFLICT(visit_id,observation_version) DO UPDATE SET status=CASE WHEN agent_runs.status='FAILED' THEN 'QUEUED' ELSE agent_runs.status END,
     error=CASE WHEN agent_runs.status='FAILED' THEN null ELSE agent_runs.error END,
@@ -171,7 +195,7 @@ export class WorkflowService {
       await db.query('INSERT INTO visits(id,name,age,gender,complaint,registered_by,arrival_at,source_data) VALUES($1,$2,$3,$4,$5,$6,$7,$8)',
         [visitId, name, age, gender, presentingComplaint, staff.id, arrivalTime || recordedAt, JSON.stringify(voiceReview ? { intake: { ...voiceReview, reviewedBy: staff.id } } : {})]);
       await db.query('INSERT INTO observations(id,visit_id,version,vitals,recorded_by) VALUES($1,$2,1,$3,$4)', [id('OBS'), visitId, JSON.stringify(vitals), staff.id]);
-      const run = await enqueue(db, visitId, 1);
+      const run = await enqueue(db, visitId, 1, staff.id);
       await audit(db, staff.id, 'PATIENT_REGISTERED', { observationVersion: 1, runId: run.id, ...(voiceReview ? { voiceReview } : {}) }, visitId);
       return {
         success: true, isDuplicate: false, data: {
@@ -197,7 +221,7 @@ export class WorkflowService {
       for (const task of staleFollowups.rows) await audit(db, staff.id, 'FOLLOWUP_STALE', { followupId: task.id, newObservationVersion: version }, visitId);
       await db.query("UPDATE agent_runs SET status='SUPERSEDED' WHERE visit_id=$1 AND status IN ('QUEUED','WAITING_FOR_REVIEW','REVIEW_REQUIRED')", [visitId]);
       await db.query("UPDATE visits SET observation_version=$2,assessment_status='AWAITING_ASSESSMENT',updated_at=now() WHERE id=$1", [visitId, version]);
-      const run = await enqueue(db, visitId, version);
+      const run = await enqueue(db, visitId, version, staff.id);
       await audit(db, staff.id, 'OBSERVATIONS_RECORDED', { version, runId: run.id }, visitId);
       return { success: true, data: { visitId, observationVersion: version, agentRunId: run.id } };
     }));
@@ -302,7 +326,7 @@ export class WorkflowService {
       const visit = (await db.query('SELECT * FROM visits WHERE id=$1 FOR UPDATE', [visitId])).rows[0];
       if (!visit) throw new NotFoundException('Visit not found.');
       if (isCompetitionMode()) requireWorkflowVisit(visit);
-      const run = await enqueue(db, visitId, visit.observation_version);
+      const run = await enqueue(db, visitId, visit.observation_version, staff.id, 'reject');
       await audit(db, staff.id, 'ASSESSMENT_REQUESTED', { runId: run.id }, visitId);
       return { success: true, data: { runId: run.id, status: run.status } };
     });
