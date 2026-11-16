@@ -11,6 +11,8 @@ import tarfile
 import time
 import urllib.request
 
+# Must match AI_PROVIDER in deploy/ec2/compose.yaml.
+EXPECTED_AGENT_PROVIDER = "bedrock"
 
 def aws(*arguments):
     result = subprocess.run(
@@ -87,6 +89,9 @@ def main():
                 health = json.loads(response.read())
                 if not isinstance(health, dict) or health.get("status") != "ok" or health.get("database") != "postgresql":
                     raise ValueError("Unexpected health response")
+                # The release must come up on the provider pinned in deploy/ec2/compose.yaml.
+                if health.get("agentProvider") != EXPECTED_AGENT_PROVIDER:
+                    raise ValueError(f'Live agent provider is {health.get("agentProvider")!r}, expected {EXPECTED_AGENT_PROVIDER!r}')
             print(f"HTTPS health check passed: https://{domain}")
             return
         except (OSError, ValueError, RuntimeError):
