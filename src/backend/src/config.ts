@@ -10,6 +10,8 @@ export const config = {
   databaseUrl:process.env.DATABASE_URL || '',
   databasePoolMax:Number(process.env.DATABASE_POOL_MAX || (process.env.AWS_LAMBDA_FUNCTION_NAME ? 2 : 10)),
   cloudfrontOriginToken:process.env.CLOUDFRONT_ORIGIN_TOKEN || '',
+  // Set only where a reverse proxy overwrites the client-IP header and the app port is not public.
+  trustProxyClientIp:process.env.TRUST_PROXY_CLIENT_IP === 'true',
   host:process.env.HOST || '127.0.0.1',port:Number(process.env.PORT || 3000),
   origins:(process.env.APP_ORIGIN || 'http://localhost:5173,http://127.0.0.1:5173').split(','),
   region:process.env.AWS_REGION || 'eu-west-1',provider,bedrockModel,openaiModel,model:provider==='ollama'?policy.ollamaModel:provider==='openai'?openaiModel:bedrockModel,
