@@ -11,27 +11,36 @@ proposals, decisions, transfers, retry keys, sessions and audit events.
 ## Implemented runtime
 
 Registration and observation writes queue durable assessment jobs. A leased worker
-runs a LangGraph loop against Amazon Bedrock Converse, connects to run-scoped custom
-MCP tools and retrieves the fixed test protocol through the official filesystem
-MCP reference server. The graph stops at a persisted human-review state. Only an
-authenticated clinical session can commit a separate approval transaction. The
-model never receives an approval tool. Client staff IDs are not authority.
+runs a LangGraph loop against the configured model provider, connects to run-scoped
+custom MCP tools and retrieves the fixed test protocol through the official
+filesystem MCP reference server. The graph stops at a persisted human-review state.
+Only an authenticated clinical session can commit a separate approval transaction.
+The model never receives an approval tool. Client staff IDs are not authority.
 
-The tested hosted model is Nova Lite through an EU inference profile. The former
-local Qwen plan below is historical; provider selection was changed to Bedrock.
+The provider is selected explicitly with `AI_PROVIDER` and recorded per run. Staging
+uses OpenAI Responses (`gpt-4.1-mini`); Amazon Bedrock Converse (Nova Lite through an
+EU inference profile) remains configurable; competition mode requires a local Ollama
+model and a dedicated synthetic-only database. New and retried assessments are
+capped per staff account and per deployment each hour to bound paid inference.
 The scorer is a named unvalidated synthetic fixture, not an approved SATS protocol.
-Docker/RDS deployment is prepared but untested; nothing has been hosted on AWS.
 See specs/contracts.md and src/backend/README.md for implemented behavior.
 
-Lambda hosting now has separate NestJS API, SQS worker, scheduled outbox dispatcher,
-and operator-only migration entry points. Run creation and delivery intent share a
-PostgreSQL transaction; worker leases and retry generations fence duplicate or old
-messages. The API retains cookie sessions behind same-origin CloudFront routing;
-shared database throttling uses an authenticated CloudFront viewer address. The SAM
-template includes private S3 frontend hosting and scoped function permissions, and
-uses an existing private database and VPC service connectivity. Local polling is
-retained for development. See deploy/lambda/README.md. SAM lint and local Lambda
-handler tests are distinct from an actual AWS deployment or container smoke test.
+**Active hosting:** a single EC2 host runs the app container, PostgreSQL and Caddy
+(HTTPS) at afyaflow.online. GitHub Actions tests every push and deploys `main`
+through AWS OIDC and Systems Manager; see deploy/ec2/README.md. Caddy supplies each
+visitor's address to the app, which throttles sign-in and unlock per address and
+failed PINs per staff account in shared PostgreSQL counters.
+
+**Alternative, not the active deployment:** the Lambda configuration has separate
+NestJS API, SQS worker, scheduled outbox dispatcher, and operator-only migration
+entry points. Run creation and delivery intent share a PostgreSQL transaction;
+worker leases and retry generations fence duplicate or old messages. The API
+retains cookie sessions behind same-origin CloudFront routing; address throttling
+there uses an authenticated CloudFront viewer address. The SAM template includes
+private S3 frontend hosting and scoped function permissions, and uses an existing
+private database and VPC service connectivity. Local polling is retained for
+development. See deploy/lambda/README.md. SAM lint and local Lambda handler tests
+are distinct from an actual Lambda deployment or container smoke test.
 
 ## Original design plan (not a claim of completed clinical validation)
 

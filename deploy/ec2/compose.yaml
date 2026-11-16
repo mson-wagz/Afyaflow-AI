@@ -39,6 +39,9 @@ services:
       OPENAI_API_KEY_FILE: /run/secrets/openai-api-key
       BEDROCK_MODEL_ID: ${BEDROCK_MODEL_ID:-eu.amazon.nova-lite-v1:0}
       AGENT_WORKER_DISABLED: 'false'
+      # Public demo accounts are shared, so cap paid model calls per staff account and overall.
+      AGENT_RUNS_PER_STAFF_HOUR: ${AGENT_RUNS_PER_STAFF_HOUR:-20}
+      AGENT_RUNS_PER_HOUR: ${AGENT_RUNS_PER_HOUR:-100}
       NODE_OPTIONS: --max-old-space-size=384
     volumes:
       - ./secrets:/run/secrets:ro

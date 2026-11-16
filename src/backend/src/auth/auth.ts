@@ -31,7 +31,10 @@ export class AuthService {
   constructor(@Inject(Database) private readonly database:Database) {}
   async signIn(body:unknown) {
     const {identifier,pin}=parse(credentials,body);
-    const staff=(await this.database.pool.query('SELECT * FROM staff WHERE lower(id)=lower($1) OR lower(staff_number)=lower($1) OR lower(profile->>\'name\')=lower($1)',[identifier])).rows[0];
+    const matches=(await this.database.pool.query('SELECT * FROM staff WHERE lower(id)=lower($1) OR lower(staff_number)=lower($1) OR lower(profile->>\'name\')=lower($1)',[identifier])).rows;
+    // IDs and staff numbers are unique; a display name is accepted only when exactly one account has it.
+    const exact=matches.filter(s=>[s.id,s.staff_number].some(v=>v.toLowerCase()===identifier.toLowerCase()));
+    const staff=exact.length===1 ? exact[0] : exact.length===0 && matches.length===1 ? matches[0] : undefined;
     // Unknown identifiers are throttled the same way, so the response does not reveal which accounts exist.
     const attemptKey=staff ? accountKey(staff.id) : unknownAccountKey(identifier);
     await this.requireAccountAttempt(attemptKey);
