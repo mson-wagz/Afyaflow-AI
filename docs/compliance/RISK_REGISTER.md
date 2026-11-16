@@ -6,7 +6,7 @@ High / Medium / Low and must be reviewed by the security officer.
 
 | # | Risk | Likelihood | Impact | Current controls | Remaining action |
 | --- | --- | --- | --- | --- | --- |
-| R1 | A contributor's computer or GitHub account is compromised and pushes malicious code (this happened: see the incident record) | High | High | Malware removed from `main`; pull requests reviewed | Ruleset blocking force pushes and requiring reviews; credential rotation; disable VS Code automatic tasks |
+| R1 | A contributor's computer or GitHub account is compromised and pushes malicious code (this happened six times; the latest sweep was on 16 Nov from a third account: see the incident record) | High | High | Malware removed from `main`; pull requests reviewed | Ruleset blocking force pushes and requiring reviews; credential rotation; disable VS Code automatic tasks |
 | R2 | Unauthorised sign-in by guessing a PIN | Low | High | Six-digit PINs, per-account and per-address throttling, administrator MFA, no published PINs | Consider MFA for all staff if devices allow |
 | R3 | Unattended shared terminal exposes patient data | Medium | Medium | Browser lock after 1-30 minutes, server lock after 15 minutes idle, patient data cleared from the browser at sign-out | Staff training to lock and sign out |
 | R4 | Leaver keeps access | Medium | High | Administrators deactivate accounts and end sessions | Joiner/leaver procedure with HR |

@@ -1,6 +1,6 @@
 # Security incident record: repository compromise (October-November 2026)
 
-**Status:** contained on `main`; follow-up actions open (see below).
+**Status:** recurred on 16 November 2026 (sixth sweep, below); branches restored and cleaned; account and device actions open.
 **Severity:** high (code execution on developer machines and CI runners).
 **Patient data involved:** none. The system held only synthetic records and the
 de-identified public MIMIC-IV-ED Demo dataset.
@@ -70,15 +70,106 @@ Commit dates in the rewritten commits are not reliable evidence of timing.
 | --- | --- | --- |
 | Clean or reinstall the computers used by `mson-wagz` and `JecintaK`; full antivirus scan | Account owners | Open |
 | From a clean device: change GitHub passwords, sign out all sessions, revoke tokens, SSH keys, OAuth apps and stored Git credentials | All contributors | Open |
-| Add a repository ruleset blocking force pushes on all branches | Repository owner | Open |
+| Add a repository ruleset blocking force pushes on all branches | Repository owner | Open. **This would have prevented both incidents; highest priority.** |
 | Revoke the OpenAI API key and delete SSM parameter `/afyaflow/staging/openai-api-key` | Project lead | Open |
 | Review CloudTrail for the GitHub deploy role and instance role, 16 Oct-16 Nov | Project lead | Open |
-| Decide what to do with the 27 other branches, which still contain the payload; until then, never open them in VS Code or run their scripts | Team | Open (branches kept by decision, 16 Nov) |
+| Decide what to do with the 27 other branches, which still contain the payload; until then, never open them in VS Code or run their scripts | Team | Done: deleted after the sixth sweep, 16 Nov |
+| **Sixth sweep:** from a clean device, secure the `majorkiema` account (password, all sessions, 2FA, tokens, SSH keys, OAuth apps, stored Git credentials) | Account owner | Open, urgent |
+| **Sixth sweep:** identify the pushing device and IP from the GitHub security log (16 Nov, ~21:28 UTC) and scan or reinstall that device | Account owner | Open, urgent |
+| **Sixth sweep:** confirm no new pushes after the restore, and re-check all branches for `init` and `.vscode/tasks.json` | Repository owner | Open |
 | Offline antivirus scan of the reviewer's computer | Reviewer | Open |
+
+## Sixth sweep (16 November 2026, evening)
+
+### What happened
+
+| When (UTC) | Event |
+| --- | --- |
+| 21:02 | PR #39 merged through GitHub (clean merge `e273a0b`, signed by GitHub). |
+| ~21:28 | All 29 branches force-pushed. `main` became `12ba056`: same parents as `e273a0b` but a different tree, committed locally as "Major Mbandi" rather than by GitHub. On other branches the newest commit was replaced by a look-alike with the same message and author plus the payload (for example `docs/pilot-protocol` `e7755e5` → `e8c0cba`). |
+| 21:28 | CI ran on `12ba056`. *Application tests and builds* ran `node init && tsc`, so **the payload executed on the GitHub Actions runner**. The Lambda image build failed (`Cannot find module '/app/init'`), so **the deploy job was skipped and staging was not changed**. |
+| ~21:45 | Detected when PRs #44 and #45 showed conflicts in files they had not changed and CI failed. |
+| ~21:48 | Restored and cleaned (below). |
+
+The commits carry the identity of the `majorkiema` account (display names "mejja" and "Major
+Mbandi"), where earlier sweeps used `mson-wagz` and `JecintaK`. The account and device that
+pushed must be confirmed from the GitHub security log. Whichever it was, it held push access.
+
+### Payload (same family as October)
+
+- `.vscode/tasks.json` runs hidden on folder open (`runOn: folderOpen`), calling
+  `.vscode/eslint-check.cmd` / `.sh`, which run `node .vscode/eslint` (16.6 KB,
+  disguised as an ESLint config); `.vscode/settings.json` sets `task.allowAutomaticTasks: true`.
+- `init` files (17.2 KB each) at the root, `src/backend` and `src/frontend`; root, backend and
+  frontend `package.json` scripts (build, start, dev, `dev:db`, `start:mcp`) changed to run
+  `node init` first.
+- `src/backend/eslint.config.mjs` and `src/frontend/vite.config.js` changed, with a long run of
+  whitespace on the last line (the October hiding technique).
+- `.gitignore` stopped ignoring `.env` and `.env.*` (secrets would be committed) and started
+  ignoring `config.bat` (likely the worm's own push script).
+- Unrelated `.vscode/launch.json` from another project (AWS profile `flo-ct-flo360`), suggesting
+  the files were copied from a template used across victims.
+
+The files were read as text only during the investigation; none were run.
+
+### Where the payload may have run
+
+- The GitHub Actions runner for the CI run on `12ba056` (ephemeral; that job has no AWS
+  credentials; the deploy job, which assumes the AWS role, did not run).
+- Any computer that opened or built an infected branch after ~21:28 on 16 November. The
+  investigating computer's working copy and local branches were checked and are clean (no
+  `.vscode`, `init` or push scripts in the repository or top-level user folders).
+- The computer or token that made the pushes.
+
+### Response
+
+- `main` restored to the genuine merge `e273a0b` and `docs/pilot-protocol` (open PR #44) to
+  `e7755e5`, both from verified clean local copies, checked for the payload files before pushing.
+- The other 27 infected branches deleted. Every one belonged to an already merged PR, so no
+  unmerged work was lost. This closes the open action on the 27 branches kept in November.
+- Every push used `--force-with-lease` on the exact infected commit, so nothing newer was overwritten.
+- After restoring: PRs #44 and #45 mergeable again; CI passing on the restored `main`.
+
+Infected commits (evidence; GitHub may keep unreachable commits for a limited time):
+
+| Branch | Infected commit | Action |
+| --- | --- | --- |
+| `ci/low-cost-aws-staging` | `6d6f43d` | Deleted (work merged in PR #16) |
+| `department-routing` | `c2bd5bb` | Deleted (work merged in PR #26) |
+| `docs/architecture-diagram` | `f1b1681` | Deleted (work merged in PR #28) |
+| `docs/pilot-protocol` | `e8c0cba` | Restored to `e7755e5` (open PR #44) |
+| `feat/bedrock-staging` | `e1e6a52` | Deleted (work merged in PR #32) |
+| `feat/fhir-export` | `ce3a195` | Deleted (work merged in PR #42) |
+| `feat/in-country-processing` | `d934f16` | Deleted (work merged in PR #41) |
+| `feat/mimic-research-data` | `baa4dbf` | Deleted (work merged in PR #19) |
+| `feat/more-personas` | `3522891` | Deleted (work merged in PR #37) |
+| `feat/openai-provider` | `637a5a0` | Deleted (work merged in PR #18) |
+| `feat/operations-dashboard` | `e26f525` | Deleted (work merged in PR #36) |
+| `feat/queue-tie-breaking` | `f8f3eff` | Deleted (work merged in PR #38) |
+| `feat/sats-adult-age` | `8850a62` | Deleted (work merged in PR #40) |
+| `feat/security-safeguards` | `7e8c502` | Deleted (work merged in PR #34) |
+| `feat/strong-auth` | `c3366cc` | Deleted (work merged in PR #35) |
+| `feat/visit-outcomes` | `d6b96c3` | Deleted (work merged in PR #39) |
+| `feature/active-reassessment` | `621e7de` | Deleted (work merged in PR #25) |
+| `feature/backend-patient-workflow` | `c6ee1c0` | Deleted (work merged in PR #15) |
+| `feature/competition-foundation` | `e508e8a` | Deleted (work merged in PR #22) |
+| `feature/local-voice-intake` | `ae0b319` | Deleted (work merged in PR #27) |
+| `feature/missing-evidence-assistant` | `6ad8c81` | Deleted (work merged in PR #24) |
+| `fix/lock-pin-retry` | `6735e54` | Deleted (work merged in PR #21) |
+| `fix/remove-login-personas` | `cfe5310` | Deleted (work merged in PR #33) |
+| `fix/remove-malware` | `d4adc46` | Deleted (work merged in PR #30) |
+| `fix/research-unlock-loading` | `817cfeb` | Deleted (work merged in PR #20) |
+| `fix/review-findings` | `c80ab40` | Deleted (work merged in PR #31) |
+| `fix/staging-oidc-subject` | `198314e` | Deleted (work merged in PR #17) |
+| `main` | `12ba056` | Restored to `e273a0b` |
+| `queue-management` | `f3d0d82` | Deleted (work merged in PR #23) |
 
 ## Lessons
 
-- Require a ruleset that blocks force pushes and requires pull requests on `main`.
+- Require a ruleset that blocks force pushes and requires pull requests on `main`. The
+  sixth sweep happened because this was still open.
+- A pull request showing conflicts in files it never changed is a warning sign: compare
+  the base branch with its last known good commit before resolving anything.
 - Disable VS Code automatic tasks (`task.allowAutomaticTasks: off` in user settings)
   and review `.vscode/`, `package.json` scripts and build configs in every pull request.
 - Treat build tooling changes as security-sensitive in review.
