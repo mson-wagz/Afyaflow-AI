@@ -49,6 +49,8 @@ export class ApiController {
   @Post('visits') @UseGuards(SessionGuard) register(@Req()req:StaffRequest,@Body()body:unknown,@Headers('idempotency-key')key:string) {return this.workflow.register(req.staff,body,requestKey(key));}
   @Post('visits/:id/observations') @UseGuards(SessionGuard) observations(@Req()req:StaffRequest,@Param('id')visitId:string,@Body()body:unknown,@Headers('idempotency-key')key:string) {return this.workflow.observations(req.staff,visitId,body,requestKey(key));}
   @Get('queue') @UseGuards(SessionGuard) @AccessLogged() queue() {return this.workflow.queue();}
+  @Post('visits/:id/seen') @UseGuards(SessionGuard) seen(@Req()req:StaffRequest,@Param('id')visitId:string,@Headers('idempotency-key')key:string) {return this.workflow.markSeen(req.staff,visitId,requestKey(key));}
+  @Post('visits/:id/outcome') @UseGuards(SessionGuard) outcome(@Req()req:StaffRequest,@Param('id')visitId:string,@Body()body:unknown,@Headers('idempotency-key')key:string) {return this.workflow.recordOutcome(req.staff,visitId,body,requestKey(key));}
   @Post('queue/precedence') @UseGuards(SessionGuard) precedence(@Req()req:StaffRequest,@Body()body:unknown,@Headers('idempotency-key')key:string) {return this.workflow.precedence(req.staff,body,requestKey(key));}
   @Get('triage/proposals') @UseGuards(SessionGuard) @AccessLogged() proposals() {return this.workflow.pending();}
   @Get('triage/decisions') @UseGuards(SessionGuard) @AccessLogged() decisions() {return this.workflow.decisions();}

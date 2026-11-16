@@ -31,3 +31,8 @@ export const transferSchema=z.object({patientId:z.string(),departmentId:z.string
 // A clinician's choice of which clinically tied patient to see first (docs/QUEUE_ORDERING.md).
 export const precedenceSchema=z.object({patientId:z.string().min(1),observationVersion:z.number().int().positive(),
   assessmentVersion:z.number().int().nonnegative(),reason:z.string().trim().min(5).max(500)}).strict();
+// A visit's final outcome (docs/OUTCOME_METRICS.md).
+export const outcomeSchema=z.object({
+  disposition:z.enum(['ADMITTED','DISCHARGED','DIED','LEFT_WITHOUT_BEING_SEEN','LEFT_AGAINST_MEDICAL_ADVICE','TRANSFERRED_OUT']),
+  note:z.string().trim().max(1000).optional(),
+}).strict();

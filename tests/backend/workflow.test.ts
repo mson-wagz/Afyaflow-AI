@@ -1096,3 +1096,57 @@ test('Level 1 ties: severity first, a full tie by registration order, and an aud
   assert.equal(queue.find((v:any)=>v.visitId===nineB).queuePrecedence,null);
   assert.deepEqual(mine(queue).map((v:any)=>v.visitId),[nineA,nineB,seven]);
 });
+
+test('visit outcomes close visits, release beds and drive KNH under-/over-triage metrics',async()=>{
+  const nurseSession=await loginAs('STAFF-101','123456'),clerkSession=await loginAs('STAFF-103','345678');
+  const summary=()=>get('/operations/summary?period=today',nurseSession);
+  const before=await summary();
+  const red={heartRate:135,systolicBp:75,respiratoryRate:32,temperature:37,avpu:'Voice'};
+  const admitted=async(vitals:object={})=>{const id=(await workflow.register(nurse,{...intake,...vitals},randomUUID())).data.id;await decision(await assess(id));return id;};
+  const green=await admitted(),greenDischarged=await admitted(),redDischarged=await admitted(red);
+  const unseen=(await workflow.register(nurse,intake,randomUUID())).data.id;
+  // Seen once, by clinical staff only.
+  assert.equal((await post(`/visits/${green}/seen`,clerkSession,{})).status,403);
+  assert.equal((await post(`/visits/${green}/seen`,nurseSession,{})).status,201);
+  const again=await post(`/visits/${green}/seen`,nurseSession,{});
+  assert.equal(again.status,409);assert.equal((await again.json()).code,'ALREADY_SEEN');
+  // Transfer, then admit: the bed is released and the visit leaves the queue.
+  const visit=(await get('/queue',nurseSession)).queue.find((v:any)=>v.visitId===green);
+  assert.ok(visit.seenAt && visit.seenByName==='Jane Mwangi, RN');
+  const department=(await workflow.departments()).find((d:any)=>d.status!=='CLOSED' && d.occupiedBeds<d.totalBeds)!;
+  await workflow.transfer(nurse,{patientId:green,departmentId:department.id,assessmentVersion:visit.assessmentVersion,
+    departmentVersion:department.version,rationale:'Synthetic transfer before admission.'},randomUUID());
+  const occupied=async()=>(await workflow.departments()).find((d:any)=>d.id===department.id)!.occupiedBeds;
+  const held=await occupied();
+  const outcome=(id:string,cookie:string,disposition:string)=>post(`/visits/${id}/outcome`,cookie,{disposition,note:'Synthetic outcome.'});
+  assert.equal((await outcome(green,clerkSession,'ADMITTED')).status,403);
+  assert.equal((await outcome(green,nurseSession,'ADMITTED')).status,201);
+  assert.equal(await occupied(),held-1);
+  assert.ok(!(await get('/queue',nurseSession)).queue.some((v:any)=>v.visitId===green));
+  // A closed visit refuses further outcomes, observations and history changes.
+  const closed=await outcome(green,nurseSession,'DISCHARGED');
+  assert.equal(closed.status,409);assert.equal((await closed.json()).code,'VISIT_CLOSED');
+  await assert.rejects(workflow.observations(nurse,green,{vitals:{heartRate:80},expectedVersion:1},randomUUID()),(e:any)=>e.getResponse().code==='VISIT_CLOSED');
+  await assert.rejects(database.pool.query("UPDATE visit_outcomes SET disposition='DIED'"),/append-only/);
+  await assert.rejects(database.pool.query('UPDATE visits SET closed_at=NULL WHERE id=$1',[green]),/cannot be reopened/);
+  const audit=(await database.pool.query("SELECT details FROM audit_events WHERE event_type='VISIT_CLOSED' AND visit_id=$1",[green])).rows[0];
+  assert.equal(audit.details.disposition,'ADMITTED');assert.equal(audit.details.releasedDepartmentId,department.id);
+  // Discharges; a clerk may record only "left without being seen", and only before the patient is seen.
+  assert.equal((await outcome(greenDischarged,nurseSession,'DISCHARGED')).status,201);
+  assert.equal((await outcome(redDischarged,nurseSession,'DISCHARGED')).status,201);
+  assert.equal((await outcome(unseen,clerkSession,'LEFT_WITHOUT_BEING_SEEN')).status,201);
+  // Metrics move exactly as the KNH definitions say.
+  const after=await summary(),b=before.outcomes,a=after.outcomes;
+  assert.equal(a.total,b.total+4);
+  assert.equal(a.byDisposition.ADMITTED,b.byDisposition.ADMITTED+1);
+  assert.equal(a.underTriage.numerator,b.underTriage.numerator+1);   // GREEN admitted
+  assert.equal(a.underTriage.denominator,b.underTriage.denominator+1);
+  assert.equal(a.overTriage.numerator,b.overTriage.numerator+1);     // RED discharged
+  assert.equal(a.overTriage.denominator,b.overTriage.denominator+2);
+  assert.equal(a.byDisposition.LEFT_WITHOUT_BEING_SEEN,b.byDisposition.LEFT_WITHOUT_BEING_SEEN+1);
+  assert.equal(a.lengthOfStay.count,b.lengthOfStay.count+4);
+  const greenSeen=(x:any)=>x.seenAgainstTarget.find((r:any)=>r.priority==='GREEN').seen;
+  assert.equal(greenSeen(after),greenSeen(before)+1);
+  assert.equal(after.seenAgainstTarget.find((r:any)=>r.priority==='RED').withinTargetPercent,null);
+  assert.equal(after.live.openVisits,(await database.pool.query("SELECT count(*)::int n FROM visits WHERE data_source='synthetic' AND closed_at IS NULL")).rows[0].n);
+});

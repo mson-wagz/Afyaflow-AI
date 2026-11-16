@@ -1,10 +1,11 @@
 /* eslint-disable @typescript-eslint/no-unsafe-assignment */
-import { Injectable, Inject, BadRequestException, ConflictException, NotFoundException, HttpException, HttpStatus } from '@nestjs/common';
+import { Injectable, Inject, BadRequestException, ConflictException, ForbiddenException, NotFoundException, HttpException, HttpStatus } from '@nestjs/common';
+import { DISPOSITIONS, dispositionsForRole } from '../../../shared/contracts/outcomes.js';
 import { consumeWindow } from '../auth/rate-limit.js';
 import { z } from 'zod';
 import { Database, audit, id, idempotent, hash } from '../database/db.js';
 import { Staff, parse, requireClinical } from '../auth/auth.js';
-import { registrationSchema, observationsSchema, decisionSchema, transferSchema, precedenceSchema } from './patients/schemas.js';
+import { registrationSchema, observationsSchema, decisionSchema, transferSchema, precedenceSchema, outcomeSchema } from './patients/schemas.js';
 import { config } from '../config.js';
 import { TRIAGE_PRIORITY } from '../../../shared/contracts/triage.js';
 import { sortQueueByApprovedPriority, calculateWorkloadSnapshot, calculateElapsedWaitingTime, areClinicallyTied } from '../../../shared/contracts/queue.js';
@@ -73,6 +74,8 @@ export interface VisitRow {
   precedence_at: string | null;
   precedence_by: string | null;
   precedence_reason: string | null;
+  seen_at: string | null;
+  seen_by_name: string | null;
 }
 
 /* ------------------------------------------------------------------ */
@@ -101,6 +104,8 @@ function requireWorkflowVisit(visit: any) {
       code: 'HISTORICAL_READ_ONLY',
       message: 'Historical research cases cannot be edited, approved, escalated or transferred.',
     });
+  if (visit.closed_at)
+    throw new ConflictException({ code: 'VISIT_CLOSED', message: 'This visit has an outcome recorded and is closed.' });
 }
 
 function requireResearch() {
@@ -165,12 +170,13 @@ export class WorkflowService {
   async visits() {
     // A clinician's "see first" decision counts only while observations and assessment are unchanged.
     const rows = (await this.database.pool.query<VisitRow>(`SELECT v.*,o.id observation_id,o.vitals,o.recorded_at,
-        qp.created_at precedence_at,qp.staff_name precedence_by,qp.reason precedence_reason FROM visits v
+        qp.created_at precedence_at,qp.staff_name precedence_by,qp.reason precedence_reason,sb.profile->>'name' seen_by_name FROM visits v
       JOIN observations o ON o.visit_id=v.id AND o.version=v.observation_version
       LEFT JOIN LATERAL (SELECT q.created_at,q.reason,s.profile->>'name' staff_name FROM queue_precedence q JOIN staff s ON s.id=q.staff_id
         WHERE q.visit_id=v.id AND q.observation_version=v.observation_version AND q.assessment_version=v.assessment_version
         ORDER BY q.created_at DESC LIMIT 1) qp ON true
-      WHERE v.data_source='synthetic' ORDER BY v.arrival_at`)).rows;
+      LEFT JOIN staff sb ON sb.id=v.seen_by
+      WHERE v.data_source='synthetic' AND v.closed_at IS NULL ORDER BY v.arrival_at`)).rows;
     const protocol = await readProtocol();
     return rows.map((v) => {
       // Invalid or missing arrival time falls back to "now" (0 min wait).
@@ -182,6 +188,7 @@ export class WorkflowService {
         assessmentVersion: v.assessment_version, observationVersion: v.observation_version, observationId: v.observation_id,
         assessmentStatus: v.assessment_status, assignedDepartment: v.assigned_department,
         registrationSeq: Number(v.registration_seq),
+        seenAt: iso(v.seen_at), seenByName: v.seen_by_name ?? null,
         queuePrecedence: v.precedence_at ? { at: iso(v.precedence_at), byName: v.precedence_by, reason: v.precedence_reason } : null,
         evidenceChecklist: evidenceChecklist({ age: v.age, vitals: v.vitals, version: v.observation_version, observationId: v.observation_id }, protocol),
         vitals: { ...v.vitals, recordedAt: iso(v.recorded_at) },
@@ -252,7 +259,7 @@ export class WorkflowService {
   async pending() {
     const visits = await this.visits(); const protocol = await readProtocol();
     const rows = (await this.database.pool.query(`SELECT p.*,r.model,r.status run_status FROM proposals p JOIN agent_runs r ON r.id=p.run_id
-      JOIN visits v ON v.id=p.visit_id WHERE v.data_source='synthetic' AND p.status='PENDING'
+      JOIN visits v ON v.id=p.visit_id WHERE v.data_source='synthetic' AND v.closed_at IS NULL AND p.status='PENDING'
       AND r.status IN ('WAITING_FOR_REVIEW','REVIEW_REQUIRED') ORDER BY p.created_at`)).rows;
     const visitsById = new Map(visits.map((v) => [v.id, v]));
     const traces = await this.traces(rows.map((p) => p.run_id));
@@ -413,6 +420,51 @@ export class WorkflowService {
         [record.precedenceId, visit.id, visit.observation_version, visit.assessment_version, staff.id, input.reason]);
       await audit(db, staff.id, 'QUEUE_PRECEDENCE_SET', { precedenceId: record.precedenceId, tiedWith, reason: input.reason }, visit.id);
       return { success: true, data: record };
+    }));
+  }
+
+  /** Record the moment a clinician first sees the patient (once per visit). */
+  async markSeen(staff: Staff, visitId: string, key: string) {
+    requireClinical(staff);
+    return this.database.transaction((db) => idempotent(db, staff.id, `seen:${visitId}`, key, {}, async () => {
+      const visit = (await db.query('SELECT * FROM visits WHERE id=$1 FOR UPDATE', [visitId])).rows[0];
+      if (!visit) throw new NotFoundException('Visit not found.');
+      requireWorkflowVisit(visit);
+      if (visit.seen_at) throw new ConflictException({ code: 'ALREADY_SEEN', message: 'This patient has already been marked as seen.' });
+      const seenAt = (await db.query('UPDATE visits SET seen_at=now(),seen_by=$2,updated_at=now() WHERE id=$1 RETURNING seen_at', [visitId, staff.id])).rows[0].seen_at;
+      await audit(db, staff.id, 'PATIENT_SEEN', {}, visitId);
+      return { success: true, data: { visitId, seenAt: iso(seenAt), seenBy: staff.id } };
+    }));
+  }
+
+  /**
+   * Close a visit with its outcome. Removes it from the queue and working lists, releases its
+   * department bed, cancels open follow-ups and supersedes unfinished assessments, atomically.
+   */
+  async recordOutcome(staff: Staff, visitId: string, body: unknown, key: string) {
+    const input = parse(outcomeSchema, body);
+    if (!dispositionsForRole(staff.role).includes(input.disposition))
+      throw new ForbiddenException({ code: 'PERMISSION_DENIED', message: staff.role === 'clerk'
+        ? 'Front-desk staff can record only that a patient left without being seen.' : 'Clinical or front-desk access required to record outcomes.' });
+    return this.database.transaction((db) => idempotent(db, staff.id, `outcome:${visitId}`, key, input, async () => {
+      const visit = (await db.query('SELECT * FROM visits WHERE id=$1 FOR UPDATE', [visitId])).rows[0];
+      if (!visit) throw new NotFoundException('Visit not found.');
+      requireWorkflowVisit(visit);
+      if (input.disposition === 'LEFT_WITHOUT_BEING_SEEN' && visit.seen_at)
+        throw new ConflictException({ code: 'ALREADY_SEEN', message: 'This patient was seen by a clinician; record that they left against medical advice instead.' });
+      const recorded = (await db.query(`INSERT INTO visit_outcomes(visit_id,disposition,priority_at_disposition,note,recorded_by)
+        VALUES($1,$2,$3,$4,$5) RETURNING recorded_at`, [visitId, input.disposition, visit.approved_priority, input.note || null, staff.id])).rows[0].recorded_at;
+      await db.query('UPDATE visits SET closed_at=$2,updated_at=now() WHERE id=$1', [visitId, recorded]);
+      if (visit.department_id)
+        await db.query(`UPDATE departments SET data=jsonb_set(data,'{occupiedBeds}',to_jsonb(greatest((data->>'occupiedBeds')::int-1,0))),
+          version=version+1,updated_at=now() WHERE id=$1`, [visit.department_id]);
+      const cancelled = (await db.query(`UPDATE followups SET status='CANCELLED',reason=$2,version=version+1
+        WHERE visit_id=$1 AND status IN ('PROPOSED','OPEN','ACKNOWLEDGED') RETURNING id`, [visitId, `Visit closed: ${DISPOSITIONS[input.disposition].label}`])).rows.map((r) => r.id);
+      await db.query("UPDATE proposals SET status='STALE' WHERE visit_id=$1 AND status='PENDING'", [visitId]);
+      await db.query("UPDATE agent_runs SET status='SUPERSEDED',lease_until=null WHERE visit_id=$1 AND status IN ('QUEUED','WAITING_FOR_REVIEW','REVIEW_REQUIRED')", [visitId]);
+      await audit(db, staff.id, 'VISIT_CLOSED', { disposition: input.disposition, priorityAtDisposition: visit.approved_priority,
+        releasedDepartmentId: visit.department_id ?? null, cancelledFollowups: cancelled }, visitId);
+      return { success: true, data: { visitId, disposition: input.disposition, priorityAtDisposition: visit.approved_priority, recordedAt: iso(recorded) } };
     }));
   }
 

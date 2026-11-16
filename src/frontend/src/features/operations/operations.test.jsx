@@ -15,6 +15,7 @@ const summary = (overrides = {}) => ({
   live: {
     openVisits: 9, awaitingAssessment: 2, byPriority: { RED: 1, ORANGE: 2, YELLOW: 3, GREEN: 1, UNPRIORITISED: 2 },
     proposalsAwaitingReview: 3, oldestProposalMinutes: 14.5, needsManualTriage: 1,
+    notYetSeen: 6, pastTargetNotSeen: { RED: 0, ORANGE: 2, YELLOW: 0, GREEN: 0 },
     followups: { proposed: 1, open: 2, overdue: 1 },
     departments: [{ id: 'DEPT-1', name: 'Resuscitation', status: 'OPEN', occupiedBeds: 4, totalBeds: 4 }],
   },
@@ -26,6 +27,17 @@ const summary = (overrides = {}) => ({
   decisions: { total: 4, approved: 3, overridden: 1, rejected: 0, acceptanceRate: 75, decidedPriority: { RED: 1, ORANGE: 1, YELLOW: 2, GREEN: 0 } },
   agentRuns: { total: 6, medianDurationSeconds: 12.3, byStatus: { DECIDED: 4, FAILED: 1, WAITING_FOR_REVIEW: 1 } },
   transfers: [{ department: 'Resuscitation', count: 2 }],
+  outcomes: {
+    total: 20, byDisposition: { ADMITTED: 6, DISCHARGED: 10, DIED: 1, LEFT_WITHOUT_BEING_SEEN: 2, LEFT_AGAINST_MEDICAL_ADVICE: 1, TRANSFERRED_OUT: 0 },
+    underTriage: { numerator: 1, denominator: 7, percent: 14.3 }, overTriage: { numerator: 4, denominator: 10, percent: 40 },
+    leftWithoutBeingSeenPercent: 10, closedWithoutApprovedPriority: 0, lengthOfStay: timing(20, 185, 410),
+  },
+  seenAgainstTarget: [
+    { priority: 'RED', seen: 2, medianMinutes: 1.5, withinTargetPercent: null },
+    { priority: 'ORANGE', seen: 4, medianMinutes: 12, withinTargetPercent: 50 },
+    { priority: 'YELLOW', seen: 5, medianMinutes: 40, withinTargetPercent: 80 },
+    { priority: 'GREEN', seen: 3, medianMinutes: 120, withinTargetPercent: 100 },
+  ],
   ...overrides,
 });
 
@@ -44,6 +56,19 @@ describe('operations dashboard', () => {
     expect(screen.getByLabelText('Red: 1 (11%)')).toBeInTheDocument();
     expect(screen.getByText(/Full/)).toBeInTheDocument();
     expect(screen.getByText('Failed')).toBeInTheDocument();
+  });
+
+  it('shows outcome-based triage accuracy against the KNH baseline and SATS target compliance', async () => {
+    api.mockResolvedValue(summary());
+    render(<OperationsView />);
+    expect(await screen.findByText('Outcomes: 20')).toBeInTheDocument();
+    expect(screen.getByText('4 of 10 discharged were Red, Orange or Yellow · KNH 62.3%')).toBeInTheDocument();
+    expect(screen.getByText('1 of 7 admitted or died were Green · KNH 7.8%')).toBeInTheDocument();
+    expect(screen.getByText('Past SATS target, not yet seen').closest('.ops-tile')).toHaveClass('ops-tile-attention');
+    const orange = screen.getByText('Level 2 · Very urgent').closest('tr');
+    expect(within(orange).getByText('50%')).toBeInTheDocument();
+    expect(within(orange).getByText('⚠ 2')).toBeInTheDocument();
+    expect(within(screen.getByText('Level 1 · Emergency').closest('tr')).getByText('Immediate')).toBeInTheDocument();
   });
 
   it('switches period and offers a table view of arrivals', async () => {
