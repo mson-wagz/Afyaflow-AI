@@ -1,5 +1,6 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useContext } from 'react';
 import useAuth from './useAuth';
+import { SyncContext } from '../../offline/SyncContext.jsx';
 import { Button, Input, Badge, Alert } from '../../components';
 
 /**
@@ -9,6 +10,7 @@ import { Button, Input, Badge, Alert } from '../../components';
  * "Locking or session expiry hides patient content and follows the reviewed draft-retention policy."
  */
 export default function LockScreen() {
+  const pendingCount = useContext(SyncContext)?.pendingCount ?? 0;
   const {
     staff,
     unlockSession,
@@ -234,7 +236,8 @@ export default function LockScreen() {
                 }}
               >
                 <p style={{ fontSize: '0.8rem', color: '#e2e8f0', marginBottom: '0.5rem' }}>
-                  Switch user? {hasDraft ? 'Your local draft will remain safe.' : ''}
+                  Switch user? This signs you out and removes your drafts from this device.
+                  {pendingCount > 0 ? ` ${pendingCount} registration${pendingCount === 1 ? ' has' : 's have'} not reached the server and will be deleted.` : ''}
                 </p>
                 <div style={{ display: 'flex', gap: '0.5rem' }}>
                   <Button

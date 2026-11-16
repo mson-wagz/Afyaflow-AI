@@ -33,7 +33,7 @@ The scoring fixture remains **unvalidated**. This is a research/development demo
 - **Hospital queue:** approved priorities, waiting times, department filtering, workload snapshots, and visible stale-data states.
 - **Deterioration review:** compare observation versions and support authorised, reasoned reassessment. The app does not measure vital signs itself.
 - **Routing:** review synthetic department availability/capacity and explicitly commit a transfer with version checks.
-- **Offline intake:** browser-local registration drafts and reconnect replay. Clinical decisions require online server acknowledgement.
+- **Offline intake:** browser-local registration drafts and reconnect replay. Clinical decisions require online server acknowledgement. Drafts and queued registrations belong to the staff member who created them and are removed from the browser at sign-out (with confirmation if any are unsynced).
 - **Audit history:** persisted staff decisions and workflow events, with append-only database protection for observations, decisions, transfers, and audit records.
 - **Read-access logging:** every view of patient records is recorded (who, which patients, which screen, when) in an append-only access log, reviewable by administrators; data is withheld if access cannot be recorded.
 
