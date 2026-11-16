@@ -431,6 +431,20 @@ test('model quota keeps clinical writes, records review-required runs and refuse
   } finally {config.agentRunsPerStaffHour=previous.staff;config.agentRunsPerHour=previous.global;}
 });
 
+test('a display name shared by two accounts cannot be used to sign in',async()=>{
+  const {pinHash}=await import('../../src/backend/src/auth/auth.js');
+  for(const [id,number,pin] of [['STAFF-TWIN-1','TWIN-001','5111'],['STAFF-TWIN-2','TWIN-002','5222']])
+    await database.pool.query('INSERT INTO staff(id,staff_number,role,pin_hash,profile) VALUES($1,$2,$3,$4,$5)',
+      [id,number,'nurse',pinHash(pin),JSON.stringify({name:'Synthetic Twin Name'})]);
+  const attempt=(identifier:string,pin:string)=>fetch(`${base}/api/auth/login`,{method:'POST',
+    headers:{'Content-Type':'application/json'},body:JSON.stringify({identifier,pin})}).then(r=>r.status);
+  // Neither PIN works through the ambiguous name, so the wrong account is never chosen.
+  assert.equal(await attempt('Synthetic Twin Name','5111'),401);
+  assert.equal(await attempt('synthetic twin name','5222'),401);
+  assert.equal(await attempt('STAFF-TWIN-1','5111'),201);
+  assert.equal(await attempt('twin-002','5222'),201);
+});
+
 test('failed PINs are throttled per account across identifier forms and shared with unlock',async()=>{
   const attempt=(identifier:string,pin:string)=>fetch(`${base}/api/auth/login`,{method:'POST',
     headers:{'Content-Type':'application/json'},body:JSON.stringify({identifier,pin})});

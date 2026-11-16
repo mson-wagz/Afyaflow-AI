@@ -22,7 +22,7 @@ Open **About the data and its limitations** for attribution. **Download adapted 
 
 ## 1. Sign in
 
-Open the supplied application URL, or `http://localhost:5173` locally. Enter a staff identifier and four-digit PIN, then sign in.
+Open the supplied application URL, or `http://localhost:5173` locally. Enter a staff identifier and four-digit PIN, then sign in. The identifier can be your staff ID, staff number or full name; if another account shares your name, sign in with your staff ID or number.
 
 Synthetic development accounts:
 
