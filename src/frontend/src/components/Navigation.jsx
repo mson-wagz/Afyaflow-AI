@@ -1,5 +1,6 @@
 import React from 'react';
 import Badge from './Badge';
+import { hasPermission, PERMISSIONS } from '../../../shared/contracts/auth.js';
 
 /**
  * Role-aware responsive navigation sidebar / navigation bar
@@ -11,6 +12,7 @@ export default function Navigation({
   pendingSyncCount = 0,
   competitionMode = false,
   isAdmin = false,
+  staffRole,
 }) {
   const navItems = [
     {
@@ -53,6 +55,14 @@ export default function Navigation({
       description: 'Facility capacity snapshots and patient transfers',
     },
     {
+      id: 'operations',
+      label: 'Operations',
+      icon: '📊',
+      requiresClinical: false,
+      permission: PERMISSIONS.OPERATIONS_VIEW,
+      description: 'Workload, waiting times and AI decision figures',
+    },
+    {
       id: 'offline-sync',
       label: 'Offline Sync & Outbox',
       icon: '📡',
@@ -80,7 +90,8 @@ export default function Navigation({
   return (
     <nav aria-label="Main application navigation">
       <ul className="nav-list">
-        {navItems.filter(item=>(!competitionMode || item.id!=='research') && (!item.adminOnly || isAdmin)).map((item) => {
+        {navItems.filter(item=>(!competitionMode || item.id!=='research') && (!item.adminOnly || isAdmin)
+          && (!item.permission || hasPermission(staffRole, item.permission))).map((item) => {
           const isActive = currentView === item.id;
           const isRestrictedForUser = item.requiresClinical && !isClinical;
 

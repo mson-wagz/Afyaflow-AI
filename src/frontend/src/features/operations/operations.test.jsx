@@ -1,0 +1,90 @@
+import React from 'react';
+import { render, screen, fireEvent, within } from '@testing-library/react';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { formatMinutes, niceTicks, bucketLabel } from './format.js';
+
+const api = vi.fn();
+vi.mock('../../api/client.js', () => ({ useBackend: true, competitionMode: false, api: (...args) => api(...args) }));
+
+const { default: OperationsView } = await import('./OperationsView.jsx');
+const { default: Navigation } = await import('../../components/Navigation.jsx');
+
+const timing = (count, medianMinutes, p90Minutes) => ({ count, medianMinutes, p90Minutes });
+const summary = (overrides = {}) => ({
+  period: 'today', timezone: 'Africa/Nairobi', from: '2026-11-15T21:00:00.000Z', to: '2026-11-16T07:30:00.000Z', bucket: 'hour',
+  live: {
+    openVisits: 9, awaitingAssessment: 2, byPriority: { RED: 1, ORANGE: 2, YELLOW: 3, GREEN: 1, UNPRIORITISED: 2 },
+    proposalsAwaitingReview: 3, oldestProposalMinutes: 14.5, needsManualTriage: 1,
+    followups: { proposed: 1, open: 2, overdue: 1 },
+    departments: [{ id: 'DEPT-1', name: 'Resuscitation', status: 'OPEN', occupiedBeds: 4, totalBeds: 4 }],
+  },
+  flow: {
+    arrivals: 5,
+    arrivalsByBucket: Array.from({ length: 11 }, (_, i) => ({ start: new Date(Date.UTC(2026, 10, 15, 21 + i)).toISOString(), arrivals: i === 10 ? 5 : 0 })),
+    doorToProposal: timing(5, 1.2, 2.5), doorToDecision: timing(4, 18, 95), proposalToDecision: timing(4, 16.4, 90),
+  },
+  decisions: { total: 4, approved: 3, overridden: 1, rejected: 0, acceptanceRate: 75, decidedPriority: { RED: 1, ORANGE: 1, YELLOW: 2, GREEN: 0 } },
+  agentRuns: { total: 6, medianDurationSeconds: 12.3, byStatus: { DECIDED: 4, FAILED: 1, WAITING_FOR_REVIEW: 1 } },
+  transfers: [{ department: 'Resuscitation', count: 2 }],
+  ...overrides,
+});
+
+describe('operations dashboard', () => {
+  beforeEach(() => { api.mockReset(); });
+
+  it('shows live workload, timings and decision figures from the summary', async () => {
+    api.mockResolvedValue(summary());
+    render(<OperationsView />);
+    expect(await screen.findByText('Open visits')).toBeInTheDocument();
+    expect(api).toHaveBeenCalledWith('/operations/summary?period=today');
+    expect(screen.getByText('Oldest waiting 15 min')).toBeInTheDocument();
+    expect(screen.getByText('Need manual triage').closest('.ops-tile')).toHaveClass('ops-tile-attention');
+    expect(screen.getByText('90% within 1 h 35 min · 4 visits')).toBeInTheDocument();
+    expect(screen.getByText('Accepted unchanged: 75% of 4')).toBeInTheDocument();
+    expect(screen.getByLabelText('Red: 1 (11%)')).toBeInTheDocument();
+    expect(screen.getByText(/Full/)).toBeInTheDocument();
+    expect(screen.getByText('Failed')).toBeInTheDocument();
+  });
+
+  it('switches period and offers a table view of arrivals', async () => {
+    api.mockResolvedValue(summary());
+    render(<OperationsView />);
+    await screen.findByText('Open visits');
+    fireEvent.click(screen.getByRole('button', { name: 'Show table' }));
+    const table = screen.getByRole('columnheader', { name: 'Arrivals' }).closest('table');
+    expect(within(table).getByText('07:00')).toBeInTheDocument();
+    expect(within(table).getByText('5')).toBeInTheDocument();
+    api.mockResolvedValue(summary({ period: '7d', bucket: 'day' }));
+    fireEvent.click(screen.getByRole('button', { name: '7 days' }));
+    expect(api).toHaveBeenLastCalledWith('/operations/summary?period=7d');
+    expect(await screen.findByText(/flow for 7 days/)).toBeInTheDocument();
+  });
+
+  it('shows server refusals', async () => {
+    api.mockRejectedValue(new Error('Clinical or administrator access required to view operations figures.'));
+    render(<OperationsView />);
+    expect(await screen.findByText(/administrator access required/i)).toBeInTheDocument();
+  });
+
+  it('lists Operations in navigation for clinical staff and administrators, not front-desk staff', () => {
+    const { rerender } = render(<Navigation currentView="queue" onNavigate={() => {}} staffRole="clerk" />);
+    expect(screen.queryByText('Operations')).toBeNull();
+    for (const role of ['nurse', 'clinician', 'doctor', 'admin']) {
+      rerender(<Navigation currentView="queue" onNavigate={() => {}} staffRole={role} />);
+      expect(screen.getByText('Operations')).toBeInTheDocument();
+    }
+  });
+});
+
+describe('operations formatting', () => {
+  it('formats durations, axis ticks and local bucket labels', () => {
+    expect(formatMinutes(null)).toBe('—');
+    expect(formatMinutes(4.25)).toBe('4.3 min');
+    expect(formatMinutes(42.4)).toBe('42 min');
+    expect(formatMinutes(120)).toBe('2 h');
+    expect(niceTicks(0)).toEqual({ top: 1, ticks: [0, 1] });
+    expect(niceTicks(7)).toEqual({ top: 8, ticks: [0, 2, 4, 6, 8] });
+    expect(bucketLabel('2026-11-15T21:00:00.000Z', 'hour', 'Africa/Nairobi')).toBe('00:00');
+    expect(bucketLabel('2026-11-15T21:00:00.000Z', 'day', 'Africa/Nairobi')).toBe('16 Nov');
+  });
+});

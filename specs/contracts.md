@@ -84,6 +84,21 @@ official filesystem MCP server. General filesystem tools are not exposed to the 
   records, optionally for one patient: who viewed which records, through which route
   and when. Other roles receive 403; a malformed `patientId` is 400.
 
+## Operations summary
+
+- `GET /operations/summary?period=today|7d|30d` (default `today`): nurses, clinicians,
+  doctors and administrators; clerks receive 403 and any other period is 400 `INVALID_PERIOD`.
+  Periods are calendar days ending today in `FACILITY_TIMEZONE` (default `Africa/Nairobi`).
+  Returns aggregates over workflow (synthetic) visits only, never research records:
+  `live` (open visits by approved priority, awaiting assessment, proposals awaiting review
+  and the oldest one's age, assessments that ended without a proposal, follow-up counts,
+  department bed occupancy), `flow` (arrivals with hourly or daily buckets, and median /
+  90th-percentile minutes from arrival to first proposal, arrival to first decision and
+  proposal to decision, each with the number of visits measured), `decisions` (approved /
+  overridden / rejected, acceptance rate) and `agentRuns` (count by status, median run time)
+  plus `transfers` per department. The response contains no names, visit IDs or free
+  text, so it is not a patient-record read and is not written to the access log.
+
 ## Staff accounts (administrators only)
 
 Other roles receive 403. Every change takes `{ reason }` (5-500 characters, else 400),

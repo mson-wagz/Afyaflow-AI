@@ -7,6 +7,7 @@ import { WorkflowService, requestKey } from './modules/workflow.service.js';
 import { Database, audit } from './database/db.js';
 import { config } from './config.js';
 import { FollowupService } from './modules/followup.service.js';
+import { OperationsService } from './modules/operations.service.js';
 
 @Controller('api')
 @UseInterceptors(AccessLogInterceptor)
@@ -14,7 +15,8 @@ export class ApiController {
   constructor(@Inject(AuthService) private readonly auth:AuthService,
     @Inject(WorkflowService) private readonly workflow:WorkflowService,
     @Inject(Database) private readonly database:Database,
-    @Inject(FollowupService) private readonly followups:FollowupService) {}
+    @Inject(FollowupService) private readonly followups:FollowupService,
+    @Inject(OperationsService) private readonly operations:OperationsService) {}
   @Get('health') async health() {await this.database.pool.query('SELECT 1');return {status:'ok',database:'postgresql',mode:config.mode,agentProvider:config.provider,clinicalValidated:false};}
   @Post('auth/login') async login(@Body()body:unknown,@Res({passthrough:true})res:Response) {
     const result=await this.auth.signIn(body);
@@ -58,6 +60,8 @@ export class ApiController {
   @Post('routing/transfers') @UseGuards(SessionGuard) transfer(@Req()req:StaffRequest,@Body()body:unknown,@Headers('idempotency-key')key:string) {return this.workflow.transfer(req.staff,body,requestKey(key));}
   @Get('deterioration') @UseGuards(SessionGuard) @AccessLogged() deterioration() {return this.workflow.deterioration();}
   @Post('deterioration/decisions') @UseGuards(SessionGuard) reassess(@Req()req:StaffRequest,@Body()body:unknown,@Headers('idempotency-key')key:string) {return this.workflow.reassess(req.staff,body,requestKey(key));}
+  // Aggregate counts and durations only (no patient identifiers), so not access-logged.
+  @Get('operations/summary') @UseGuards(SessionGuard) operationsSummary(@Req()req:StaffRequest,@Query('period')period?:string) {return this.operations.summary(req.staff,period);}
   @Get('audit') @UseGuards(SessionGuard) @AccessLogged() audit(@Req()req:StaffRequest) {return this.workflow.audit(req.staff);}
   @Get('audit/access') @UseGuards(SessionGuard) @AccessLogged() accessLog(@Req()req:StaffRequest,@Query('patientId')patientId?:string) {return listAccess(this.database,req.staff,patientId);}
   // Staff account management (administrators only; each change needs a reason and is audited).

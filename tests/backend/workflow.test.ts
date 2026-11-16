@@ -1007,3 +1007,42 @@ test('historical records cannot acquire follow-ups, even through direct database
     VALUES($1,$2,$3,1,'{}','fixture')`,[`FOLLOWUP-${randomUUID()}`,requested.data.runId,visit.id]),/synthetic workflow visits/);
   assert.equal((await database.pool.query('SELECT count(*) FROM followups WHERE visit_id=$1',[visit.id])).rows[0].count,'0');
 });
+
+test('operations summary reports synthetic aggregates without patient identifiers or access-log rows',async()=>{
+  const nurseSession=await loginAs('STAFF-101','123456'),clerkSession=await loginAs('STAFF-103','345678');
+  const summary=()=>get('/operations/summary?period=today',nurseSession);
+  const before=await summary();
+  const registered=await register();
+  const visitId=registered.data.id;
+  await decision(await assess(visitId));
+  const after=await summary();
+  // The new visit is counted from arrival through its approved decision.
+  assert.equal(after.flow.arrivals,before.flow.arrivals+1);
+  assert.equal(after.live.openVisits,before.live.openVisits+1);
+  assert.equal(after.decisions.approved,before.decisions.approved+1);
+  assert.equal(after.flow.doorToProposal.count,before.flow.doorToProposal.count+1);
+  assert.equal(after.flow.doorToDecision.count,before.flow.doorToDecision.count+1);
+  assert.equal(after.flow.proposalToDecision.count,before.flow.proposalToDecision.count+1);
+  assert.ok(after.flow.doorToDecision.medianMinutes>=0 && after.flow.doorToDecision.p90Minutes>=after.flow.doorToDecision.medianMinutes);
+  assert.equal(after.decisions.total,after.decisions.approved+after.decisions.overridden+after.decisions.rejected);
+  // Live counts include only workflow visits, never imported research records.
+  const synthetic=(await database.pool.query("SELECT count(*)::int n FROM visits WHERE data_source='synthetic'")).rows[0].n;
+  assert.equal(after.live.openVisits,synthetic);
+  assert.equal(Object.values(after.live.byPriority).reduce((a:number,b:any)=>a+b,0),synthetic);
+  // Buckets cover the window from local midnight, and sum to the arrivals figure.
+  assert.equal(after.timezone,'Africa/Nairobi');assert.equal(after.bucket,'hour');
+  assert.equal(after.flow.arrivalsByBucket[0].start,after.from);
+  assert.equal(after.flow.arrivalsByBucket.reduce((a:number,b:any)=>a+b.arrivals,0),after.flow.arrivals);
+  const week=await get('/operations/summary?period=7d',nurseSession),month=await get('/operations/summary?period=30d',nurseSession);
+  assert.equal(week.flow.arrivalsByBucket.length,7);assert.equal(month.flow.arrivalsByBucket.length,30);
+  assert.ok(month.flow.arrivals>=week.flow.arrivals && week.flow.arrivals>=after.flow.arrivals);
+  // No names or visit IDs, and reading it is not a patient-record access.
+  const text=JSON.stringify([after,week,month]);
+  assert.ok(!text.includes(visitId) && !text.includes(intake.name) && !text.includes('SYN-PT'));
+  assert.equal((await database.pool.query("SELECT count(*)::int n FROM access_log WHERE route LIKE '%operations%'")).rows[0].n,0);
+  // Front-desk, anonymous and malformed requests are refused.
+  assert.equal((await fetch(`${base}/api/operations/summary`,{headers:{Cookie:clerkSession}})).status,403);
+  assert.equal((await fetch(`${base}/api/operations/summary`)).status,401);
+  assert.equal((await fetch(`${base}/api/operations/summary?period=1y`,{headers:{Cookie:nurseSession}})).status,400);
+  assert.equal((await get('/operations/summary',await adminLogin())).period,'today');
+});
