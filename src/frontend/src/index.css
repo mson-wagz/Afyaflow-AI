@@ -544,3 +544,9 @@ a:focus-visible {
   .ops-meter { grid-template-columns: 1fr auto; }
   .ops-meter-track { grid-column: 1 / -1; grid-row: 2; }
 }
+
+/* Agent run trace */
+.trace-meter { display: flex; flex-wrap: wrap; gap: 0.5rem 1.25rem; padding: 0.6rem 0.75rem; background: var(--color-primary-light); border-radius: var(--radius-md); font-size: 0.85rem; color: var(--color-text); }
+.trace-note { font-size: 0.75rem; color: var(--color-text-muted); margin: 0.4rem 0; }
+.trace-steps { padding-left: 1.25rem; margin: 0.75rem 0; font-size: 0.85rem; display: flex; flex-direction: column; gap: 0.45rem; }
+.trace-muted { color: var(--color-text-subtle); font-size: 0.75rem; }

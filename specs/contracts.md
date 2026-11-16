@@ -50,6 +50,11 @@ eight-hour absolute expiry still applies.
   `queueOrder { rank, level, severity, version }`, `clinicalTie { size, position }` or null,
   `queuePrecedence { at, byName, reason }` or null, and `tieBreak`. Priority objects carry
   `level` (1-5) and `category`.
+- `GET /visits/:id/fhir`: FHIR R4 `collection` Bundle (`application/fhir+json`) for one
+  workflow visit, open or closed: Patient, Encounter (EMER, period, disposition) and LOINC/UCUM
+  vital-sign, TEWS and approved SATS level Observations. Nurses, clinicians, doctors and
+  admins (403 otherwise); 404 for unknown or research visits; access-logged. See
+  docs/INTEROPERABILITY.md.
 - `POST /visits/:id/seen`: plus retry key. Clinical roles. Records the first time a clinician
   saw the patient; once only (409 `ALREADY_SEEN`).
 - `POST /visits/:id/outcome`: `{ disposition, note? }` plus retry key. `disposition` is ADMITTED,

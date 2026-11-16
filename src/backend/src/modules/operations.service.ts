@@ -3,6 +3,8 @@ import { Database } from '../database/db.js';
 import type { Staff } from '../auth/auth.js';
 import { config } from '../config.js';
 import { hasPermission, PERMISSIONS } from '../../../shared/contracts/auth.js';
+import { MODEL_CALL_TOOLS, runUsage, hostingUsdPerMonth, round } from './usage.js';
+import { escalationSettings } from './escalation.js';
 
 /* ------------------------------------------------------------------ */
 /* Operations dashboard: aggregate figures for supervisors            */
@@ -113,6 +115,9 @@ export class OperationsService {
     ]);
 
     const l = live.rows[0], c = cohort.rows[0], d = decisions.rows[0], o = outcomes.rows[0];
+    const aiCost = await this.aiCost(start, days, d.approved + d.overridden + d.rejected);
+    const esc = (await db.query(`SELECT count(*) FILTER (WHERE status='SENT')::int sent,count(*) FILTER (WHERE status='FAILED')::int failed,
+      count(*) FILTER (WHERE status='QUEUED')::int queued FROM sms_escalations WHERE created_at>=$1`, [start])).rows[0];
     const percent = (n: number, total: number) => (total ? Math.round((n / total) * 1000) / 10 : null);
     const levels = ['RED', 'ORANGE', 'YELLOW', 'GREEN'] as const;
     const decided = d.approved + d.overridden + d.rejected;
@@ -155,12 +160,52 @@ export class OperationsService {
         closedWithoutApprovedPriority: o.unprioritised,
         lengthOfStay: timing(o, 'los'),
       },
+      aiCost,
+      // SMS alerts to the on-call clinician for unseen Level 1 patients (docs/INTEGRATION_MAP.md).
+      escalations: { ...esc, provider: escalationSettings().provider },
       // RED's target is "immediate", so it reports time to be seen without a compliance percentage.
       seenAgainstTarget: levels.map((code) => {
         const r = seen.rows.find((x) => x.code === code);
         return { priority: code, seen: r?.n ?? 0, medianMinutes: minutes(r?.p50 ?? null),
           withinTargetPercent: code === 'RED' || !r ? null : percent(r.within_target, r.n) };
       }),
+    };
+  }
+
+  /**
+   * Measured AI cost-to-serve for runs started in the window. A completed outcome is a clinician
+   * decision on an AI proposal; model cost includes every run (failed, superseded and retried runs
+   * too), and hosting is the configured monthly cost spread over the window's days.
+   */
+  private async aiCost(start: Date, days: number, completedOutcomes: number) {
+    const rows = (await this.database.pool.query(`SELECT r.id,r.provider,r.model,t.tool,t.outputs FROM agent_runs r
+      JOIN visits v ON v.id=r.visit_id LEFT JOIN tool_traces t ON t.run_id=r.id AND t.tool=ANY($2)
+      WHERE v.data_source='synthetic' AND r.created_at>=$1`, [start, MODEL_CALL_TOOLS])).rows;
+    const runs = new Map<string, { provider: string; model: string; calls: any[] }>();
+    for (const r of rows) {
+      if (!runs.has(r.id)) runs.set(r.id, { provider: r.provider, model: r.model, calls: [] });
+      if (r.tool) runs.get(r.id)!.calls.push({ tool: r.tool, outputs: r.outputs });
+    }
+    const usages = [...runs.values()].map((r) => ({ ...runUsage(r.provider, r.model, r.calls), model: r.model, provider: r.provider }));
+    const sum = (f: (u: typeof usages[number]) => number) => usages.reduce((a, u) => a + f(u), 0);
+    const calls = sum((u) => u.modelCalls), metered = calls - sum((u) => u.unmeteredModelCalls);
+    const input = sum((u) => u.inputTokens), output = sum((u) => u.outputTokens);
+    const priced = usages.filter((u) => u.costUsd !== null);
+    const modelCost = priced.reduce((a, u) => a + (u.costUsd as number), 0);
+    const hosting = hostingUsdPerMonth() * days / 30.44;
+    const per = (value: number) => (completedOutcomes ? round(value / completedOutcomes, 6) : null);
+    const models = [...new Map(usages.map((u) => [u.model, { model: u.model, provider: u.provider, price: u.price }])).values()];
+    return {
+      runs: usages.length, completedOutcomes, modelCalls: calls,
+      modelCallsPerRun: { average: usages.length ? round(calls / usages.length, 2) : null, max: usages.length ? Math.max(...usages.map((u) => u.modelCalls)) : null },
+      tokensPerAnswer: metered ? { input: Math.round(input / metered), output: Math.round(output / metered) } : null,
+      tokens: { input, output },
+      unmeteredModelCalls: calls - metered, unpricedRuns: usages.length - priced.length,
+      modelCostUsd: round(modelCost, 6), hostingCostUsd: round(hosting, 4), hostingUsdPerMonth: hostingUsdPerMonth(),
+      costPerRunUsd: { average: priced.length ? round(modelCost / priced.length, 6) : null,
+        max: priced.length ? round(Math.max(...priced.map((u) => u.costUsd as number)), 6) : null },
+      modelCostPerOutcomeUsd: per(modelCost), hostingPerOutcomeUsd: per(hosting), costPerOutcomeUsd: per(modelCost + hosting),
+      models,
     };
   }
 }

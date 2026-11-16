@@ -5,6 +5,7 @@ import { TRIAGE_PRIORITY } from '../../../../shared/contracts/triage.js';
 import { DISPOSITIONS, SATS_TARGET_MINUTES, KNH_SATS_BASELINE } from '../../../../shared/contracts/outcomes.js';
 import { StatTile, SegmentedBar, ColumnChart, MeterList } from './charts.jsx';
 import { formatCount, formatMinutes, formatPercent, bucketLabel } from './format.js';
+import { formatUsd } from '../triage/RunTrace.jsx';
 
 const PERIODS = [{ id: 'today', label: 'Today' }, { id: '7d', label: '7 days' }, { id: '30d', label: '30 days' }];
 const REFRESH_MS = 60000;
@@ -73,7 +74,7 @@ export default function OperationsView() {
   ];
 
   const pastTarget = Object.values(live.pastTargetNotSeen || {}).reduce((a, b) => a + b, 0);
-  const { outcomes, seenAgainstTarget } = data;
+  const { outcomes, seenAgainstTarget, aiCost } = data;
   const ratio = (r) => (r.denominator ? `${formatCount(r.numerator)} of ${formatCount(r.denominator)}` : 'No cases yet');
 
   return (
@@ -183,7 +184,33 @@ export default function OperationsView() {
             ))}
           </tbody>
         </table>
+        {data.escalations && data.escalations.provider !== 'none' && (
+          <p className="ops-note">
+            SMS escalations to the on-call clinician (Level 1 patients unseen past the grace period): {formatCount(data.escalations.sent)} sent
+            {data.escalations.failed ? `, ⚠ ${formatCount(data.escalations.failed)} failed` : ''}.
+          </p>
+        )}
       </Card>
+
+      {aiCost && (
+        <Card title="AI cost to serve" subtitle="Measured from the token usage each model call reported. A completed triage is a clinician decision on an AI proposal">
+          <div className="ops-kpis">
+            <StatTile label="Cost per completed triage" value={formatUsd(aiCost.costPerOutcomeUsd)}
+              detail={aiCost.completedOutcomes ? `AI ${formatUsd(aiCost.modelCostPerOutcomeUsd)} + hosting ${formatUsd(aiCost.hostingPerOutcomeUsd)} · ${formatCount(aiCost.completedOutcomes)} completed` : 'No completed triage yet'} />
+            <StatTile label="Tokens per answer" value={aiCost.tokensPerAnswer ? formatCount(aiCost.tokensPerAnswer.input + aiCost.tokensPerAnswer.output) : '—'}
+              detail={aiCost.tokensPerAnswer ? `${formatCount(aiCost.tokensPerAnswer.input)} input + ${formatCount(aiCost.tokensPerAnswer.output)} output, average per model call` : 'No metered model calls yet'} />
+            <StatTile label="Model calls per assessment" value={aiCost.modelCallsPerRun.average ?? '—'}
+              detail={aiCost.modelCallsPerRun.max !== null ? `Worst case ${aiCost.modelCallsPerRun.max} · ${formatCount(aiCost.runs)} assessments` : 'No assessments yet'} />
+            <StatTile label="AI cost per assessment" value={formatUsd(aiCost.costPerRunUsd.average)}
+              detail={aiCost.costPerRunUsd.max !== null ? `Worst case ${formatUsd(aiCost.costPerRunUsd.max)}` : '—'} />
+          </div>
+          <p className="ops-note">
+            {aiCost.models.map((m) => `${m.model}: ${m.price ? `$${m.price.inputUsdPerMillion} / $${m.price.outputUsdPerMillion} per 1M input / output tokens (${m.price.source})` : 'not priced'}`).join(' · ') || 'No model calls in this period.'}
+            {' '}Hosting ${aiCost.hostingUsdPerMonth}/month spread over the period. Failed and retried assessments are included.
+            {aiCost.unmeteredModelCalls ? ` ⚠ ${aiCost.unmeteredModelCalls} model call(s) reported no usage and are not counted.` : ''}
+          </p>
+        </Card>
+      )}
 
       <Card title="Transfers by department">
         {transfers.length ? (

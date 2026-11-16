@@ -19,6 +19,7 @@ import { confirmDiscardUnsynced } from './offline/browserData.js';
 import { Header, Navigation } from './components';
 import { SESSION_STATUS, hasPermission, PERMISSIONS } from '../../shared/contracts/auth.js';
 import { OperationsView } from './features/operations';
+import { LanguageProvider } from './i18n';
 
 import { useBackend, competitionMode } from './api/client.js';
 import ResearchView from './features/research/ResearchView.jsx';
@@ -119,10 +120,12 @@ function AppShell() {
 
 export default function App() {
   return (
-    <AuthProvider>
-      <SyncProvider>
-        <AppShell />
-      </SyncProvider>
-    </AuthProvider>
+    <LanguageProvider>
+      <AuthProvider>
+        <SyncProvider>
+          <AppShell />
+        </SyncProvider>
+      </AuthProvider>
+    </LanguageProvider>
   );
 }

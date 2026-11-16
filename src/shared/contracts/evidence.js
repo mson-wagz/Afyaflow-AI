@@ -1,3 +1,4 @@
+import { ADULT_CHART_MIN_AGE } from './triage.js';
 const fields={
   age:{label:'Age',unit:'years',action:'Confirm recorded age from an approved source; do not estimate.'},
   heartRate:{label:'Heart rate',unit:'bpm',action:'Record a measured heart rate in bpm.'},
@@ -16,7 +17,7 @@ export function evidenceChecklist({age,vitals={},version,observationId},protocol
   const keys=[...new Set([...required,...Object.keys(fields)])];
   const items=keys.map(key=>{
     const value=key==='age'?age:vitals[key],missing=absent(value);
-    const unsupported=key==='age' && !missing && (!Number.isInteger(value) || value<18);
+    const unsupported=key==='age' && !missing && (!Number.isInteger(value) || value<ADULT_CHART_MIN_AGE);
     const index=protocol.requiredFields.indexOf(key);
     return {key,...fields[key],required:required.includes(key),value:missing?null:value,
       status:missing?'MISSING':unsupported?'UNSUPPORTED':'PRESENT',
@@ -25,7 +26,7 @@ export function evidenceChecklist({age,vitals={},version,observationId},protocol
       citation:{protocolId:protocol.id,version:protocol.version,pointer:key==='age'?'#/population':index>=0?`#/requiredFields/${index}`:'#/purpose'}};
   });
   return {observationId,observationVersion:version,protocolId:protocol.id,protocolVersion:protocol.version,
-    clinicalValidated:false,supportedPopulation:Number.isInteger(age) && age>=18,
+    clinicalValidated:false,supportedPopulation:Number.isInteger(age) && age>=ADULT_CHART_MIN_AGE,
     missingRequired:items.filter(item=>item.required && item.status==='MISSING').map(item=>item.key),
     items};
 }

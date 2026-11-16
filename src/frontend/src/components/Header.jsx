@@ -1,4 +1,5 @@
 import React from 'react';
+import { useT, LanguageSwitcher } from '../i18n';
 import Badge from './Badge';
 import Button from './Button';
 
@@ -15,6 +16,7 @@ export default function Header({
   isOnline = true,
   hasDraft = false,
 }) {
+  const t = useT();
   return (
     <header className="app-header" role="banner">
       <div className="header-brand">
@@ -89,20 +91,22 @@ export default function Header({
             </button>
 
             <Badge variant={staff.isClinical ? 'clinical' : 'admin'}>
-              {staff.isClinical ? 'Clinical Staff' : 'Administrative'}
+              {staff.isClinical ? t('Clinical Staff') : t('Administrative')}
             </Badge>
+
+            <LanguageSwitcher />
 
             {/* Shared Device Quick Lock Button */}
             <Button
               variant="outline"
               size="sm"
               onClick={onLock}
-              aria-label="Lock shared device terminal"
-              title="Lock shared terminal to protect patient confidentiality"
+              aria-label={t('Lock shared device terminal')}
+              title={t('Lock shared terminal to protect patient confidentiality')}
               style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}
             >
               <span aria-hidden="true">🔒</span>
-              <span>Lock Terminal</span>
+              <span>{t('Lock Terminal')}</span>
             </Button>
 
             {/* Sign Out Button */}
@@ -110,10 +114,10 @@ export default function Header({
               variant="secondary"
               size="sm"
               onClick={onSignOut}
-              aria-label="Sign out of AfyaFlow AI"
+              aria-label={t('Sign out of AfyaFlow AI')}
               title="Sign out"
             >
-              Sign Out
+              {t('Sign Out')}
             </Button>
           </div>
         )}

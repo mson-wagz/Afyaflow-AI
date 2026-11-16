@@ -1,4 +1,5 @@
 import React from 'react';
+import { useT } from '../i18n';
 import Badge from './Badge';
 import { hasPermission, PERMISSIONS } from '../../../shared/contracts/auth.js';
 
@@ -14,6 +15,7 @@ export default function Navigation({
   isAdmin = false,
   staffRole,
 }) {
+  const t = useT();
   const navItems = [
     {
       id: 'research',label: 'Historical Research Cases',icon: '▤',requiresClinical: false,
@@ -68,7 +70,7 @@ export default function Navigation({
       icon: '📡',
       requiresClinical: false,
       description: 'PWA outbox, retry triggers and sync state',
-      badge: pendingSyncCount > 0 ? `${pendingSyncCount} pending` : null,
+      badge: pendingSyncCount > 0 ? t('{n} pending', { n: pendingSyncCount }) : null,
     },
     {
       id: 'security-audit',
@@ -110,7 +112,7 @@ export default function Navigation({
                   <span aria-hidden="true" style={{ fontSize: '1.1rem' }}>
                     {item.icon}
                   </span>
-                  <span>{item.label}</span>
+                  <span>{t(item.label)}</span>
                 </div>
                 <div style={{ display: 'flex', gap: '0.35rem', alignItems: 'center' }}>
                   {item.badge && (
@@ -123,7 +125,7 @@ export default function Navigation({
                       variant={isClinical ? 'clinical' : 'locked'}
                       style={{ fontSize: '0.65rem', padding: '0.1rem 0.4rem' }}
                     >
-                      {isClinical ? 'Clinical' : 'Restricted'}
+                      {isClinical ? t('Clinical') : t('Restricted')}
                     </Badge>
                   )}
                 </div>

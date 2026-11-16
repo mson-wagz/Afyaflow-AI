@@ -4,7 +4,7 @@ import { z } from 'zod';
 import { readFile } from 'node:fs/promises';
 import { performance } from 'node:perf_hooks';
 import { Database, id, hash, audit } from '../../src/backend/src/database/db.js';
-import { calculateSatsScore } from '../../src/shared/contracts/triage.js';
+import { calculateSatsScore, ADULT_CHART_MIN_AGE } from '../../src/shared/contracts/triage.js';
 import { evidenceChecklist } from '../../src/shared/contracts/evidence.js';
 import { readProtocolThroughFilesystem } from './borrowed-protocol.js';
 import { config } from '../../src/backend/src/config.js';
@@ -19,8 +19,8 @@ export function scoreEvidence(evidence:any,protocol:any) {
   const missing=protocol.requiredFields.filter((key:string) => vitals[key] === '' || vitals[key] === undefined);
   const ageMissing=!Number.isInteger(evidence.age);
   if(ageMissing)missing.push('age');
-  if (ageMissing || evidence.age < 18 || missing.length) return {...result,score:null,priority:null,isSufficientEvidence:false,
-    missingEvidence:missing,ruleTriggered:ageMissing ? 'Age unavailable: population eligibility cannot be established; research/staff review required' : evidence.age < 18 ? 'Unsupported population: manual staff review required' : 'Missing core observations: manual staff review required',
+  if (ageMissing || evidence.age < ADULT_CHART_MIN_AGE || missing.length) return {...result,score:null,priority:null,isSufficientEvidence:false,
+    missingEvidence:missing,ruleTriggered:ageMissing ? 'Age unavailable: population eligibility cannot be established; research/staff review required' : evidence.age < ADULT_CHART_MIN_AGE ? 'Children 12 and under follow the paediatric emergency pathway: manual staff review required' : 'Missing core observations: manual staff review required',
     observationId:evidence.observationId,observationVersion:evidence.version,protocolId:protocol.id};
   return {...result,observationId:evidence.observationId,observationVersion:evidence.version,protocolId:protocol.id};
 }

@@ -1150,3 +1150,87 @@ test('visit outcomes close visits, release beds and drive KNH under-/over-triage
   assert.equal(after.seenAgainstTarget.find((r:any)=>r.priority==='RED').withinTargetPercent,null);
   assert.equal(after.live.openVisits,(await database.pool.query("SELECT count(*)::int n FROM visits WHERE data_source='synthetic' AND closed_at IS NULL")).rows[0].n);
 });
+
+test('FHIR R4 export bundles a closed visit with coded vitals, triage and outcome, and is access-logged',async()=>{
+  const nurseSession=await loginAs('STAFF-101','123456'),clerkSession=await loginAs('STAFF-103','345678');
+  const visitId=(await workflow.register(nurse,intake,randomUUID())).data.id;
+  await decision(await assess(visitId));
+  assert.equal((await post(`/visits/${visitId}/outcome`,nurseSession,{disposition:'DISCHARGED'})).status,201);
+  const response=await fetch(`${base}/api/visits/${visitId}/fhir`,{headers:{Cookie:nurseSession}});
+  assert.equal(response.status,200);assert.match(response.headers.get('content-type')!,/application\/fhir\+json/);
+  const bundle=await response.json();
+  assert.equal(bundle.resourceType,'Bundle');assert.equal(bundle.type,'collection');
+  const resources=bundle.entry.map((e:any)=>e.resource);
+  const byType=(t:string)=>resources.filter((r:any)=>r.resourceType===t);
+  const [patient]=byType('Patient'),[encounter]=byType('Encounter');
+  assert.equal(patient.identifier[0].value,visitId);assert.equal(patient.gender,'female');
+  assert.equal(encounter.status,'finished');assert.equal(encounter.class.code,'EMER');
+  assert.equal(encounter.hospitalization.dischargeDisposition.coding[0].code,'home');
+  assert.ok(encounter.period.start && encounter.period.end);
+  const code=(loinc:string)=>byType('Observation').find((o:any)=>o.code.coding?.[0]?.code===loinc);
+  assert.deepEqual(code('8867-4').valueQuantity,{value:75,unit:'/min',system:'http://unitsofmeasure.org',code:'/min'});
+  assert.equal(code('8480-6').valueQuantity.code,'mm[Hg]');
+  assert.equal(code('30525-0').valueQuantity.value,30);
+  assert.equal(byType('Observation').find((o:any)=>o.code.coding?.[0]?.code==='tews').valueInteger,0);
+  assert.equal(byType('Observation').find((o:any)=>o.code.coding?.[0]?.code==='triage-level').valueCodeableConcept.coding[0].code,'GREEN');
+  // Every reference resolves inside the bundle.
+  const urls=new Set(bundle.entry.map((e:any)=>e.fullUrl));
+  for(const r of byType('Observation')) {assert.ok(urls.has(r.subject.reference));assert.ok(urls.has(r.encounter.reference));}
+  assert.ok(urls.has(encounter.subject.reference));
+  // Reading it is a logged record access; front-desk staff and unknown visits are refused.
+  const logged=(await database.pool.query("SELECT patient_ids FROM access_log WHERE route='GET /api/visits/:id/fhir' AND staff_id='STAFF-101'")).rows;
+  assert.ok(logged.some((r:any)=>r.patient_ids.includes(visitId)));
+  assert.equal((await fetch(`${base}/api/visits/${visitId}/fhir`,{headers:{Cookie:clerkSession}})).status,403);
+  assert.equal((await fetch(`${base}/api/visits/SYN-PT-missing/fhir`,{headers:{Cookie:nurseSession}})).status,404);
+});
+
+test('measured token usage and cost per completed outcome come from logged model calls',async()=>{
+  const session=await loginAs('STAFF-101','123456');
+  const summary=async()=>(await get('/operations/summary?period=today',session)).aiCost;
+  const before=await summary();
+  const visitId=(await workflow.register(nurse,intake,randomUUID())).data.id;
+  // A priced run: the same four-call tool sequence, with provider-reported usage like Bedrock's.
+  const priced:Model=async(messages,tools,signal)=>({...(await fakeModel(messages,tools,signal)),usage:{inputTokens:1250,outputTokens:80,totalTokens:1330}});
+  const run=(await database.pool.query('SELECT id FROM agent_runs WHERE visit_id=$1',[visitId])).rows[0];
+  await database.pool.query("UPDATE agent_runs SET status='RUNNING',provider='bedrock',model='eu.amazon.nova-lite-v1:0',lease_until=now()+interval '5 minutes' WHERE id=$1",[run.id]);
+  await executeAgent(database,run.id,priced);
+  await decision((await workflow.pending()).find(p=>p.patientId===visitId)!);
+  const trace=await get(`/agents/runs/${run.id}`,session);
+  assert.equal(trace.usage.modelCalls,4);assert.equal(trace.usage.inputTokens,5000);assert.equal(trace.usage.outputTokens,320);
+  assert.equal(trace.usage.costUsd,0.00043332);   // 5,000 × 0.069/1M + 320 × 0.276/1M
+  assert.match(trace.usage.price.source,/AWS Price List API/);
+  const after=await summary();
+  assert.equal(after.runs,before.runs+1);assert.equal(after.modelCalls,before.modelCalls+4);
+  assert.equal(after.completedOutcomes,before.completedOutcomes+1);
+  assert.ok(Math.abs(after.modelCostUsd-before.modelCostUsd-0.00043332)<1e-6);
+  assert.equal(after.hostingUsdPerMonth,18.84);
+  assert.ok(after.costPerOutcomeUsd>0 && after.models.some((m:any)=>m.model==='eu.amazon.nova-lite-v1:0'));
+});
+
+test('unseen Level 1 patients past the grace period trigger one nameless SMS to the on-call clinician, with bounded retries',async()=>{
+  const {runEscalations}=await import('../../src/backend/src/modules/escalation.js');
+  const settings={provider:'africastalking',environment:'sandbox',graceMinutes:5,recipient:'+254700000001'};
+  const sent:string[]=[];let fail=false;
+  const sender={provider:'africastalking-sandbox',send:async(_to:string,message:string)=>{sent.push(message);return {ok:!fail,response:{statusCode:fail?500:101}};}};
+  const red={heartRate:135,systolicBp:75,respiratoryRate:32,temperature:37,avpu:'Voice'};
+  const make=async(name:string)=>{const id=(await workflow.register(nurse,{...intake,...red,name,arrivalTime:new Date(Date.now()-10*60000).toISOString()},randomUUID())).data.id;await decision(await assess(id));return id;};
+  const waiting=await make('Synthetic Unseen Red Patient'),seen=await make('Synthetic Seen Red Patient');
+  await workflow.markSeen(nurse,seen,randomUUID());
+  const rows=async(id:string)=>(await database.pool.query('SELECT * FROM sms_escalations WHERE visit_id=$1',[id])).rows;
+  await runEscalations(database,sender,settings);
+  const [alert]=await rows(waiting);
+  assert.equal(alert.status,'SENT');assert.equal(alert.recipient_masked,'+254•••001');
+  assert.equal((await rows(seen)).length,0);
+  assert.ok(!sent.some(m=>m.includes('Synthetic')) && sent.some(m=>/Level 1 \(Emergency\)/.test(m)));
+  // Never twice for the same patient.
+  const count=sent.length;await runEscalations(database,sender,settings);assert.equal(sent.length,count);
+  // A failed send is retried at most three times in total, then left visible as FAILED.
+  const third=await make('Synthetic Retry Red Patient');fail=true;
+  for(let i=0;i<5;i++)await runEscalations(database,sender,settings);
+  const [failed]=await rows(third);assert.equal(failed.status,'FAILED');assert.equal(failed.attempts,3);
+  const audits=(await database.pool.query("SELECT event_type FROM audit_events WHERE visit_id=ANY($1) AND event_type LIKE 'SMS_%'",[[waiting,third]])).rows.map(r=>r.event_type);
+  assert.equal(audits.filter(e=>e==='SMS_ESCALATION_SENT').length,1);assert.equal(audits.filter(e=>e==='SMS_ESCALATION_FAILED').length,3);
+  const session=await loginAs('STAFF-101','123456');
+  const esc=(await get('/operations/summary?period=today',session)).escalations;
+  assert.ok(esc.sent>=1 && esc.failed>=1);
+});

@@ -1,6 +1,7 @@
 /* eslint-disable @typescript-eslint/no-unsafe-assignment */
 import { Injectable, Inject, BadRequestException, ConflictException, ForbiddenException, NotFoundException, HttpException, HttpStatus } from '@nestjs/common';
 import { DISPOSITIONS, dispositionsForRole } from '../../../shared/contracts/outcomes.js';
+import { runUsage } from './usage.js';
 import { consumeWindow } from '../auth/rate-limit.js';
 import { z } from 'zod';
 import { Database, audit, id, idempotent, hash } from '../database/db.js';
@@ -293,6 +294,8 @@ export class WorkflowService {
     for (const run of visible) result.set(run.id, {
       runId: run.id, patientId: run.visit_id, model: run.model, provider: run.provider, status: run.status, error: run.error,
       timestamp: iso(run.created_at), toolCalls: calls.get(run.id),
+      // Measured from the provider-reported usage stored with each model call.
+      usage: runUsage(run.provider, run.model, calls.get(run.id)!),
     });
     return result;
   }
