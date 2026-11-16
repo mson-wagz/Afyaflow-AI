@@ -6,6 +6,13 @@ HttpOnly, SameSite=Strict cookie; sessions expire after eight hours. The databas
 staff role is authoritative. A supplied `staffId`, role or browser persona cannot
 grant clinical authority. Locked sessions cannot access patient endpoints.
 
+Sessions are also locked server-side after `SESSION_IDLE_MINUTES` (default 15) with no
+authenticated request, which covers closed tabs, crashed devices and bypassed client
+timers. The next request returns 403 `SESSION_LOCKED` (the frontend shows its lock
+screen), a `SESSION_IDLE_LOCK` audit event is written, and `POST /auth/unlock` with the
+PIN resumes the session. Activity is recorded at most once a minute per session. The
+eight-hour absolute expiry still applies.
+
 ## Authentication
 
 - `POST /auth/login`: `{ identifier, pin }`; seeded identifiers and PINs are synthetic.

@@ -85,8 +85,15 @@ export function AuthProvider({ children }) {
     }).catch(() => {if(!cancelled){updateStaff(null);setSessionStatus(SESSION_STATUS.UNAUTHENTICATED);}})
       .finally(()=>{if(!cancelled)setRestoring(false);});
     const expired=()=>{updateStaff(null);setSessionStatus(SESSION_STATUS.UNAUTHENTICATED);};
+    // The server locks idle sessions; mirror it so patient data is hidden behind the PIN screen.
+    const serverLocked=()=>{
+      setSessionStatus(status=>status===SESSION_STATUS.UNAUTHENTICATED?status:SESSION_STATUS.LOCKED);
+      setLockTimestamp(new Date().toLocaleTimeString());
+    };
     window.addEventListener('afyaflow-session-expired',expired);
-    return ()=>{cancelled=true;window.removeEventListener('afyaflow-session-expired',expired);};
+    window.addEventListener('afyaflow-session-locked',serverLocked);
+    return ()=>{cancelled=true;window.removeEventListener('afyaflow-session-expired',expired);
+      window.removeEventListener('afyaflow-session-locked',serverLocked);};
   }, [updateStaff,refreshLogs]);
 
   // Locking function

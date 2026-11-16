@@ -33,6 +33,14 @@ describe('Browser API client unit tests', () => {
     expect(dispatch).not.toHaveBeenCalled();
   });
 
+  it('shows the lock screen when the server has locked an idle session', async () => {
+    respond({ code: 'SESSION_LOCKED', message: 'Unlock the terminal' }, 403);
+    const dispatch = vi.spyOn(window, 'dispatchEvent');
+    await expect(api('/queue')).rejects.toMatchObject({ status: 403, code: 'SESSION_LOCKED' });
+    expect(dispatch).toHaveBeenCalledWith(expect.objectContaining({ type: 'afyaflow-session-locked' }));
+    expect(dispatch).not.toHaveBeenCalledWith(expect.objectContaining({ type: 'afyaflow-session-expired' }));
+  });
+
   it('notifies the app when the server rejects an expired session', async () => {
     respond({ code: 'SESSION_EXPIRED', message: 'Sign in again' }, 401);
     const dispatch = vi.spyOn(window, 'dispatchEvent');

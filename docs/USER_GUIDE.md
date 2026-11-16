@@ -147,6 +147,8 @@ Only a missing or expired session requires signing in again.
 
 Use the header lock control before leaving a shared terminal. Unlock with your PIN. Sign out when finishing or handing over the device; signing out (or **Switch Staff User** on the lock screen) ends your server session and removes your drafts and queued registrations from the browser, as described in section 9. Expired sessions require sign-in; the backend currently issues sessions lasting up to eight hours.
 
+The terminal locks itself after the inactivity time chosen in your profile (1–30 minutes). Independently, the server locks any session that has made no request for 15 minutes, for example after a tab was closed or a device switched off without signing out. Either way, unlock with your PIN to continue; your drafts are kept.
+
 Open **Staff Access & Audit** for permitted events. Nurses and clerks see their own staff events; clinicians and administrators see broader history. **Authorised Clinical Decision & Audit History** in the triage screen records patient decisions and reasons. History is not editable through the app.
 
 Viewing patient records is also recorded: each screen that shows patient data logs who viewed which patients and when (repeated refreshes of the same view are recorded once every five minutes). Administrators can review this record-access history, for example to answer "who has viewed this patient?", through `GET /api/audit/access?patientId=<visit ID>`. If the system cannot record an access, it does not show the data and asks you to try again.

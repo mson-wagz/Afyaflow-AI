@@ -25,7 +25,7 @@ The scoring fixture remains **unvalidated**. This is a research/development demo
 
 - **Historical research library:** verified public MIMIC-IV-ED Demo import, source inspection, JSON export, explicit MCP-backed AI research reviews and separation from operational demonstrations.
 
-- **Staff access:** server-backed sign-in, HttpOnly cookie sessions, locking, logout, role checks, and shared authentication throttling.
+- **Staff access:** server-backed sign-in, HttpOnly cookie sessions, locking, logout, role checks, and shared authentication throttling. Sessions idle for 15 minutes (`SESSION_IDLE_MINUTES`) are locked by the server as well as the browser.
 - **Registration:** demographic and complaint validation, timestamped observations, staff attribution, draft retention, and retry-safe submission.
 - **Measurement feedback:** visible success, missing-value warnings, and range errors. Passing entry checks does not establish clinical normality or save a visit.
 - **Agent assessments:** durable jobs, versioned evidence, bounded execution, actual model/tool traces, and persisted proposals for human review.

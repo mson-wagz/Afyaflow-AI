@@ -1,5 +1,6 @@
 import { CanActivate, ExecutionContext, Injectable, Inject, UnauthorizedException, ForbiddenException, BadRequestException, HttpException, HttpStatus } from '@nestjs/common';
 import { allowAuthAttempt, clearAuthAttempts, ACCOUNT_LIMIT, accountKey, unknownAccountKey } from './rate-limit.js';
+import { config } from '../config.js';
 import { randomBytes, scryptSync, timingSafeEqual } from 'node:crypto';
 import { z } from 'zod';
 import type { Request } from 'express';
@@ -50,10 +51,22 @@ export class AuthService {
   async session(req:Request,allowLocked=false) {
     const token=req.headers.cookie?.split(';').map(s=>s.trim()).find(s=>s.startsWith('afyaflow_session='))?.slice('afyaflow_session='.length);
     if (!token || !/^[a-f0-9]{64}$/.test(token)) throw new UnauthorizedException({code:'UNAUTHENTICATED',message:'Sign in to continue.'});
-    const row=(await this.database.pool.query(`SELECT s.*,t.role,t.profile FROM sessions s JOIN staff t ON t.id=s.staff_id
-      WHERE s.token_hash=$1 AND s.expires_at>now()`,[hash(token)])).rows[0];
+    const row=(await this.database.pool.query(`SELECT s.*,t.role,t.profile,
+      s.last_seen_at<now()-make_interval(mins=>$2) AS idle, s.last_seen_at<now()-interval '60 seconds' AS touch_due
+      FROM sessions s JOIN staff t ON t.id=s.staff_id WHERE s.token_hash=$1 AND s.expires_at>now()`,[hash(token),config.sessionIdleMinutes])).rows[0];
     if (!row) throw new UnauthorizedException({code:'SESSION_EXPIRED',message:'Session expired. Sign in again.'});
+    // Server-side automatic lock: a session with no authenticated request for SESSION_IDLE_MINUTES
+    // (closed tab, crashed device, bypassed client timer) needs the PIN again.
+    if (!row.locked && row.idle) {
+      await this.database.transaction(async db => {
+        const locked=await db.query('UPDATE sessions SET locked=true WHERE token_hash=$1 AND NOT locked RETURNING staff_id',[row.token_hash]);
+        if (locked.rowCount) await audit(db,row.staff_id,'SESSION_IDLE_LOCK',{idleMinutes:config.sessionIdleMinutes});
+      });
+      row.locked=true;
+    }
     if (row.locked && !allowLocked) throw new ForbiddenException({code:'SESSION_LOCKED',message:'Unlock the terminal before accessing patient data.'});
+    // Activity refresh is written at most once a minute per session to keep polling cheap.
+    if (!row.locked && row.touch_due) await this.database.pool.query('UPDATE sessions SET last_seen_at=now() WHERE token_hash=$1',[row.token_hash]);
     return {staff:{...row.profile,id:row.staff_id,role:row.role} as Staff,sessionHash:row.token_hash,locked:row.locked};
   }
   async unlock(req:Request,body:unknown) {
@@ -65,7 +78,7 @@ export class AuthService {
     if (!pinMatches(pin,row.pin_hash)) throw new UnauthorizedException({code:'INVALID_PIN',message:'Incorrect PIN.'});
     await clearAuthAttempts(this.database,accountKey(session.staff.id));
     await this.database.transaction(async db => {
-      await db.query('UPDATE sessions SET locked=false WHERE token_hash=$1',[session.sessionHash]);
+      await db.query('UPDATE sessions SET locked=false,last_seen_at=now() WHERE token_hash=$1',[session.sessionHash]);
       await audit(db,session.staff.id,'SESSION_UNLOCK',{});
     });
     return {success:true,staff:session.staff};
