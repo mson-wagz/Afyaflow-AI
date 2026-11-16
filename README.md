@@ -12,6 +12,7 @@ The scoring fixture remains **unvalidated**. This is a research/development demo
 
 ## Documentation
 
+- [Security and privacy safeguards](docs/SECURITY.md): how patient data is protected, HIPAA and Kenya Data Protection Act mapping, and work outstanding before real patient data.
 - [Data sources and research use](docs/DATA_SOURCES.md): dataset provenance, licensing, mappings, missing fields, import/export and AI use.
 - [Application user guide](docs/USER_GUIDE.md): sign-in, registration, assessments, decisions, queues, routing, and offline drafts.
 - [Backend setup](src/backend/README.md): local PostgreSQL, Bedrock configuration, and development accounts.
