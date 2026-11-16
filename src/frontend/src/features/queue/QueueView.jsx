@@ -176,6 +176,12 @@ export default function QueueView() {
                 >
                   <td style={{ padding: '0.75rem 0.5rem', fontWeight: 700, color: 'var(--color-text-subtle)' }}>
                     #{idx + 1}
+                    {/* The reason compares with the entry directly above in the full order; hide it when a filter hides that entry. */}
+                    {pt.tieBreak && queue[idx - 1]?.queueOrder?.rank === pt.queueOrder?.rank - 1 && (
+                      <div style={{ fontSize: '0.7rem', fontWeight: 400, maxWidth: '11rem', marginTop: '2px' }}>
+                        Same level as above: {pt.tieBreak}
+                      </div>
+                    )}
                   </td>
                   <td style={{ padding: '0.75rem 0.5rem' }}>
                     <div style={{ fontWeight: 600 }}>{pt.patientName}</div>
@@ -199,7 +205,7 @@ export default function QueueView() {
                           fontWeight: 700,
                         }}
                       >
-                        ● {pt.approvedPriority.label}
+                        ● {pt.approvedPriority.level ? `Level ${pt.approvedPriority.level} · ` : ''}{pt.approvedPriority.label}
                       </span>
                     ) : (
                       <Badge variant="draft">Awaiting Approval</Badge>

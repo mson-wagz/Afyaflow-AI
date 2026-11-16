@@ -43,6 +43,12 @@ eight-hour absolute expiry still applies.
   queues a new assessment without silently changing approved priority.
 - `GET /queue`: approved priority ordering, arrival timestamps, pending proposals,
   assessment state and workload. Model failure does not hide waiting patients.
+  Ordering is `queue-order-v2` (docs/QUEUE_ORDERING.md): approved SATS level, then for
+  Level 1 higher TEWS (unscored first) and earlier arrival, for Levels 2-4 earlier arrival
+  and higher TEWS, and finally visit ID, a strict total order. Each entry has
+  `queueOrder { rank, level, severity, version }` and `tieBreak` (the rule that placed it
+  below the entry above on the same level, else null). Priority objects carry `level` (1-5)
+  and `category`.
 
 ## Agent and human decisions
 

@@ -1049,3 +1049,27 @@ test('operations summary reports synthetic aggregates without patient identifier
   assert.equal((await fetch(`${base}/api/operations/summary?period=1y`,{headers:{Cookie:nurseSession}})).status,400);
   assert.equal((await get('/operations/summary',await adminLogin())).period,'today');
 });
+
+test('Level 1 ties are ordered by severity, then arrival, then visit ID in the served queue',async()=>{
+  const session=await loginAs('STAFF-101','123456');
+  const arrivalTime='2026-01-01T06:00:00.000Z';
+  const red=(name:string,vitals:object)=>workflow.register(nurse,{...intake,name,arrivalTime,...vitals},randomUUID());
+  const tews7={heartRate:135,systolicBp:75,respiratoryRate:25,temperature:38.6,avpu:'Alert'};
+  const tews9={heartRate:135,systolicBp:75,respiratoryRate:32,temperature:37,avpu:'Voice'};
+  const ids:string[]=[];
+  for(const [name,vitals] of [['Synthetic Red Seven',tews7],['Synthetic Red Nine A',tews9],['Synthetic Red Nine B',tews9]] as const){
+    const visitId=(await red(name,vitals)).data.id;ids.push(visitId);
+    await decision(await assess(visitId));
+  }
+  const queue=(await get('/queue',session)).queue;
+  const mine=queue.filter((v:any)=>ids.includes(v.visitId));
+  assert.ok(mine.every((v:any)=>v.approvedPriority.code==='RED' && v.approvedPriority.level===1));
+  // TEWS 9 before TEWS 7 despite identical arrival; the two TEWS 9 patients are separated by visit ID.
+  const nines=[ids[1],ids[2]].sort();
+  assert.deepEqual(mine.map((v:any)=>v.visitId),[...nines,ids[0]]);
+  assert.deepEqual(mine.map((v:any)=>v.queueOrder.severity),[9,9,7]);
+  // Ranks are unique and contiguous across the whole served queue.
+  assert.deepEqual(queue.map((v:any)=>v.queueOrder.rank),queue.map((_:any,i:number)=>i+1));
+  const second=queue.findIndex((v:any)=>v.visitId===nines[1]);
+  if(queue[second-1].visitId===nines[0]) assert.equal(queue[second].tieBreak,'same severity and arrival time; ordered by visit ID');
+});
