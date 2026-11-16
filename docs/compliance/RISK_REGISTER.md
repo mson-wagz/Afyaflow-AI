@@ -12,7 +12,7 @@ High / Medium / Low and must be reviewed by the security officer.
 | R4 | Leaver keeps access | Medium | High | Administrators deactivate accounts and end sessions | Joiner/leaver procedure with HR |
 | R5 | Loss of the server or its disk | Low | High | Encrypted EBS; daily encrypted off-host backups with restore testing | Run the stack update that creates the bucket; monthly restore test |
 | R6 | Inappropriate viewing of patient records by authorised staff | Medium | Medium | Read-access log reviewable by administrators | Periodic access review procedure |
-| R7 | Patient data processed outside Kenya (Bedrock in Ireland) | Certain once real data is used | Medium | Transfer limited to assessment inputs; Bedrock does not retain prompts while model invocation logging is off | DPO approval and documented safeguards before real data |
+| R7 | Patient data processed outside Kenya (Bedrock in Ireland) | Certain once real data is used | Medium | Transfer limited to assessment inputs; Bedrock does not retain prompts while model invocation logging is off; `DATA_RESIDENCY=kenya` enforces local inference for a Kenyan-hosted deployment | Host in Kenya with the residency setting, or DPO approval and documented safeguards before real data |
 | R8 | AI proposes an unsafe priority | Medium | High | Deterministic scoring; the model cannot approve; clinician decision required; missing evidence forces review | Clinical validation of the scoring protocol |
 | R9 | Third-party script or dependency compromise in the browser | Low | High | Pinned dependencies, lockfiles, CSP (report-only) | Enforce the CSP after verification |
 | R10 | Cost abuse of the AI service | Medium | Low | Hourly per-staff and global assessment caps | Billing alerts |

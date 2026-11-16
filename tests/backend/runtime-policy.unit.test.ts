@@ -16,3 +16,17 @@ test('competition rejects hosted providers, remote endpoints and cloud model tag
   assert.throws(()=>assertCompetitionRun('competition','synthetic','openai'));
   assert.doesNotThrow(()=>assertCompetitionRun('competition','synthetic','ollama'));
 });
+
+test('Kenyan data residency requires local inference and a declared Kenyan host',()=>{
+  // Hosted inference would send assessment inputs abroad.
+  for(const AI_PROVIDER of ['bedrock','openai'])
+    assert.throws(()=>runtimePolicy({DATA_RESIDENCY:'kenya',HOSTING_COUNTRY:'KE',AI_PROVIDER}),/AI_PROVIDER=ollama/);
+  // The operator must declare the host country.
+  for(const HOSTING_COUNTRY of [undefined,'','IE','ZA'])
+    assert.throws(()=>runtimePolicy({DATA_RESIDENCY:'kenya',AI_PROVIDER:'ollama',HOSTING_COUNTRY}),/HOSTING_COUNTRY=KE/);
+  assert.throws(()=>runtimePolicy({DATA_RESIDENCY:'nairobi'}),/unrestricted or kenya/);
+  assert.deepEqual(runtimePolicy({DATA_RESIDENCY:'kenya',AI_PROVIDER:'ollama',HOSTING_COUNTRY:'ke'}).dataResidency,
+    {policy:'kenya',inference:'local',hostingCountry:'KE'});
+  // The default is unchanged, and reports hosted inference honestly.
+  assert.deepEqual(runtimePolicy({}).dataResidency,{policy:'unrestricted',inference:'hosted',hostingCountry:null});
+});

@@ -17,7 +17,7 @@ export class ApiController {
     @Inject(Database) private readonly database:Database,
     @Inject(FollowupService) private readonly followups:FollowupService,
     @Inject(OperationsService) private readonly operations:OperationsService) {}
-  @Get('health') async health() {await this.database.pool.query('SELECT 1');return {status:'ok',database:'postgresql',mode:config.mode,agentProvider:config.provider,clinicalValidated:false};}
+  @Get('health') async health() {await this.database.pool.query('SELECT 1');return {status:'ok',database:'postgresql',mode:config.mode,agentProvider:config.provider,dataResidency:config.dataResidency,clinicalValidated:false};}
   @Post('auth/login') async login(@Body()body:unknown,@Res({passthrough:true})res:Response) {
     const result=await this.auth.signIn(body);
     res.cookie('afyaflow_session',result.token,{httpOnly:true,sameSite:'strict',secure:config.secureCookies,maxAge:8*3600000,path:'/api'});

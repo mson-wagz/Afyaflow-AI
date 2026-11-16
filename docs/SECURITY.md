@@ -55,7 +55,19 @@ must be approved by the facility's data protection officer and documented: the l
 basis, the safeguards relied on (AWS contractual and technical protections, encryption
 in transit and at rest, access controls and logging), and how patients are informed.
 
+**In-country option.** Setting `DATA_RESIDENCY=kenya` keeps processing in Kenya for a
+deployment hosted there. The server refuses to start unless AI inference uses the local
+model on the same host (`AI_PROVIDER=ollama`), so assessment inputs never leave the
+server, and unless the operator declares the host country with `HOSTING_COUNTRY=KE`. The
+software cannot verify a server's physical location: the declaration, and placing the
+database and backups in Kenya too, are the operator's responsibility. `GET /api/health`
+reports the policy, whether inference is local or hosted, and the declared country. The
+current staging site is unrestricted (Ireland) and must not hold real patient data. See the
+[Kenya regulatory checklist](compliance/KENYA_REGULATORY_CHECKLIST.md).
+
 ## Compliance records
+
+- [Kenya regulatory checklist](compliance/KENYA_REGULATORY_CHECKLIST.md) (draft)
 
 - [Incident record: repository compromise, October-November 2026](compliance/INCIDENT-2026-10-repository-compromise.md)
 - [Risk register](compliance/RISK_REGISTER.md) (draft)
