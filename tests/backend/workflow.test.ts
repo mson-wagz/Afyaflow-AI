@@ -1150,3 +1150,36 @@ test('visit outcomes close visits, release beds and drive KNH under-/over-triage
   assert.equal(after.seenAgainstTarget.find((r:any)=>r.priority==='RED').withinTargetPercent,null);
   assert.equal(after.live.openVisits,(await database.pool.query("SELECT count(*)::int n FROM visits WHERE data_source='synthetic' AND closed_at IS NULL")).rows[0].n);
 });
+
+test('FHIR R4 export bundles a closed visit with coded vitals, triage and outcome, and is access-logged',async()=>{
+  const nurseSession=await loginAs('STAFF-101','123456'),clerkSession=await loginAs('STAFF-103','345678');
+  const visitId=(await workflow.register(nurse,intake,randomUUID())).data.id;
+  await decision(await assess(visitId));
+  assert.equal((await post(`/visits/${visitId}/outcome`,nurseSession,{disposition:'DISCHARGED'})).status,201);
+  const response=await fetch(`${base}/api/visits/${visitId}/fhir`,{headers:{Cookie:nurseSession}});
+  assert.equal(response.status,200);assert.match(response.headers.get('content-type')!,/application\/fhir\+json/);
+  const bundle=await response.json();
+  assert.equal(bundle.resourceType,'Bundle');assert.equal(bundle.type,'collection');
+  const resources=bundle.entry.map((e:any)=>e.resource);
+  const byType=(t:string)=>resources.filter((r:any)=>r.resourceType===t);
+  const [patient]=byType('Patient'),[encounter]=byType('Encounter');
+  assert.equal(patient.identifier[0].value,visitId);assert.equal(patient.gender,'female');
+  assert.equal(encounter.status,'finished');assert.equal(encounter.class.code,'EMER');
+  assert.equal(encounter.hospitalization.dischargeDisposition.coding[0].code,'home');
+  assert.ok(encounter.period.start && encounter.period.end);
+  const code=(loinc:string)=>byType('Observation').find((o:any)=>o.code.coding?.[0]?.code===loinc);
+  assert.deepEqual(code('8867-4').valueQuantity,{value:75,unit:'/min',system:'http://unitsofmeasure.org',code:'/min'});
+  assert.equal(code('8480-6').valueQuantity.code,'mm[Hg]');
+  assert.equal(code('30525-0').valueQuantity.value,30);
+  assert.equal(byType('Observation').find((o:any)=>o.code.coding?.[0]?.code==='tews').valueInteger,0);
+  assert.equal(byType('Observation').find((o:any)=>o.code.coding?.[0]?.code==='triage-level').valueCodeableConcept.coding[0].code,'GREEN');
+  // Every reference resolves inside the bundle.
+  const urls=new Set(bundle.entry.map((e:any)=>e.fullUrl));
+  for(const r of byType('Observation')) {assert.ok(urls.has(r.subject.reference));assert.ok(urls.has(r.encounter.reference));}
+  assert.ok(urls.has(encounter.subject.reference));
+  // Reading it is a logged record access; front-desk staff and unknown visits are refused.
+  const logged=(await database.pool.query("SELECT patient_ids FROM access_log WHERE route='GET /api/visits/:id/fhir' AND staff_id='STAFF-101'")).rows;
+  assert.ok(logged.some((r:any)=>r.patient_ids.includes(visitId)));
+  assert.equal((await fetch(`${base}/api/visits/${visitId}/fhir`,{headers:{Cookie:clerkSession}})).status,403);
+  assert.equal((await fetch(`${base}/api/visits/SYN-PT-missing/fhir`,{headers:{Cookie:nurseSession}})).status,404);
+});

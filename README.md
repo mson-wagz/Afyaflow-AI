@@ -14,6 +14,8 @@ The scoring fixture remains **unvalidated**. This is a research/development demo
 
 - [Security and privacy safeguards](docs/SECURITY.md): how patient data is protected, HIPAA and Kenya Data Protection Act mapping, and work outstanding before real patient data.
 - [Data sources and research use](docs/DATA_SOURCES.md): dataset provenance, licensing, mappings, missing fields, import/export and AI use.
+- [Outcome metrics](docs/OUTCOME_METRICS.md), [queue ordering](docs/QUEUE_ORDERING.md) and [interoperability (FHIR export)](docs/INTEROPERABILITY.md).
+- For Kenyatta National Hospital: [SATS clinical review pack](docs/SATS_CLINICAL_REVIEW.md), [pilot evaluation protocol](docs/PILOT_PROTOCOL.md) and [Kenya regulatory checklist](docs/compliance/KENYA_REGULATORY_CHECKLIST.md).
 - [Application user guide](docs/USER_GUIDE.md): sign-in, registration, assessments, decisions, queues, routing, and offline drafts.
 - [Backend setup](src/backend/README.md): local PostgreSQL, Bedrock configuration, and development accounts.
 - [Lambda deployment guide](deploy/lambda/README.md): AWS prerequisites, SAM deployment, migrations, and staging checks.
@@ -28,6 +30,7 @@ The scoring fixture remains **unvalidated**. This is a research/development demo
 
 - **Staff access:** server-backed sign-in, HttpOnly cookie sessions, locking, logout, role checks, and shared authentication throttling. Sessions idle for 15 minutes (`SESSION_IDLE_MINUTES`) are locked by the server as well as the browser.
 - **Visit outcomes:** mark when a clinician first sees a patient and close visits as admitted, discharged, died, left without being seen, left against medical advice or transferred; closing frees the bed and cancels open work.
+- **FHIR R4 export:** `GET /api/visits/:id/fhir` bundles a visit (patient, encounter, LOINC-coded vital signs, TEWS, approved SATS level and outcome) for the facility's hospital information system, so triage is not typed twice.
 - **Operations dashboard:** live workload, priority mix, bed occupancy, arrivals, time-to-triage percentiles, AI proposal acceptance, over- and under-triage against the KNH SATS baseline, SATS target compliance, length of stay and left-without-being-seen rate for today, 7 or 30 days. Aggregates only, with no patient identifiers; not available to front-desk staff.
 - **Registration:** demographic and complaint validation, timestamped observations, staff attribution, draft retention, and retry-safe submission.
 - **Measurement feedback:** visible success, missing-value warnings, and range errors. Passing entry checks does not establish clinical normality or save a visit.
