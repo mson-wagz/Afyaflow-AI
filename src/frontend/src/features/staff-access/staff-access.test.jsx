@@ -169,11 +169,10 @@ describe('Staff Access and App Shell Feature Specification Tests', () => {
     });
 
     it('displays server permission denial banner when non-clinical user attempts clinical approval in UI', async () => {
+      // Start the demo session as a non-clinical user: Faith (clerk).
+      const { pin: _pin, ...clerk } = SYNTHETIC_STAFF_FIXTURES[2];
+      localStorage.setItem('afyaflow_session_v1', JSON.stringify(clerk));
       render(<App />);
-
-      // Switch to non-clinical persona: Faith (clerk)
-      const clerkButton = screen.getByRole('button', { name: /Faith \(clerk\)/i });
-      fireEvent.click(clerkButton);
 
       await waitFor(() => {
         expect(screen.getAllByText(/Faith Achieng/i).length).toBeGreaterThan(0);

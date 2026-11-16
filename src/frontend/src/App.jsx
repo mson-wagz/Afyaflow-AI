@@ -15,7 +15,7 @@ import { DeteriorationView } from './features/deterioration';
 import { RoutingView } from './features/routing';
 import { SyncProvider, useOfflineSync, OfflineSyncView } from './offline';
 import { Header, Navigation } from './components';
-import { SESSION_STATUS, SYNTHETIC_STAFF_FIXTURES } from '../../shared/contracts/auth.js';
+import { SESSION_STATUS } from '../../shared/contracts/auth.js';
 
 import { useBackend, competitionMode } from './api/client.js';
 import ResearchView from './features/research/ResearchView.jsx';
@@ -27,7 +27,6 @@ function AppShell() {
     sessionStatus,
     lockSession,
     signOut,
-    signIn,
     hasDraft,
     isClinical,
   } = useAuth();
@@ -43,11 +42,6 @@ function AppShell() {
     return <><div role="alert">{authError}</div><SignInScreen /></>;
   }
 
-  // Quick switcher handler for evaluators/demos
-  const handleQuickSwitchRole = async (targetStaff) => {
-    await signIn(targetStaff.staffNumber, targetStaff.pin);
-  };
-
   return (
     <div className="app-container">
       {/* Shared-device lock screen overlay if locked */}
@@ -62,53 +56,6 @@ function AppShell() {
         hasDraft={hasDraft}
         isOnline={isOnline}
       />
-
-      {/* Quick Evaluator Role Switcher Strip */}
-      <aside
-        style={{
-          backgroundColor: '#0f172a',
-          color: '#e2e8f0',
-          padding: '0.45rem 1rem',
-          fontSize: '0.8rem',
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          flexWrap: 'wrap',
-          gap: '0.5rem',
-          borderBottom: '1px solid #1e293b',
-        }}
-        aria-label="Evaluation persona switcher"
-      >
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-          <span style={{ color: '#38bdf8', fontWeight: 600 }}>Persona Switcher:</span>
-          <span style={{ color: '#94a3b8', fontSize: '0.75rem' }}>
-            Current: <strong>{staff.name}</strong> ({staff.role})
-          </span>
-        </div>
-
-        <div style={{ display: 'flex', gap: '0.35rem', flexWrap: 'wrap' }}>
-          {SYNTHETIC_STAFF_FIXTURES.map((f) => (
-            <button
-              key={f.id}
-              type="button"
-              onClick={() => handleQuickSwitchRole(f)}
-              style={{
-                background: staff.id === f.id ? 'var(--color-primary)' : 'rgba(255, 255, 255, 0.1)',
-                color: '#fff',
-                border: '1px solid',
-                borderColor: staff.id === f.id ? 'var(--color-primary-hover)' : 'rgba(255, 255, 255, 0.2)',
-                borderRadius: 'var(--radius-sm)',
-                padding: '0.2rem 0.5rem',
-                fontSize: '0.75rem',
-                cursor: 'pointer',
-                fontWeight: staff.id === f.id ? 700 : 500,
-              }}
-            >
-              {f.name.split(' ')[0]} ({f.role})
-            </button>
-          ))}
-        </div>
-      </aside>
 
       {/* Responsive Shell: Navigation + Main Content */}
       <div className="app-shell">
