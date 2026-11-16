@@ -29,7 +29,7 @@ let mockAuditLogs = [
 /**
  * Simulates server-side sign-in
  * @param {string} identifier Staff ID, Staff Number, or Name
- * @param {string} pin 4-digit PIN
+ * @param {string} pin staff PIN (PIN_LENGTH digits)
  * @returns {Promise<{ success: boolean, staff?: object, token?: string, error?: string }>}
  */
 export async function apiSignIn(identifier, pin) {
@@ -59,7 +59,7 @@ export async function apiSignIn(identifier, pin) {
   if (staff.pin !== pin.trim()) {
     return {
       success: false,
-      error: 'Invalid 4-digit security PIN. Please try again.',
+      error: 'Invalid security PIN. Please try again.',
     };
   }
 

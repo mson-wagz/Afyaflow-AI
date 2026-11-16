@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import useAuth from './useAuth';
 import { Button, Input, Card, Alert } from '../../components';
+import { PIN_LENGTH } from '../../../../shared/contracts/auth.js';
 
 /**
  * Staff Sign-In Screen
@@ -23,8 +24,8 @@ export default function SignInScreen() {
       setError('Staff identifier is required');
       return;
     }
-    if (!pin.trim() || pin.trim().length !== 4) {
-      setError('A 4-digit PIN is required');
+    if (!pin.trim() || pin.trim().length !== PIN_LENGTH) {
+      setError(`A ${PIN_LENGTH}-digit PIN is required`);
       return;
     }
 
@@ -126,14 +127,14 @@ export default function SignInScreen() {
 
             <Input
               id="staff-pin"
-              label="4-digit Security PIN"
+              label={`${PIN_LENGTH}-digit Security PIN`}
               type="password"
               inputMode="numeric"
               pattern="[0-9]*"
-              maxLength={4}
+              maxLength={PIN_LENGTH}
               value={pin}
               onChange={(e) => setPin(e.target.value)}
-              placeholder="••••"
+              placeholder="••••••"
               required
               autoComplete="current-password"
             />

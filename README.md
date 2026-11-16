@@ -155,12 +155,9 @@ Open **http://localhost:5173**. The backend listens on port 3000 by default, and
 
 ### Synthetic development accounts
 
-- **Nurse:** `STAFF-101`, PIN `1234` — Jane Mwangi.
-- **Clinician:** `STAFF-102`, PIN `2345` — Kamau Otieno.
-- **Clerk:** `STAFF-103`, PIN `3456` — Faith Achieng.
-- **Administrator:** `STAFF-104`, PIN `4567` — Samuel Mutua.
+`npm run db:seed` creates four synthetic staff accounts (nurse, clinician, clerk and administrator). Their local development PINs are documented in [backend setup](src/backend/README.md). In production the seed gives these accounts random, unusable secrets; an operator issues real PINs privately (see [EC2 deployment](deploy/ec2/README.md#staff-accounts-and-pins)). No deployed PINs are published.
 
-These public fixture credentials are for synthetic demonstrations only. Clerks can register demographics and complaints; recording measurements and clinical decisions requires a clinical role. Administrative accounts cannot register visits.
+Clerks can register demographics and complaints; recording measurements and clinical decisions requires a clinical role. Administrative accounts cannot register visits.
 
 ### Browser-only demonstration mode
 

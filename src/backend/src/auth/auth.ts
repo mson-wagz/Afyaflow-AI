@@ -5,7 +5,7 @@ import { randomBytes, scryptSync, timingSafeEqual } from 'node:crypto';
 import { z } from 'zod';
 import type { Request } from 'express';
 import { Database, audit, hash } from '../database/db.js';
-import { isClinicalRole } from '../../../shared/contracts/auth.js';
+import { isClinicalRole, PIN_PATTERN } from '../../../shared/contracts/auth.js';
 
 export type Staff = {id:string;name:string;role:string;[key:string]:unknown};
 export type StaffRequest = Request & {staff:Staff;sessionHash:string};
@@ -25,7 +25,7 @@ export function parse<T>(schema:z.ZodType<T>,body:unknown):T {
   if (!result.success) throw new BadRequestException({code:'VALIDATION_ERROR',message:'Invalid request fields.',errors:result.error.flatten()});
   return result.data;
 }
-const credentials=z.object({identifier:z.string().trim().min(1).max(100),pin:z.string().regex(/^\d{4}$/)}).strict();
+const credentials=z.object({identifier:z.string().trim().min(1).max(100),pin:z.string().regex(PIN_PATTERN)}).strict();
 
 @Injectable()
 export class AuthService {
@@ -70,7 +70,7 @@ export class AuthService {
     return {staff:{...row.profile,id:row.staff_id,role:row.role} as Staff,sessionHash:row.token_hash,locked:row.locked};
   }
   async unlock(req:Request,body:unknown) {
-    const {pin}=parse(z.object({pin:z.string().regex(/^\d{4}$/)}).strict(),body);
+    const {pin}=parse(z.object({pin:z.string().regex(PIN_PATTERN)}).strict(),body);
     const session=await this.session(req,true);
     const row=(await this.database.pool.query('SELECT pin_hash FROM staff WHERE id=$1',[session.staff.id])).rows[0];
     // Shares the sign-in budget: a locked terminal must not become a way to guess the account PIN.

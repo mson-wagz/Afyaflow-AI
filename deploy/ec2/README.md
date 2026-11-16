@@ -112,11 +112,32 @@ external-network failures fail the job even if the containers are healthy; inspe
 the current deployment before retrying. Database migrations are never automatically
 reversed. Manual recovery may require the pre-migration dump.
 
-Synthetic seeding is disabled by default. To create public demonstration accounts,
-an operator must explicitly invoke the release with `SEED_SYNTHETIC=true` or run
-the existing seed command with its production override. Never seed real data.
-Then verify sign-in, registration, a real Bedrock proposal, human approval, queue,
-and routing. Health checks alone do not verify these workflows.
+Synthetic seeding is disabled by default. To create the synthetic staff accounts and
+records, an operator must explicitly invoke the release with `SEED_SYNTHETIC=true` or
+run the existing seed command with its production override. Seeded accounts cannot
+sign in until an operator issues PINs (below). Never seed real data. Then verify
+sign-in, registration, a real Bedrock proposal, human approval, queue, and routing.
+Health checks alone do not verify these workflows.
+
+## Staff accounts and PINs
+
+No PINs are published. Staff PINs are six digits; accounts created by the production
+seed, and any account whose PIN predates six-digit PINs, cannot sign in until a PIN
+is issued. Issue PINs on the host through Systems Manager Session Manager (AWS
+Console → EC2 → the instance → Connect → Session Manager):
+
+```sh
+sudo -i
+cd /opt/afyaflow
+admin() { docker compose --env-file .env --project-name afyaflow exec -T app \
+  node dist/src/backend/src/admin/staff-admin.js "$@"; }
+admin list                    # staff IDs, numbers, roles, names
+admin reset-pin STAFF-102     # prints a new PIN once and ends that person's sessions
+```
+
+Give each PIN to its owner privately (not by email or chat history). The PIN is stored
+only as a salted hash and the `STAFF_PIN_RESET` audit event never contains it. Close
+the session window afterwards so the PIN is not left on screen.
 
 ## Persistence and cleanup
 

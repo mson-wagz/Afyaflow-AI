@@ -22,16 +22,9 @@ Open **About the data and its limitations** for attribution. **Download adapted 
 
 ## 1. Sign in
 
-Open the supplied application URL, or `http://localhost:5173` locally. Enter a staff identifier and four-digit PIN, then sign in. The identifier can be your staff ID, staff number or full name; if another account shares your name, sign in with your staff ID or number.
+Open the supplied application URL, or `http://localhost:5173` locally. Enter a staff identifier and six-digit PIN, then sign in. The identifier can be your staff ID, staff number or full name; if another account shares your name, sign in with your staff ID or number.
 
-Synthetic development accounts:
-
-- `STAFF-101` / `1234`: Jane, nurse.
-- `STAFF-102` / `2345`: Kamau, clinician.
-- `STAFF-103` / `3456`: Faith, clerk.
-- `STAFF-104` / `4567`: Samuel, administrator.
-
-These are public demo credentials, not production accounts. Quick-select staff cards are demonstration conveniences.
+Your PIN is issued to you privately by an administrator or the system operator; no PINs are published. Keep it to yourself and ask for a new one if you think someone else knows it. Developers running the app locally use the development accounts described in the [backend setup](../src/backend/README.md); those PINs do not work on any deployed site.
 
 Nurses and clinicians can record measurements, request assessments, approve/reject/override proposals, reassess patients, and authorise transfers. Clerks can register demographics and complaints and view queues; they cannot record clinical measurements or commit clinical decisions. Administrators can inspect broader audit history but cannot register visits or approve clinical decisions.
 
