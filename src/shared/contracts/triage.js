@@ -64,10 +64,17 @@ export const CLINICAL_DECISION_TYPES = {
   OVERRIDE: 'OVERRIDDEN',
 };
 
+/**
+ * Youngest age scored with the adult chart. Kenyatta National Hospital directs all patients
+ * over 12 to the adult A&E and children 12 and under to the Paediatric Emergency Unit
+ * (Wangara et al., Int J Emerg Med 2019;12:5). Younger children need the paediatric pathway.
+ */
+export const ADULT_CHART_MIN_AGE = 13;
+
 export const PROTOCOL_METADATA = {
   name: 'AfyaFlow synthetic adult scoring fixture',
-  version: 'demo-v1',
-  population: 'Synthetic adults aged 18 and above',
+  version: 'demo-v2',
+  population: 'Synthetic patients aged 13 and above (KNH adult A&E population)',
   authority: 'Project test fixture; not an approved clinical protocol',
   clinicalValidated: false,
   deterministicScoringEngine: 'synthetic-demo-v1',

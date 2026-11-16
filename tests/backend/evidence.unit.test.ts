@@ -25,3 +25,15 @@ test('population evidence distinguishes missing age from a recorded unsupported 
   assert.equal(child.items[0].status,'UNSUPPORTED');assert.equal(child.items[0].value,0);
   assert.equal(child.missingRequired.includes('age'),false);
 });
+
+test('the adult chart starts at 13, matching KNH routing of patients over 12 to the adult A&E',async()=>{
+  const protocol=await readProtocol();
+  const vitals={heartRate:80,systolicBp:120,respiratoryRate:16,temperature:37,avpu:'Alert'};
+  assert.equal(protocol.version,'demo-v2');
+  const adolescent=scoreEvidence({age:13,vitals,version:1,observationId:'OBS-test'},protocol);
+  assert.equal(adolescent.isSufficientEvidence,true);assert.equal(adolescent.priority.code,'GREEN');
+  assert.equal(evidenceChecklist({age:13,vitals,version:1,observationId:'OBS-test'},protocol).supportedPopulation,true);
+  const child=scoreEvidence({age:12,vitals,version:1,observationId:'OBS-test'},protocol);
+  assert.equal(child.priority,null);assert.match(child.ruleTriggered,/paediatric emergency pathway/);
+  assert.equal(evidenceChecklist({age:12,vitals,version:1,observationId:'OBS-test'},protocol).supportedPopulation,false);
+});

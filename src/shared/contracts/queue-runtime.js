@@ -5,7 +5,7 @@
  * Follows specs/frontend/queue-management/spec.md & specs/features/queue-management/spec.md
  */
 
-import { TRIAGE_PRIORITY, calculateSatsScore } from './triage.js';
+import { TRIAGE_PRIORITY, calculateSatsScore, ADULT_CHART_MIN_AGE } from './triage.js';
 
 /* ------------------------------------------------------------------ */
 /* Queue ordering and tie-breaking (queue-order-v3)                    */
@@ -34,10 +34,10 @@ export function queueLevel(item) {
 /**
  * Physiological severity used only to order patients within one approved level: the TEWS of
  * the latest recorded observations, scored exactly as the assessment tool scores it. Null when
- * the protocol cannot score the patient (under 18, age unknown or observations incomplete).
+ * the protocol cannot score the patient (under 13, age unknown or observations incomplete).
  */
 export function queueSeverity(item) {
-  if (!Number.isInteger(item?.age) || item.age < 18) return null;
+  if (!Number.isInteger(item?.age) || item.age < ADULT_CHART_MIN_AGE) return null;
   const result = calculateSatsScore(item.vitals || {});
   return result.isSufficientEvidence ? result.score : null;
 }

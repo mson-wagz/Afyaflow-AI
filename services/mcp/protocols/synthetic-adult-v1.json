@@ -1,8 +1,8 @@
 {
   "id": "afyaflow-synthetic-adult-v1",
   "name": "AfyaFlow synthetic adult scoring fixture",
-  "version": "demo-v1",
-  "population": "Synthetic adults aged 18 and above",
+  "version": "demo-v2",
+  "population": "Synthetic patients aged 13 and above (KNH adult A&E population)",
   "authority": "Project test fixture; not an approved clinical protocol",
   "clinicalValidated": false,
   "requiredFields": ["heartRate", "systolicBp", "respiratoryRate", "temperature", "avpu"],

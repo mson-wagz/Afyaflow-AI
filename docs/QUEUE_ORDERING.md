@@ -32,7 +32,7 @@ The visit ID is a final guard that is never reached in practice (see below).
 
 **Severity** is the Triage Early Warning Score (TEWS) of the patient's latest recorded
 observations, calculated by the same deterministic scorer as the assessment tool. It is
-never produced by the AI model. A patient the protocol cannot score (under 18, age
+never produced by the AI model. A patient the protocol cannot score (12 or under, age
 unknown, or observations incomplete) is **unscored** and goes ahead of scored patients on
 the same level: there is no recorded evidence that they are less severe, and they need a
 clinician's attention to complete the assessment.
@@ -107,7 +107,7 @@ so a conflicting second change is refused with `409` rather than applied twice.
 ## Limits
 
 - The scorer is the project's synthetic fixture, not a validated SATS implementation. It
-  scores adults only. The ordering rules must be reviewed by a qualified clinician before
+  scores patients aged 13 and over, the population KNH sends to the adult A&E. The ordering rules must be reviewed by a qualified clinician before
   clinical use.
 - The order is advice for the next patient to see. Clinicians can change a patient's level
   through reassessment (manual escalation) at any time; the tie-break never changes a level.

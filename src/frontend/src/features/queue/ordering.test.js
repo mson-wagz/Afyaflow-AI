@@ -22,6 +22,7 @@ describe('queue tie-breaking (queue-order-v3)', () => {
     expect(queueSeverity(patient('a', 'RED', { vitals: VITALS.tews7 }))).toBe(7);
     expect(queueSeverity(patient('b', 'RED', { vitals: VITALS.tews9 }))).toBe(9);
     expect(queueSeverity(patient('c', 'RED', { vitals: VITALS.tews9, age: 12 }))).toBeNull();
+    expect(queueSeverity(patient('c13', 'RED', { vitals: VITALS.tews9, age: 13 }))).toBe(9); // KNH adult A&E starts at 13
     expect(queueSeverity(patient('d', 'RED', { vitals: { heartRate: 140 } }))).toBeNull();
   });
 
