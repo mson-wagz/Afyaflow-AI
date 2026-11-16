@@ -642,6 +642,8 @@ test('administrators deactivate, reactivate, reset and sign out staff accounts w
   assert.deepEqual(events.map(e=>e.event_type),['STAFF_DEACTIVATED','STAFF_REACTIVATED','STAFF_SESSIONS_ENDED','STAFF_PIN_RESET']);
   assert.ok(events.every(e=>e.staff_id==='STAFF-104' && e.details.reason==='Synthetic account review.'));
   // Two administrators deactivating each other at once cannot remove the last one.
+  // Other seeded administrators are set aside so these two are the only active ones.
+  const others=(await database.pool.query("UPDATE staff SET active=false WHERE role='admin' AND active AND id<>'STAFF-104' RETURNING id")).rows.map(r=>r.id);
   await database.pool.query("INSERT INTO staff(id,staff_number,role,pin_hash,profile) VALUES('STAFF-ADMIN-2','ADM-002','admin',$1,$2)",
     [pinHash('602418'),JSON.stringify({name:'Synthetic Second Admin'})]);
   const reason={reason:'Synthetic concurrent deactivation.'};
@@ -649,6 +651,7 @@ test('administrators deactivate, reactivate, reset and sign out staff accounts w
   await setStaffActive(database,adminA,'STAFF-ADMIN-2',false,reason);
   await assert.rejects(setStaffActive(database,adminB,'STAFF-104',false,reason),(error:any)=>error.getResponse().code==='LAST_ADMIN');
   assert.equal((await database.pool.query("SELECT active FROM staff WHERE id='STAFF-104'")).rows[0].active,true);
+  await database.pool.query('UPDATE staff SET active=true WHERE id=ANY($1)',[others]);
 });
 
 test('a display name shared by two accounts cannot be used to sign in',async()=>{

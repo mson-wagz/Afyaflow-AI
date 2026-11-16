@@ -27,9 +27,11 @@ research records are read-only and excluded from the synthetic clinical queue.
    `npm run dev --prefix src/frontend`. Open http://localhost:5173.
 
 **Local development accounts.** Outside production, the seed creates the fixtures in
-`src/shared/contracts/auth.js` with their six-digit development PINs: STAFF-101
-(nurse), STAFF-102 (clinician), STAFF-103 (clerk) and STAFF-104 (admin). Read the PINs
-from that file. They are public in this repository, so in production
+`src/shared/contracts/auth.js` with their six-digit development PINs, two per role
+for simulating handovers and reassignment: STAFF-101 and STAFF-105 (nurses), STAFF-102
+and STAFF-106 (clinicians), STAFF-107 (doctor), STAFF-103 and STAFF-108 (clerks), and
+STAFF-104 and STAFF-109 (admins; each needs `staff:admin enroll-mfa` before signing in).
+Read the PINs from that file. They are public in this repository, so in production
 (`NODE_ENV=production`) the seed instead gives each account a random 64-character
 secret that no PIN can match. PINs are hashed with salted scrypt. Synthetic seeding
 retains existing records and is disabled in production unless
