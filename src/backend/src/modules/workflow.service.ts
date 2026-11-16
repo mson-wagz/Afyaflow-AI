@@ -457,6 +457,11 @@ export class WorkflowService {
       requireWorkflowVisit(visit);
       if (visit.observation_version !== input.observationVersion) throw new ConflictException('Observation version changed.');
       if (input.action === 'ESCALATE' && !input.targetPriority) throw new BadRequestException('A manual escalation priority is required.');
+      // Escalation only raises urgency; lowering a priority must go through a reviewed triage decision.
+      const urgency = { RED: 1, ORANGE: 2, YELLOW: 3, GREEN: 4 } as const;
+      if (input.action === 'ESCALATE' && visit.approved_priority &&
+        urgency[input.targetPriority as keyof typeof urgency] >= urgency[visit.approved_priority as keyof typeof urgency])
+        throw new BadRequestException({ code: 'NOT_AN_ESCALATION', message: `Escalation must be more urgent than the current ${visit.approved_priority} priority. Use a triage review to lower or keep a priority.` });
       const code = input.action === 'ESCALATE' ? input.targetPriority : visit.approved_priority;
       if (input.action === 'ESCALATE') {
         await db.query("UPDATE visits SET approved_priority=$2,assessment_version=assessment_version+1,assessment_status='APPROVED',updated_at=now() WHERE id=$1", [visit.id, code]);

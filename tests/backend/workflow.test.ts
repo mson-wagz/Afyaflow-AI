@@ -118,6 +118,17 @@ test('routing enforces clinical permission and assessment/department versions',a
   assert.equal(a.data.transferId,b.data.transferId);
   assert.match((await workflow.queue()).queue.find(v=>v.visitId===visit.id)!.assignedDepartment,/General Outpatient/);
 });
+test('manual escalation only raises urgency',async () => {
+  const result=await register(),proposal=await assess(result.data.id);
+  await workflow.decide(nurse,{patientId:proposal.patientId,proposalId:proposal.proposalId,observationVersion:proposal.observationVersion,
+    decision:'OVERRIDDEN',overridePriority:'YELLOW',reason:'Synthetic override to a known starting priority.'},randomUUID());
+  const escalate=(targetPriority:string)=>workflow.reassess(nurse,{patientId:result.data.id,observationVersion:1,action:'ESCALATE',
+    targetPriority,reason:'Synthetic deterioration review.'},randomUUID());
+  for(const lower of ['GREEN','YELLOW'])
+    await assert.rejects(escalate(lower),(error:any)=>error.getStatus()===400 && error.getResponse().code==='NOT_AN_ESCALATION');
+  assert.equal((await workflow.visits()).find(v=>v.id===result.data.id)!.approvedPriority.code,'YELLOW');
+  assert.equal((await escalate('ORANGE')).data.newPriority.code,'ORANGE');
+});
 test('transfers occupy and release department beds and bump department versions',async () => {
   const template=(await database.pool.query("SELECT data FROM departments WHERE id='DEP-GOPD'")).rows[0].data;
   for(const [id,name] of [['DEP-TEST-A','Synthetic Ward A'],['DEP-TEST-B','Synthetic Ward B']])
