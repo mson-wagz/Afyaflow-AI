@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import useAuth from './useAuth';
-import { SYNTHETIC_STAFF_FIXTURES } from '../../../../shared/contracts/auth.js';
-import { Button, Input, Card, Alert, Badge } from '../../components';
+import { Button, Input, Card, Alert } from '../../components';
 
 /**
  * Staff Sign-In Screen
@@ -40,12 +39,6 @@ export default function SignInScreen() {
     } finally {
       setLoading(false);
     }
-  };
-
-  const handleSelectQuickStaff = (staff) => {
-    setIdentifier(staff.staffNumber);
-    setPin(staff.pin);
-    setError('');
   };
 
   return (
@@ -157,66 +150,6 @@ export default function SignInScreen() {
               </Button>
             </div>
           </form>
-
-          {/* Synthetic Demo Personas for Quick Review */}
-          <div
-            style={{
-              marginTop: '1.5rem',
-              paddingTop: '1.25rem',
-              borderTop: '1px solid var(--color-border-subtle)',
-            }}
-          >
-            <div
-              style={{
-                fontSize: '0.8rem',
-                fontWeight: 600,
-                color: 'var(--color-text-muted)',
-                marginBottom: '0.75rem',
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-              }}
-            >
-              <span>Quick Select Synthetic Persona:</span>
-              <span style={{ fontSize: '0.7rem', color: 'var(--color-primary)' }}>
-                Contract-aligned
-              </span>
-            </div>
-
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
-              {SYNTHETIC_STAFF_FIXTURES.map((f) => (
-                <button
-                  key={f.id}
-                  type="button"
-                  onClick={() => handleSelectQuickStaff(f)}
-                  className="btn btn-outline btn-sm"
-                  style={{
-                    display: 'flex',
-                    flexDirection: 'column',
-                    alignItems: 'flex-start',
-                    textAlign: 'left',
-                    padding: '0.5rem',
-                    height: 'auto',
-                    minHeight: '52px',
-                    backgroundColor: identifier === f.staffNumber ? 'var(--color-primary-light)' : '#f8fafc',
-                    borderColor: identifier === f.staffNumber ? 'var(--color-primary)' : 'var(--color-border)',
-                  }}
-                >
-                  <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%' }}>
-                    <strong style={{ fontSize: '0.8rem' }}>{f.name}</strong>
-                  </div>
-                  <div style={{ display: 'flex', gap: '0.35rem', marginTop: '2px', alignItems: 'center' }}>
-                    <Badge variant={f.isClinical ? 'clinical' : 'admin'} style={{ fontSize: '0.65rem' }}>
-                      {f.role}
-                    </Badge>
-                    <span style={{ fontSize: '0.7rem', color: 'var(--color-text-subtle)' }}>
-                      PIN: {f.pin}
-                    </span>
-                  </div>
-                </button>
-              ))}
-            </div>
-          </div>
         </Card>
       </div>
     </div>
