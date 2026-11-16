@@ -8,6 +8,7 @@ import { Database, audit } from './database/db.js';
 import { config } from './config.js';
 import { FollowupService } from './modules/followup.service.js';
 import { OperationsService } from './modules/operations.service.js';
+import { visitBundle } from './modules/fhir.js';
 
 @Controller('api')
 @UseInterceptors(AccessLogInterceptor)
@@ -49,6 +50,10 @@ export class ApiController {
   @Post('visits') @UseGuards(SessionGuard) register(@Req()req:StaffRequest,@Body()body:unknown,@Headers('idempotency-key')key:string) {return this.workflow.register(req.staff,body,requestKey(key));}
   @Post('visits/:id/observations') @UseGuards(SessionGuard) observations(@Req()req:StaffRequest,@Param('id')visitId:string,@Body()body:unknown,@Headers('idempotency-key')key:string) {return this.workflow.observations(req.staff,visitId,body,requestKey(key));}
   @Get('queue') @UseGuards(SessionGuard) @AccessLogged() queue() {return this.workflow.queue();}
+  // FHIR R4 export of one visit (open or closed) for hospital systems; a record read, so access-logged.
+  @Get('visits/:id/fhir') @UseGuards(SessionGuard) @AccessLogged() fhir(@Req()req:StaffRequest,@Param('id')visitId:string,@Res({passthrough:true})res:Response) {
+    res.type('application/fhir+json');return visitBundle(this.database,req.staff,visitId);
+  }
   @Post('visits/:id/seen') @UseGuards(SessionGuard) seen(@Req()req:StaffRequest,@Param('id')visitId:string,@Headers('idempotency-key')key:string) {return this.workflow.markSeen(req.staff,visitId,requestKey(key));}
   @Post('visits/:id/outcome') @UseGuards(SessionGuard) outcome(@Req()req:StaffRequest,@Param('id')visitId:string,@Body()body:unknown,@Headers('idempotency-key')key:string) {return this.workflow.recordOutcome(req.staff,visitId,body,requestKey(key));}
   @Post('queue/precedence') @UseGuards(SessionGuard) precedence(@Req()req:StaffRequest,@Body()body:unknown,@Headers('idempotency-key')key:string) {return this.workflow.precedence(req.staff,body,requestKey(key));}
