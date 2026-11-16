@@ -118,6 +118,35 @@ test('routing enforces clinical permission and assessment/department versions',a
   assert.equal(a.data.transferId,b.data.transferId);
   assert.match((await workflow.queue()).queue.find(v=>v.visitId===visit.id)!.assignedDepartment,/General Outpatient/);
 });
+test('transfers occupy and release department beds and bump department versions',async () => {
+  const template=(await database.pool.query("SELECT data FROM departments WHERE id='DEP-GOPD'")).rows[0].data;
+  for(const [id,name] of [['DEP-TEST-A','Synthetic Ward A'],['DEP-TEST-B','Synthetic Ward B']])
+    await database.pool.query('INSERT INTO departments(id,data) VALUES($1,$2)',[id,JSON.stringify({...template,name,status:'OPEN',totalBeds:1,occupiedBeds:0})]);
+  const approvedVisit=async()=>{const r=await register();await decision(await assess(r.data.id));return (await workflow.visits()).find(v=>v.id===r.data.id)!;};
+  const first=await approvedVisit(),second=await approvedVisit();
+  const ward=async(id:string)=>(await workflow.departments()).find(d=>d.id===id)!;
+  const move=(visit:any,departmentId:string,departmentVersion:number)=>workflow.transfer(nurse,{patientId:visit.id,departmentId,
+    assessmentVersion:visit.assessmentVersion,departmentVersion,rationale:'Synthetic capacity check.'},randomUUID());
+  const code=(expected:string)=>(error:any)=>error.getResponse().code===expected;
+  // Taking the only bed fills the ward and changes its version.
+  const moved=await move(first,'DEP-TEST-A',1);
+  assert.equal(moved.data.previousDepartment,'Triage Holding');
+  assert.deepEqual([(await ward('DEP-TEST-A')).occupiedBeds,(await ward('DEP-TEST-A')).version],[1,2]);
+  // A view from before that transfer is stale; a fresh one sees the ward is full.
+  await assert.rejects(move(second,'DEP-TEST-A',1),code('STALE_ROUTE'));
+  await assert.rejects(move(second,'DEP-TEST-A',2),code('DEPARTMENT_UNAVAILABLE'));
+  // Moving the first patient on releases the bed they held.
+  await move(first,'DEP-TEST-B',1);
+  assert.deepEqual([(await ward('DEP-TEST-A')).occupiedBeds,(await ward('DEP-TEST-A')).version],[0,3]);
+  assert.deepEqual([(await ward('DEP-TEST-B')).occupiedBeds,(await ward('DEP-TEST-B')).version],[1,2]);
+  await move(second,'DEP-TEST-A',3);
+  assert.equal((await ward('DEP-TEST-A')).occupiedBeds,1);
+  // Re-transferring to the current department is refused rather than double-counting a bed.
+  await assert.rejects(move(first,'DEP-TEST-B',2),code('ALREADY_IN_DEPARTMENT'));
+  assert.equal((await ward('DEP-TEST-B')).occupiedBeds,1);
+  const audit=(await database.pool.query("SELECT details FROM audit_events WHERE visit_id=$1 AND event_type='DEPARTMENT_TRANSFERRED' ORDER BY timestamp",[first.id])).rows;
+  assert.deepEqual(audit.map(a=>a.details.previousDepartmentId),[null,'DEP-TEST-A']);
+});
 test('PostgreSQL transaction rollback leaves neither visit change nor audit event',async () => {
   const before=(await database.pool.query("SELECT * FROM visits WHERE id='SYN-PT-8821'")).rows[0];
   await assert.rejects(database.transaction(async db=>{await db.query("UPDATE visits SET approved_priority='RED' WHERE id='SYN-PT-8821'");throw new Error('intentional rollback');}));

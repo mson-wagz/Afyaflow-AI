@@ -390,25 +390,42 @@ export class WorkflowService {
     }));
   }
 
-  /** Transfer a patient to a department with clinician approval. */
+  /**
+   * Transfer a patient to a department with clinician approval.
+   * Occupies a bed in the target department and releases the bed held in the previous one,
+   * bumping both department versions so stale routing views are refused.
+   */
   async transfer(staff: Staff, body: unknown, key: string) {
     requireClinical(staff); const input = parse(transferSchema, body);
     return this.database.transaction((db) => idempotent(db, staff.id, 'transfer', key, input, async () => {
       const visit = (await db.query('SELECT * FROM visits WHERE id=$1 FOR UPDATE', [input.patientId])).rows[0];
-      const department = (await db.query('SELECT * FROM departments WHERE id=$1 FOR UPDATE', [input.departmentId])).rows[0];
-      if (!visit || !department) throw new NotFoundException('Visit or department not found.');
+      if (!visit) throw new NotFoundException('Visit or department not found.');
+      // Lock target and previous departments in id order so concurrent opposite transfers cannot deadlock.
+      const ids = [...new Set([input.departmentId, visit.department_id].filter(Boolean))];
+      const locked = (await db.query('SELECT * FROM departments WHERE id=ANY($1) ORDER BY id FOR UPDATE', [ids])).rows;
+      const department = locked.find((d) => d.id === input.departmentId);
+      if (!department) throw new NotFoundException('Visit or department not found.');
       requireWorkflowVisit(visit);
       if (!visit.approved_priority || visit.assessment_version !== input.assessmentVersion || department.version !== input.departmentVersion)
         throw new ConflictException({ code: 'STALE_ROUTE', message: 'Approved assessment or department availability changed. Refresh routing.' });
+      if (visit.department_id === department.id)
+        throw new ConflictException({ code: 'ALREADY_IN_DEPARTMENT', message: `The patient is already assigned to ${department.data.name}.` });
       if (department.data.status === 'CLOSED' || department.data.occupiedBeds >= department.data.totalBeds)
         throw new ConflictException({ code: 'DEPARTMENT_UNAVAILABLE', message: 'No available capacity. Escalate for manual routing; urgency is unchanged.' });
+      const previous = locked.find((d) => d.id === visit.department_id) || null;
       const record = {
         transferId: id('TRF'), patientId: visit.id, patientName: visit.name, department: department.data.name,
+        previousDepartment: previous?.data.name ?? visit.assigned_department,
         approvedPriority: priority(visit.approved_priority), clinicianName: staff.name, timestamp: new Date().toISOString(), rationale: input.rationale, serverAcknowledged: true,
       };
       await db.query('INSERT INTO transfers(id,visit_id,staff_id,department_id,data) VALUES($1,$2,$3,$4,$5)', [record.transferId, visit.id, staff.id, department.id, JSON.stringify(record)]);
       await db.query('UPDATE visits SET department_id=$2,assigned_department=$3,updated_at=now() WHERE id=$1', [visit.id, department.id, department.data.name]);
-      await audit(db, staff.id, 'DEPARTMENT_TRANSFERRED', { transferId: record.transferId, departmentId: department.id }, visit.id);
+      await db.query(`UPDATE departments SET data=jsonb_set(data,'{occupiedBeds}',to_jsonb((data->>'occupiedBeds')::int+$2)),
+        version=version+1,updated_at=now() WHERE id=$1`, [department.id, 1]);
+      if (previous)
+        await db.query(`UPDATE departments SET data=jsonb_set(data,'{occupiedBeds}',to_jsonb(greatest((data->>'occupiedBeds')::int-1,0))),
+          version=version+1,updated_at=now() WHERE id=$1`, [previous.id]);
+      await audit(db, staff.id, 'DEPARTMENT_TRANSFERRED', { transferId: record.transferId, departmentId: department.id, previousDepartmentId: previous?.id ?? null }, visit.id);
       return { success: true, data: record };
     }));
   }
