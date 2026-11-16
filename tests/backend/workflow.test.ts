@@ -590,6 +590,67 @@ test('administrators must enrol an authenticator and present a fresh code at sig
   assert.ok(!JSON.stringify(await database.pool.query("SELECT details FROM audit_events WHERE event_type LIKE 'STAFF_MFA_%'").then(r=>r.rows)).includes(secret));
 });
 
+test('administrators deactivate, reactivate, reset and sign out staff accounts with reasons',async()=>{
+  const {pinHash}=await import('../../src/backend/src/auth/auth.js');
+  const {setStaffActive}=await import('../../src/backend/src/admin/staff-accounts.js');
+  await database.pool.query("INSERT INTO staff(id,staff_number,role,pin_hash,profile) VALUES('STAFF-LIFE','LIFE-001','nurse',$1,$2)",
+    [pinHash('602418'),JSON.stringify({name:'Synthetic Lifecycle Nurse'})]);
+  const admin=await adminLogin();
+  let nurse=await loginAs('STAFF-LIFE','602418');
+  const act=(session:string,path:string,body:object={reason:'Synthetic account review.'})=>post(path,session,body);
+  const status=async(session:string)=>(await fetch(`${base}/api/queue`,{headers:{Cookie:session}})).status;
+  const signIn=(pin:string)=>fetch(`${base}/api/auth/login`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({identifier:'STAFF-LIFE',pin})});
+  // Only administrators manage accounts, and the list never exposes secrets.
+  assert.equal((await fetch(`${base}/api/staff`,{headers:{Cookie:nurse}})).status,403);
+  assert.equal((await act(nurse,'/staff/STAFF-101/deactivate')).status,403);
+  const list=await get('/staff',admin);
+  assert.deepEqual(list.find((s:any)=>s.id==='STAFF-LIFE'),{id:'STAFF-LIFE',staffNumber:'LIFE-001',name:'Synthetic Lifecycle Nurse',
+    role:'nurse',active:true,deactivatedAt:null,mfaEnrolled:false,openSessions:1});
+  assert.ok(!JSON.stringify(list).includes('pin_hash') && !list.some((s:any)=>s.name==='MIMIC dataset importer'));
+  // A reason is required.
+  assert.equal((await act(admin,'/staff/STAFF-LIFE/deactivate',{reason:'no'})).status,400);
+  // Deactivation ends sessions and blocks sign-in, and removes the person from follow-up owners.
+  assert.equal((await act(admin,'/staff/STAFF-LIFE/deactivate')).status,201);
+  assert.equal(await status(nurse),401);
+  const refused=await signIn('602418');
+  assert.equal(refused.status,403);assert.equal((await refused.json()).code,'ACCOUNT_DEACTIVATED');
+  assert.equal((await act(admin,'/staff/STAFF-LIFE/deactivate')).status,409);
+  const clinician=await loginAs('STAFF-102','234567');
+  assert.ok(!(await get('/followups/staff',clinician)).some((s:any)=>s.id==='STAFF-LIFE'));
+  assert.equal((await act(admin,'/staff/STAFF-LIFE/reactivate')).status,201);
+  nurse=await loginAs('STAFF-LIFE','602418');
+  // Ending sessions signs the person out everywhere without changing their PIN.
+  assert.equal((await act(admin,'/staff/STAFF-LIFE/end-sessions')).status,201);
+  assert.equal(await status(nurse),401);
+  assert.equal((await signIn('602418')).status,201);
+  // A PIN reset returns the new PIN once and never stores it.
+  const reset=await act(admin,'/staff/STAFF-LIFE/reset-pin');
+  assert.equal(reset.status,201);
+  const {pin}=(await reset.json()).data;
+  assert.match(pin,/^\d{6}$/);
+  assert.equal((await signIn('602418')).status,401);
+  assert.equal((await signIn(pin)).status,201);
+  const stored=JSON.stringify((await database.pool.query('SELECT response FROM request_keys')).rows)+
+    JSON.stringify((await database.pool.query('SELECT details FROM audit_events').then(r=>r.rows)));
+  assert.ok(!stored.includes(pin));
+  // Administrators cannot act on their own account.
+  for(const action of ['deactivate','reset-pin','end-sessions']){
+    const self=await act(admin,`/staff/STAFF-104/${action}`);
+    assert.equal(self.status,400);assert.equal((await self.json()).code,'SELF_ACTION');
+  }
+  const events=(await database.pool.query("SELECT event_type,staff_id,details FROM audit_events WHERE details->>'staffId'='STAFF-LIFE' ORDER BY timestamp")).rows;
+  assert.deepEqual(events.map(e=>e.event_type),['STAFF_DEACTIVATED','STAFF_REACTIVATED','STAFF_SESSIONS_ENDED','STAFF_PIN_RESET']);
+  assert.ok(events.every(e=>e.staff_id==='STAFF-104' && e.details.reason==='Synthetic account review.'));
+  // Two administrators deactivating each other at once cannot remove the last one.
+  await database.pool.query("INSERT INTO staff(id,staff_number,role,pin_hash,profile) VALUES('STAFF-ADMIN-2','ADM-002','admin',$1,$2)",
+    [pinHash('602418'),JSON.stringify({name:'Synthetic Second Admin'})]);
+  const reason={reason:'Synthetic concurrent deactivation.'};
+  const adminA={id:'STAFF-104',name:'A',role:'admin'},adminB={id:'STAFF-ADMIN-2',name:'B',role:'admin'};
+  await setStaffActive(database,adminA,'STAFF-ADMIN-2',false,reason);
+  await assert.rejects(setStaffActive(database,adminB,'STAFF-104',false,reason),(error:any)=>error.getResponse().code==='LAST_ADMIN');
+  assert.equal((await database.pool.query("SELECT active FROM staff WHERE id='STAFF-104'")).rows[0].active,true);
+});
+
 test('a display name shared by two accounts cannot be used to sign in',async()=>{
   const {pinHash}=await import('../../src/backend/src/auth/auth.js');
   for(const [id,number,pin] of [['STAFF-TWIN-1','TWIN-001','511111'],['STAFF-TWIN-2','TWIN-002','522222']])

@@ -148,6 +148,14 @@ Open **Staff Access & Audit** for permitted events. Nurses and clerks see their 
 
 Viewing patient records is also recorded: each screen that shows patient data logs who viewed which patients and when (repeated refreshes of the same view are recorded once every five minutes). Administrators can review this record-access history, for example to answer "who has viewed this patient?", through `GET /api/audit/access?patientId=<visit ID>`. If the system cannot record an access, it does not show the data and asks you to try again.
 
+**Administrators: managing staff accounts.** Open **Staff Accounts** (shown only to administrators). Type a reason for the change first; it is required and recorded. Then, on a staff member's row:
+
+- **Deactivate** when someone leaves or should no longer have access. They are signed out everywhere and cannot sign in; **Reactivate** restores access.
+- **Reset PIN** when someone forgets their PIN or it may be known to others. The new PIN appears once at the top of the screen; give it to the person privately. Their other sessions end.
+- **End sessions** when a device was lost or left signed in. The person keeps their PIN.
+
+You cannot change your own account, and the last active administrator cannot be deactivated. Authenticator apps are set up by the system operator.
+
 ## Troubleshooting
 
 ### Active reassessment and follow-ups

@@ -44,6 +44,7 @@ export class AuthService {
     const attemptKey=staff ? accountKey(staff.id) : unknownAccountKey(identifier);
     await this.requireAccountAttempt(attemptKey);
     if (!staff || !pinMatches(pin,staff.pin_hash)) throw new UnauthorizedException({code:'INVALID_CREDENTIALS',message:'Invalid staff identifier or PIN.'});
+    if (!staff.active) throw new ForbiddenException({code:'ACCOUNT_DEACTIVATED',message:'This account has been deactivated. Contact an administrator.'});
     if (MFA_REQUIRED_ROLES.includes(staff.role)) await this.requireSecondFactor(staff,otp);
     await clearAuthAttempts(this.database,attemptKey);
     const token=randomBytes(32).toString('hex');
@@ -58,7 +59,7 @@ export class AuthService {
     if (!token || !/^[a-f0-9]{64}$/.test(token)) throw new UnauthorizedException({code:'UNAUTHENTICATED',message:'Sign in to continue.'});
     const row=(await this.database.pool.query(`SELECT s.*,t.role,t.profile,
       s.last_seen_at<now()-make_interval(mins=>$2) AS idle, s.last_seen_at<now()-interval '60 seconds' AS touch_due
-      FROM sessions s JOIN staff t ON t.id=s.staff_id WHERE s.token_hash=$1 AND s.expires_at>now()`,[hash(token),config.sessionIdleMinutes])).rows[0];
+      FROM sessions s JOIN staff t ON t.id=s.staff_id WHERE s.token_hash=$1 AND s.expires_at>now() AND t.active`,[hash(token),config.sessionIdleMinutes])).rows[0];
     if (!row) throw new UnauthorizedException({code:'SESSION_EXPIRED',message:'Session expired. Sign in again.'});
     // Server-side automatic lock: a session with no authenticated request for SESSION_IDLE_MINUTES
     // (closed tab, crashed device, bypassed client timer) needs the PIN again.

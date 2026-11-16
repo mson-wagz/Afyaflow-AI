@@ -7,6 +7,7 @@ import {
   LockScreen,
   StaffProfileModal,
   SecurityAuditView,
+  StaffAccountsView,
 } from './features/staff-access';
 import { RegistrationView } from './features/registration';
 import { TriageView } from './features/triage';
@@ -67,6 +68,7 @@ function AppShell() {
             isClinical={isClinical}
             pendingSyncCount={pendingCount}
             competitionMode={competitionMode}
+            isAdmin={staff.role === 'admin'}
           />
 
           <div
@@ -99,6 +101,7 @@ function AppShell() {
           {currentView === 'routing' && <RoutingView currentStaff={staff} isClinical={isClinical} />}
           {currentView === 'offline-sync' && <OfflineSyncView />}
           {currentView === 'security-audit' && <SecurityAuditView />}
+          {currentView === 'staff-accounts' && staff.role === 'admin' && <StaffAccountsView />}
         </main>
       </div>
 

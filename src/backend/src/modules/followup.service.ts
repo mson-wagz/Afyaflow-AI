@@ -19,7 +19,7 @@ export class FollowupService {
   now=()=>new Date();
   async staff(staff:Staff) {
     requireClinical(staff);
-    return (await this.database.pool.query("SELECT id,profile->>'name' name,role FROM staff WHERE role IN ('nurse','clinician','doctor') ORDER BY id")).rows;
+    return (await this.database.pool.query("SELECT id,profile->>'name' name,role FROM staff WHERE active AND role IN ('nurse','clinician','doctor') ORDER BY id")).rows;
   }
   async list(staff:Staff) {
     requireClinical(staff);const now=this.now().getTime();
@@ -87,7 +87,7 @@ export class FollowupService {
     }));
   }
   private async requireOwner(db:any,ownerId:string) {
-    const owner=(await db.query("SELECT id FROM staff WHERE id=$1 AND role IN ('nurse','clinician','doctor')",[ownerId])).rows[0];
+    const owner=(await db.query("SELECT id FROM staff WHERE id=$1 AND active AND role IN ('nurse','clinician','doctor')",[ownerId])).rows[0];
     if(!owner)throw new BadRequestException('Choose an eligible clinical staff owner.');
   }
 }
