@@ -201,7 +201,7 @@ before an agent proposal can change the approved queue. See [competition setup](
 The scoring rules remain an unvalidated synthetic demonstration fixture. A local model
 does not make the scores clinically validated.
 
-- **Sign-in fails:** check identifier/PIN, backend connectivity, and whether demo accounts were seeded. Repeated attempts can trigger temporary throttling.
+- **Sign-in fails:** check identifier/PIN, backend connectivity, and whether demo accounts were seeded. Repeated attempts can trigger temporary throttling: 20 attempts per minute from one network address, and 10 incorrect PINs per account within 15 minutes. Incorrect unlock PINs count toward the same account limit. A successful sign-in or unlock clears the account count; otherwise wait 15 minutes.
 - **Validation passes but registration fails:** check demographic/complaint errors and role permissions. Measurement validation checks only that section.
 - **No proposed priority:** inspect run status and missing evidence; ask the developer to check model access. Unsupported populations need staff review.
 - **Override denied:** use an authorised clinical account or ask an authorised staff member to review.

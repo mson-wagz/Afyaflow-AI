@@ -31,6 +31,8 @@ services:
       DATABASE_SSL: 'false'
       DATABASE_POOL_MAX: '5'
       APP_ORIGIN: https://${APP_DOMAIN:?HTTPS hostname required}
+      # The app publishes no ports; only Caddy reaches it and Caddy sets this header.
+      TRUST_PROXY_CLIENT_IP: 'true'
       AWS_REGION: ${AWS_REGION:-eu-west-1}
       AI_PROVIDER: ${AI_PROVIDER:-bedrock}
       OPENAI_MODEL: ${OPENAI_MODEL:-gpt-4.1-mini}

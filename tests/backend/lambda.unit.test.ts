@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import type { SQSEvent } from 'aws-lambda';
 import { handleAgentRecords } from '../../src/backend/src/lambda/worker.js';
-import { trustedCloudFrontSource } from '../../src/backend/src/auth/ingress.js';
+import { trustedCloudFrontSource, trustedProxySource } from '../../src/backend/src/auth/ingress.js';
 
 const job={runId:'RUN-12345678-1234-1234-1234-123456789abc',generation:1};
 function event(bodies:string[]):SQSEvent {
@@ -33,4 +33,12 @@ test('viewer addresses require a valid CloudFront origin token',()=>{
   assert.equal(trustedCloudFrontSource({...headers,'x-afyaflow-origin-token':'forged'},token),null);
   assert.equal(trustedCloudFrontSource({...headers,'cloudfront-viewer-address':'invalid'},token),null);
   assert.equal(trustedCloudFrontSource({'x-forwarded-for':'192.0.2.10'},token),null);
+});
+test('proxy client addresses come only from the header the proxy overwrites',()=>{
+  assert.equal(trustedProxySource({'x-afyaflow-client-ip':'198.51.100.7'}),'198.51.100.7');
+  assert.equal(trustedProxySource({'x-afyaflow-client-ip':'2001:db8::5'}),'2001:db8::5');
+  assert.equal(trustedProxySource({'x-afyaflow-client-ip':'198.51.100.7, 203.0.113.9'}),null);
+  assert.equal(trustedProxySource({'x-afyaflow-client-ip':'not-an-address'}),null);
+  assert.equal(trustedProxySource({'x-forwarded-for':'198.51.100.7'}),null);
+  assert.equal(trustedProxySource({}),null);
 });

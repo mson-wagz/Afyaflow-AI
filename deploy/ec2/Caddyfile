@@ -1,6 +1,9 @@
 {$APP_DOMAIN} {
     encode zstd gzip
-    reverse_proxy app:3000
+    reverse_proxy app:3000 {
+        # Overwrites any client-supplied value; the app throttles sign-in by this address.
+        header_up X-AfyaFlow-Client-IP {remote_host}
+    }
     header {
         X-Content-Type-Options nosniff
         Referrer-Policy strict-origin-when-cross-origin
