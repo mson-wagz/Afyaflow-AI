@@ -8,6 +8,8 @@
 export const TRIAGE_PRIORITY = {
   RED: {
     code: 'RED',
+    level: 1,
+    category: 'Emergency',
     label: 'Resuscitation / Immediate',
     color: '#dc2626',
     bgColor: '#fee2e2',
@@ -16,6 +18,8 @@ export const TRIAGE_PRIORITY = {
   },
   ORANGE: {
     code: 'ORANGE',
+    level: 2,
+    category: 'Very urgent',
     label: 'Very Urgent',
     color: '#c2410c',
     bgColor: '#ffedd5',
@@ -24,6 +28,8 @@ export const TRIAGE_PRIORITY = {
   },
   YELLOW: {
     code: 'YELLOW',
+    level: 3,
+    category: 'Urgent',
     label: 'Urgent',
     color: '#a16207',
     bgColor: '#fef9c3',
@@ -32,6 +38,8 @@ export const TRIAGE_PRIORITY = {
   },
   GREEN: {
     code: 'GREEN',
+    level: 4,
+    category: 'Routine',
     label: 'Routine',
     color: '#15803d',
     bgColor: '#dcfce7',
@@ -40,6 +48,8 @@ export const TRIAGE_PRIORITY = {
   },
   BLUE: {
     code: 'BLUE',
+    level: 5,
+    category: 'Deceased',
     label: 'Deceased',
     color: '#475569',
     bgColor: '#f1f5f9',

@@ -94,7 +94,16 @@ If the agent is unavailable, an authorised clinician can open **Manual assessmen
 
 Open **Hospital Queue** to inspect visits, waiting times, approved priorities, assessment status, and departments. Use the department filter and refresh controls.
 
-Pending proposals do not silently replace approved priorities. Queue priority changes come from saved staff decisions. Workload/capacity recommendations use synthetic data, not actual staffing or bed measurements.
+Pending proposals do not silently replace approved priorities. Queue priority changes come from saved staff decisions.
+
+Patients are ordered by approved level: Level 1 (Emergency) first, then Levels 2, 3 and 4. When several patients share a level:
+
+- **Level 1:** the patient with the highest early warning score (TEWS) comes first. A patient who cannot be scored (a child, or missing observations) comes before scored patients, because there is no evidence they are less severe. Then earliest arrival.
+- **Levels 2–4:** earliest arrival first, because everyone on the level has the same time target. Patients who arrived at the same time are ordered by TEWS.
+- Arrival times within the same minute count as the same time.
+- **Patients tied on everything** (same level, score and arrival) are marked **Tied 1 of 2** and so on. Clinical staff can press **See first** on one of them and give a reason; it moves to the top of the tied group only, and the choice ends when that patient's observations change. Otherwise the patient registered first is seen first. If Level 1 patients are tied, a red alert asks you to call additional clinicians, because they all need immediate care.
+
+Under the order number, **Same level as above** explains why a patient is below the one above them. The ordering never changes anyone's level; reassess the patient to do that. Details: [Queue ordering](QUEUE_ORDERING.md). Workload/capacity recommendations use synthetic data, not actual staffing or bed measurements.
 
 **Showing Stale Queue Snapshot** means a refresh failed and older information is retained. Check the last-confirmed time and restore connectivity before treating it as current shared state. **Simulate Polling Outage** is a demo control; end it with **Restore Network**.
 

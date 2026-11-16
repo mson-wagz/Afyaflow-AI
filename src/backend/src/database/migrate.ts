@@ -57,6 +57,10 @@ export async function migrate(database: Database) {
       await db.query(await readFile('src/backend/src/database/009_staff_lifecycle.sql','utf8'));
       await db.query("INSERT INTO schema_migrations(version) VALUES('009')");
     }
+    if (!(await db.query("SELECT 1 FROM schema_migrations WHERE version='010'")).rowCount) {
+      await db.query(await readFile('src/backend/src/database/010_queue_ties.sql','utf8'));
+      await db.query("INSERT INTO schema_migrations(version) VALUES('010')");
+    }
   });
 }
 if (

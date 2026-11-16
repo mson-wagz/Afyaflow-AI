@@ -1049,3 +1049,50 @@ test('operations summary reports synthetic aggregates without patient identifier
   assert.equal((await fetch(`${base}/api/operations/summary?period=1y`,{headers:{Cookie:nurseSession}})).status,400);
   assert.equal((await get('/operations/summary',await adminLogin())).period,'today');
 });
+
+test('Level 1 ties: severity first, a full tie by registration order, and an audited clinician choice',async()=>{
+  const session=await loginAs('STAFF-101','123456'),clerkSession=await loginAs('STAFF-103','345678');
+  const arrivalTime='2026-01-01T06:00:00.000Z';
+  const tews7={heartRate:135,systolicBp:75,respiratoryRate:25,temperature:38.6,avpu:'Alert'};
+  const tews9={heartRate:135,systolicBp:75,respiratoryRate:32,temperature:37,avpu:'Voice'};
+  const ids:string[]=[];
+  // Seconds within the minute do not separate arrivals.
+  for(const [name,vitals,time] of [['Synthetic Red Seven',tews7,arrivalTime],['Synthetic Red Nine A',tews9,arrivalTime],
+    ['Synthetic Red Nine B',tews9,'2026-01-01T06:00:40.000Z']] as const){
+    const visitId=(await workflow.register(nurse,{...intake,name,arrivalTime:time,...vitals},randomUUID())).data.id;ids.push(visitId);
+    await decision(await assess(visitId));
+  }
+  const [seven,nineA,nineB]=ids;
+  const served=async()=>(await get('/queue',session)).queue;
+  const mine=(queue:any[])=>queue.filter((v:any)=>ids.includes(v.visitId));
+  let queue=await served();
+  // TEWS 9 before TEWS 7; the two TEWS 9 patients are a full clinical tie, decided by registration order.
+  assert.deepEqual(mine(queue).map((v:any)=>v.visitId),[nineA,nineB,seven]);
+  assert.ok(mine(queue).every((v:any)=>v.approvedPriority.level===1));
+  const b=queue.find((v:any)=>v.visitId===nineB);
+  assert.equal(b.clinicalTie.size>=2,true);
+  assert.equal(queue.find((v:any)=>v.visitId===seven).clinicalTie,null);
+  assert.deepEqual(queue.map((v:any)=>v.queueOrder.rank),queue.map((_:any,i:number)=>i+1));
+  // A clinician chooses B first: reason required, clerks refused, stale versions and untied patients refused.
+  const choose=(cookie:string,visit:any,extra:object={})=>post('/queue/precedence',cookie,
+    {patientId:visit.visitId,observationVersion:visit.observationVersion,assessmentVersion:visit.assessmentVersion,reason:'Airway concern on reassessment',...extra});
+  assert.equal((await choose(clerkSession,b)).status,403);
+  assert.equal((await choose(session,b,{reason:'no'})).status,400);
+  assert.equal((await choose(session,b,{observationVersion:b.observationVersion+1})).status,409);
+  const notTied=await choose(session,queue.find((v:any)=>v.visitId===seven));
+  assert.equal(notTied.status,409);assert.equal((await notTied.json()).code,'NOT_TIED');
+  assert.equal((await choose(session,b)).status,201);
+  queue=await served();
+  assert.deepEqual(mine(queue).map((v:any)=>v.visitId),[nineB,nineA,seven]);
+  const chosen=queue.find((v:any)=>v.visitId===nineB);
+  assert.equal(chosen.queuePrecedence.reason,'Airway concern on reassessment');
+  assert.equal(chosen.queuePrecedence.byName,'Jane Mwangi, RN');
+  const event=(await database.pool.query("SELECT details FROM audit_events WHERE event_type='QUEUE_PRECEDENCE_SET' AND visit_id=$1",[nineB])).rows[0];
+  assert.ok(event.details.tiedWith.includes(nineA));
+  await assert.rejects(database.pool.query('DELETE FROM queue_precedence'),/append-only/);
+  // New observations end the choice: the tie falls back to registration order.
+  await workflow.observations(nurse,nineB,{vitals:tews9,expectedVersion:chosen.observationVersion},randomUUID());
+  queue=await served();
+  assert.equal(queue.find((v:any)=>v.visitId===nineB).queuePrecedence,null);
+  assert.deepEqual(mine(queue).map((v:any)=>v.visitId),[nineA,nineB,seven]);
+});

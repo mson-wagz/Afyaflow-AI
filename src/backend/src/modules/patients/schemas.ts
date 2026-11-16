@@ -28,3 +28,6 @@ export const decisionSchema=z.object({
 export const transferSchema=z.object({patientId:z.string(),departmentId:z.string(),
   assessmentVersion:z.number().int().nonnegative(),departmentVersion:z.number().int().positive(),
   rationale:z.string().trim().min(5).max(2000)}).strict();
+// A clinician's choice of which clinically tied patient to see first (docs/QUEUE_ORDERING.md).
+export const precedenceSchema=z.object({patientId:z.string().min(1),observationVersion:z.number().int().positive(),
+  assessmentVersion:z.number().int().nonnegative(),reason:z.string().trim().min(5).max(500)}).strict();
