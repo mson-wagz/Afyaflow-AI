@@ -22,16 +22,11 @@ Open **About the data and its limitations** for attribution. **Download adapted 
 
 ## 1. Sign in
 
-Open the supplied application URL, or `http://localhost:5173` locally. Enter a staff identifier and four-digit PIN, then sign in. The identifier can be your staff ID, staff number or full name; if another account shares your name, sign in with your staff ID or number.
+Open the supplied application URL, or `http://localhost:5173` locally. Enter a staff identifier and six-digit PIN, then sign in. The identifier can be your staff ID, staff number or full name; if another account shares your name, sign in with your staff ID or number.
 
-Synthetic development accounts:
+**Administrators** also need an authenticator app on their phone. After a correct PIN the sign-in screen asks for the 6-digit **Authenticator code**; each code works once. The system operator sets up the app with you. If you lose the phone, ask the operator to remove and re-enrol it. Unlocking a locked terminal needs only your PIN.
 
-- `STAFF-101` / `1234`: Jane, nurse.
-- `STAFF-102` / `2345`: Kamau, clinician.
-- `STAFF-103` / `3456`: Faith, clerk.
-- `STAFF-104` / `4567`: Samuel, administrator.
-
-These are public demo credentials, not production accounts. Quick-select staff cards are demonstration conveniences.
+Your PIN is issued to you privately by an administrator or the system operator; no PINs are published. Keep it to yourself and ask for a new one if you think someone else knows it. Developers running the app locally use the development accounts described in the [backend setup](../src/backend/README.md); those PINs do not work on any deployed site.
 
 Nurses and clinicians can record measurements, request assessments, approve/reject/override proposals, reassess patients, and authorise transfers. Clerks can register demographics and complaints and view queues; they cannot record clinical measurements or commit clinical decisions. Administrators can inspect broader audit history but cannot register visits or approve clinical decisions.
 
@@ -152,6 +147,14 @@ The terminal locks itself after the inactivity time chosen in your profile (1–
 Open **Staff Access & Audit** for permitted events. Nurses and clerks see their own staff events; clinicians and administrators see broader history. **Authorised Clinical Decision & Audit History** in the triage screen records patient decisions and reasons. History is not editable through the app.
 
 Viewing patient records is also recorded: each screen that shows patient data logs who viewed which patients and when (repeated refreshes of the same view are recorded once every five minutes). Administrators can review this record-access history, for example to answer "who has viewed this patient?", through `GET /api/audit/access?patientId=<visit ID>`. If the system cannot record an access, it does not show the data and asks you to try again.
+
+**Administrators: managing staff accounts.** Open **Staff Accounts** (shown only to administrators). Type a reason for the change first; it is required and recorded. Then, on a staff member's row:
+
+- **Deactivate** when someone leaves or should no longer have access. They are signed out everywhere and cannot sign in; **Reactivate** restores access.
+- **Reset PIN** when someone forgets their PIN or it may be known to others. The new PIN appears once at the top of the screen; give it to the person privately. Their other sessions end.
+- **End sessions** when a device was lost or left signed in. The person keeps their PIN.
+
+You cannot change your own account, and the last active administrator cannot be deactivated. Authenticator apps are set up by the system operator.
 
 ## Troubleshooting
 

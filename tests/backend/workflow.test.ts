@@ -60,7 +60,7 @@ before(async () => {
   await migrate(database);await seed(database);
   const module=await Test.createTestingModule({imports:[AppModule]}).overrideProvider(Database).useValue(database).compile();
   app=module.createNestApplication({logger:false});await app.listen(0,'127.0.0.1');base=await app.getUrl();
-  const login=await fetch(`${base}/api/auth/login`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({identifier:'STAFF-101',pin:'1234'})});
+  const login=await fetch(`${base}/api/auth/login`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({identifier:'STAFF-101',pin:'123456'})});
   assert.equal(login.status,201);cookie=login.headers.get('set-cookie')!.split(';')[0];
 });
 after(async () => {
@@ -176,11 +176,11 @@ test('PostgreSQL transaction rollback leaves neither visit change nor audit even
 });
 test('HTTP sessions reject anonymous access, PIN failure, locked access and logout reuse',async () => {
   assert.equal((await fetch(`${base}/api/queue`)).status,401);
-  assert.equal((await fetch(`${base}/api/auth/login`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({identifier:'STAFF-101',pin:'0000'})})).status,401);
+  assert.equal((await fetch(`${base}/api/auth/login`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({identifier:'STAFF-101',pin:'000000'})})).status,401);
   assert.equal((await fetch(`${base}/api/queue`,{headers:{Cookie:cookie}})).status,200);
   await fetch(`${base}/api/auth/lock`,{method:'POST',headers:{Cookie:cookie,'Content-Type':'application/json'},body:'{}'});
   assert.equal((await fetch(`${base}/api/queue`,{headers:{Cookie:cookie}})).status,403);
-  await fetch(`${base}/api/auth/unlock`,{method:'POST',headers:{Cookie:cookie,'Content-Type':'application/json'},body:JSON.stringify({pin:'1234'})});
+  await fetch(`${base}/api/auth/unlock`,{method:'POST',headers:{Cookie:cookie,'Content-Type':'application/json'},body:JSON.stringify({pin:'123456'})});
   assert.equal((await fetch(`${base}/api/queue`,{headers:{Cookie:cookie}})).status,200);
   await fetch(`${base}/api/auth/logout`,{method:'POST',headers:{Cookie:cookie}});
   assert.equal((await fetch(`${base}/api/queue`,{headers:{Cookie:cookie}})).status,401);
@@ -230,6 +230,17 @@ async function loginAs(identifier:string,pin:string) {
   assert.equal(response.status,201);
   return response.headers.get('set-cookie')!.split(';')[0];
 }
+// Administrators need an authenticator code. Tests enrol a fixed secret and allow the current
+// code again (clearing the replay marker) so several admin sign-ins can share one 30-second step.
+const ADMIN_TEST_SECRET='JBSWY3DPEHPK3PXPJBSWY3DPEHPK3PXP';
+async function adminLogin() {
+  const {totpCode,totpStep}=await import('../../src/backend/src/auth/totp.js');
+  await database.pool.query("UPDATE staff SET mfa_secret=$1,mfa_last_step=NULL WHERE id='STAFF-104'",[ADMIN_TEST_SECRET]);
+  const response=await fetch(`${base}/api/auth/login`,{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({identifier:'STAFF-104',pin:'456789',otp:totpCode(ADMIN_TEST_SECRET,totpStep(Date.now()))})});
+  assert.equal(response.status,201);
+  return response.headers.get('set-cookie')!.split(';')[0];
+}
 async function post(path:string,session:string,body:unknown,key=randomUUID()) {
   return fetch(`${base}/api${path}`,{method:'POST',headers:{Cookie:session,'Content-Type':'application/json','Idempotency-Key':key},body:JSON.stringify(body)});
 }
@@ -240,7 +251,7 @@ async function get(path:string,session:string) {
 }
 
 test('the server locks sessions left idle and unlocking with the PIN resumes them',async()=>{
-  const session=await loginAs('STAFF-103','3456');
+  const session=await loginAs('STAFF-103','345678');
   const token=session.split('=')[1];
   const {hash}=await import('../../src/backend/src/database/db.js');
   const lastSeen=()=>database.pool.query('SELECT last_seen_at,locked FROM sessions WHERE token_hash=$1',[hash(token)]).then(r=>r.rows[0]);
@@ -259,13 +270,13 @@ test('the server locks sessions left idle and unlocking with the PIN resumes the
   assert.equal(me.locked,true);
   assert.equal((await database.pool.query("SELECT count(*) FROM audit_events WHERE staff_id='STAFF-103' AND event_type='SESSION_IDLE_LOCK'")).rows[0].count,'1');
   // The PIN unlocks it and restarts the idle clock.
-  const unlock=await fetch(`${base}/api/auth/unlock`,{method:'POST',headers:{Cookie:session,'Content-Type':'application/json'},body:JSON.stringify({pin:'3456'})});
+  const unlock=await fetch(`${base}/api/auth/unlock`,{method:'POST',headers:{Cookie:session,'Content-Type':'application/json'},body:JSON.stringify({pin:'345678'})});
   assert.equal(unlock.status,201);
   assert.equal((await queue()).status,200);
 });
 
 test('reading patient records is access-logged once per view and reviewable by administrators only',async()=>{
-  const session=await loginAs('STAFF-102','2345');
+  const session=await loginAs('STAFF-102','234567');
   const rows=(route:string)=>database.pool.query("SELECT * FROM access_log WHERE staff_id='STAFF-102' AND route=$1 ORDER BY accessed_at",[route]).then(r=>r.rows);
   const before=(await rows('GET /api/visits')).length;
   const visits=await get('/visits',session);await get('/visits',session);
@@ -278,7 +289,7 @@ test('reading patient records is access-logged once per view and reviewable by a
   await get(`/visits/${target}/evidence`,session);
   assert.deepEqual((await rows('GET /api/visits/:id/evidence')).at(-1).patient_ids,[target]);
   // Administrators can see who viewed a patient; other roles cannot.
-  const admin=await loginAs('STAFF-104','4567');
+  const admin=await adminLogin();
   const viewers=await get(`/audit/access?patientId=${encodeURIComponent(target)}`,admin);
   assert.ok(viewers.some((v:any)=>v.staffId==='STAFF-102' && v.route==='GET /api/visits/:id/evidence'));
   assert.equal((await fetch(`${base}/api/audit/access`,{headers:{Cookie:session}})).status,403);
@@ -293,7 +304,7 @@ test('reading patient records is access-logged once per view and reviewable by a
 });
 
 test('HTTP journey connects registration, MCP evidence, clinician approval, routing and audit',async()=>{
-  const session=await loginAs('STAFF-102','2345');
+  const session=await loginAs('STAFF-102','234567');
   const key=randomUUID();
   const response=await post('/visits',session,intake,key);
   assert.equal(response.status,201);
@@ -333,7 +344,7 @@ test('HTTP journey connects registration, MCP evidence, clinician approval, rout
 });
 
 test('HTTP rejects missing retry headers and conflicting retries without duplicate visits',async()=>{
-  const session=await loginAs('STAFF-101','1234');
+  const session=await loginAs('STAFF-101','123456');
   const before=(await get('/visits',session)).length;
   const missing=await fetch(`${base}/api/visits`,{method:'POST',headers:{Cookie:session,'Content-Type':'application/json'},body:JSON.stringify(intake)});
   assert.equal(missing.status,400);
@@ -347,7 +358,7 @@ test('HTTP rejects missing retry headers and conflicting retries without duplica
 });
 
 test('HTTP observation updates invalidate evidence and ignore forged clinical identity',async()=>{
-  const session=await loginAs('STAFF-101','1234'),clerkSession=await loginAs('STAFF-103','3456');
+  const session=await loginAs('STAFF-101','123456'),clerkSession=await loginAs('STAFF-103','345678');
   const response=await post('/visits',session,intake);
   assert.equal(response.status,201);
   const visitId=(await response.json()).data.id,proposal=await assess(visitId);
@@ -484,47 +495,207 @@ test('model quota keeps clinical writes, records review-required runs and refuse
   } finally {config.agentRunsPerStaffHour=previous.staff;config.agentRunsPerHour=previous.global;}
 });
 
+test('PINs are six digits, production seeds are unusable and operators issue strong PINs',async()=>{
+  const {pinMatches}=await import('../../src/backend/src/auth/auth.js');
+  const {seedPinHash}=await import('../../src/backend/src/database/seed.js');
+  const {isWeakPin,generatePin}=await import('../../src/backend/src/admin/staff-accounts.js');
+  const {run}=await import('../../src/backend/src/admin/staff-admin.js');
+  const attempt=(identifier:string,pin:string)=>fetch(`${base}/api/auth/login`,{method:'POST',
+    headers:{'Content-Type':'application/json'},body:JSON.stringify({identifier,pin})});
+  // Four-digit PINs are no longer accepted at all.
+  assert.equal((await attempt('STAFF-101','1234')).status,400);
+  // Published fixture PINs never work in production.
+  assert.equal(pinMatches('123456',seedPinHash('123456',false)),true);
+  assert.equal(pinMatches('123456',seedPinHash('123456',true)),false);
+  for(const weak of ['000000','111111','123456','654321','234567'])assert.equal(isWeakPin(weak),true,weak);
+  for(const ok of ['135790','902114','600213'])assert.equal(isWeakPin(ok),false,ok);
+  for(let i=0;i<50;i++){const pin=generatePin();assert.match(pin,/^\d{6}$/);assert.equal(isWeakPin(pin),false);}
+  // The operator command line issues a PIN, ends existing sessions and records who did it.
+  await database.pool.query("INSERT INTO staff(id,staff_number,role,pin_hash,profile) VALUES('STAFF-OPS-1','OPS-001','nurse',$1,$2)",
+    [seedPinHash('x',true),JSON.stringify({name:'Synthetic Operator Target'})]);
+  assert.equal((await attempt('STAFF-OPS-1','135790')).status,401);
+  const lines:string[]=[];
+  await run(database,['reset-pin','STAFF-OPS-1'],line=>lines.push(line));
+  const pin=lines[0].match(/(\d{6})$/)![1];
+  const login=await attempt('STAFF-OPS-1',pin);assert.equal(login.status,201);
+  const session=login.headers.get('set-cookie')!.split(';')[0];
+  await run(database,['reset-pin','STAFF-OPS-1'],()=>{});
+  assert.equal((await fetch(`${base}/api/queue`,{headers:{Cookie:session}})).status,401);
+  assert.equal((await attempt('STAFF-OPS-1',pin)).status,401);
+  const events=(await database.pool.query("SELECT details FROM audit_events WHERE event_type='STAFF_PIN_RESET' AND details->>'staffId'='STAFF-OPS-1'")).rows;
+  assert.equal(events.length,2);assert.equal(events[0].details.via,'operator-cli');
+  assert.ok(!JSON.stringify(events).includes(pin));
+  const listed:string[]=[];await run(database,['list'],line=>listed.push(line));
+  assert.ok(listed.some(line=>line.startsWith('STAFF-OPS-1\tOPS-001\tnurse')));
+  await assert.rejects(run(database,['reset-pin','STAFF-DOES-NOT-EXIST'],()=>{}),/not found/);
+  await assert.rejects(run(database,['delete-everything'],()=>{}),/Usage/);
+});
+
+test('authenticator codes follow RFC 6238 and are single-use',async()=>{
+  const {totpCode,verifyTotp,base32Encode,base32Decode,totpStep,otpauthUri}=await import('../../src/backend/src/auth/totp.js');
+  // RFC 6238 appendix B, SHA1 seed "12345678901234567890".
+  const seed=base32Encode(Buffer.from('12345678901234567890'));
+  assert.equal(seed,'GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ');
+  assert.equal(totpCode(seed,totpStep(59_000),8),'94287082');
+  assert.equal(totpCode(seed,totpStep(1_111_111_109_000),8),'07081804');
+  assert.equal(base32Decode(seed).toString(),'12345678901234567890');
+  const at=1_700_000_000_000,step=totpStep(at);
+  assert.equal(verifyTotp(seed,totpCode(seed,step),null,at),step);
+  // One step of clock drift either way is tolerated; two is not.
+  assert.equal(verifyTotp(seed,totpCode(seed,step-1),null,at),step-1);
+  assert.equal(verifyTotp(seed,totpCode(seed,step+1),null,at),step+1);
+  assert.equal(verifyTotp(seed,totpCode(seed,step-2),null,at),null);
+  // A code is not accepted again once its step has been used.
+  assert.equal(verifyTotp(seed,totpCode(seed,step),step,at),null);
+  assert.equal(verifyTotp(seed,'12345',null,at),null);
+  assert.match(otpauthUri(seed,'KNH-OPS-005'),/^otpauth:\/\/totp\/AfyaFlow%3AKNH-OPS-005\?secret=GEZDG.*&issuer=AfyaFlow&algorithm=SHA1&digits=6&period=30$/);
+});
+
+test('administrators must enrol an authenticator and present a fresh code at sign-in',async()=>{
+  const {totpCode,totpStep}=await import('../../src/backend/src/auth/totp.js');
+  const {run}=await import('../../src/backend/src/admin/staff-admin.js');
+  const attempt=(body:object)=>fetch(`${base}/api/auth/login`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+  const code=async(response:Response)=>(await response.json()).code;
+  const admin={identifier:'STAFF-104',pin:'456789'};
+  await database.pool.query("UPDATE staff SET mfa_secret=NULL,mfa_last_step=NULL WHERE id='STAFF-104'");
+  // Not enrolled: a correct PIN is still refused.
+  let response=await attempt(admin);
+  assert.equal(response.status,403);assert.equal(await code(response),'MFA_NOT_ENROLLED');
+  // A wrong PIN never reveals whether a code would be needed.
+  response=await attempt({...admin,pin:'000000'});
+  assert.equal(await code(response),'INVALID_CREDENTIALS');
+  const lines:string[]=[];
+  await run(database,['enroll-mfa','STAFF-104'],line=>lines.push(line));
+  const secret=lines[0].match(/: ([A-Z2-7]{32})$/)![1];
+  assert.match(lines[1],/^otpauth URI \(for QR code tools\): otpauth:\/\/totp\//);
+  response=await attempt(admin);
+  assert.equal(response.status,401);assert.equal(await code(response),'MFA_REQUIRED');
+  const current=totpCode(secret,totpStep(Date.now()));
+  response=await attempt({...admin,otp:current==='000000'?'000001':'000000'});
+  assert.equal(await code(response),'INVALID_MFA_CODE');
+  assert.equal((await attempt({...admin,otp:current})).status,201);
+  // The same code cannot be replayed.
+  response=await attempt({...admin,otp:current});
+  assert.equal(response.status,401);assert.equal(await code(response),'INVALID_MFA_CODE');
+  // Other roles sign in with a PIN alone.
+  assert.equal((await attempt({identifier:'STAFF-101',pin:'123456'})).status,201);
+  const listed:string[]=[];await run(database,['list'],line=>listed.push(line));
+  assert.ok(listed.some(line=>line.startsWith('STAFF-104')&&line.endsWith('\tMFA')));
+  // Removing the authenticator (lost phone) blocks administrator sign-in until re-enrolled.
+  await run(database,['remove-mfa','STAFF-104'],()=>{});
+  response=await attempt({...admin,otp:totpCode(secret,totpStep(Date.now())+1)});
+  assert.equal(await code(response),'MFA_NOT_ENROLLED');
+  const events=(await database.pool.query("SELECT event_type FROM audit_events WHERE details->>'staffId'='STAFF-104' AND event_type LIKE 'STAFF_MFA_%' ORDER BY timestamp")).rows.map(r=>r.event_type);
+  assert.deepEqual(events.slice(-2),['STAFF_MFA_ENROLLED','STAFF_MFA_REMOVED']);
+  assert.ok(!JSON.stringify(await database.pool.query("SELECT details FROM audit_events WHERE event_type LIKE 'STAFF_MFA_%'").then(r=>r.rows)).includes(secret));
+});
+
+test('administrators deactivate, reactivate, reset and sign out staff accounts with reasons',async()=>{
+  const {pinHash}=await import('../../src/backend/src/auth/auth.js');
+  const {setStaffActive}=await import('../../src/backend/src/admin/staff-accounts.js');
+  await database.pool.query("INSERT INTO staff(id,staff_number,role,pin_hash,profile) VALUES('STAFF-LIFE','LIFE-001','nurse',$1,$2)",
+    [pinHash('602418'),JSON.stringify({name:'Synthetic Lifecycle Nurse'})]);
+  const admin=await adminLogin();
+  let nurse=await loginAs('STAFF-LIFE','602418');
+  const act=(session:string,path:string,body:object={reason:'Synthetic account review.'})=>post(path,session,body);
+  const status=async(session:string)=>(await fetch(`${base}/api/queue`,{headers:{Cookie:session}})).status;
+  const signIn=(pin:string)=>fetch(`${base}/api/auth/login`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({identifier:'STAFF-LIFE',pin})});
+  // Only administrators manage accounts, and the list never exposes secrets.
+  assert.equal((await fetch(`${base}/api/staff`,{headers:{Cookie:nurse}})).status,403);
+  assert.equal((await act(nurse,'/staff/STAFF-101/deactivate')).status,403);
+  const list=await get('/staff',admin);
+  assert.deepEqual(list.find((s:any)=>s.id==='STAFF-LIFE'),{id:'STAFF-LIFE',staffNumber:'LIFE-001',name:'Synthetic Lifecycle Nurse',
+    role:'nurse',active:true,deactivatedAt:null,mfaEnrolled:false,openSessions:1});
+  assert.ok(!JSON.stringify(list).includes('pin_hash') && !list.some((s:any)=>s.name==='MIMIC dataset importer'));
+  // A reason is required.
+  assert.equal((await act(admin,'/staff/STAFF-LIFE/deactivate',{reason:'no'})).status,400);
+  // Deactivation ends sessions and blocks sign-in, and removes the person from follow-up owners.
+  assert.equal((await act(admin,'/staff/STAFF-LIFE/deactivate')).status,201);
+  assert.equal(await status(nurse),401);
+  const refused=await signIn('602418');
+  assert.equal(refused.status,403);assert.equal((await refused.json()).code,'ACCOUNT_DEACTIVATED');
+  assert.equal((await act(admin,'/staff/STAFF-LIFE/deactivate')).status,409);
+  const clinician=await loginAs('STAFF-102','234567');
+  assert.ok(!(await get('/followups/staff',clinician)).some((s:any)=>s.id==='STAFF-LIFE'));
+  assert.equal((await act(admin,'/staff/STAFF-LIFE/reactivate')).status,201);
+  nurse=await loginAs('STAFF-LIFE','602418');
+  // Ending sessions signs the person out everywhere without changing their PIN.
+  assert.equal((await act(admin,'/staff/STAFF-LIFE/end-sessions')).status,201);
+  assert.equal(await status(nurse),401);
+  assert.equal((await signIn('602418')).status,201);
+  // A PIN reset returns the new PIN once and never stores it.
+  const reset=await act(admin,'/staff/STAFF-LIFE/reset-pin');
+  assert.equal(reset.status,201);
+  const {pin}=(await reset.json()).data;
+  assert.match(pin,/^\d{6}$/);
+  assert.equal((await signIn('602418')).status,401);
+  assert.equal((await signIn(pin)).status,201);
+  const stored=JSON.stringify((await database.pool.query('SELECT response FROM request_keys')).rows)+
+    JSON.stringify((await database.pool.query('SELECT details FROM audit_events').then(r=>r.rows)));
+  assert.ok(!stored.includes(pin));
+  // Administrators cannot act on their own account.
+  for(const action of ['deactivate','reset-pin','end-sessions']){
+    const self=await act(admin,`/staff/STAFF-104/${action}`);
+    assert.equal(self.status,400);assert.equal((await self.json()).code,'SELF_ACTION');
+  }
+  const events=(await database.pool.query("SELECT event_type,staff_id,details FROM audit_events WHERE details->>'staffId'='STAFF-LIFE' ORDER BY timestamp")).rows;
+  assert.deepEqual(events.map(e=>e.event_type),['STAFF_DEACTIVATED','STAFF_REACTIVATED','STAFF_SESSIONS_ENDED','STAFF_PIN_RESET']);
+  assert.ok(events.every(e=>e.staff_id==='STAFF-104' && e.details.reason==='Synthetic account review.'));
+  // Two administrators deactivating each other at once cannot remove the last one.
+  await database.pool.query("INSERT INTO staff(id,staff_number,role,pin_hash,profile) VALUES('STAFF-ADMIN-2','ADM-002','admin',$1,$2)",
+    [pinHash('602418'),JSON.stringify({name:'Synthetic Second Admin'})]);
+  const reason={reason:'Synthetic concurrent deactivation.'};
+  const adminA={id:'STAFF-104',name:'A',role:'admin'},adminB={id:'STAFF-ADMIN-2',name:'B',role:'admin'};
+  await setStaffActive(database,adminA,'STAFF-ADMIN-2',false,reason);
+  await assert.rejects(setStaffActive(database,adminB,'STAFF-104',false,reason),(error:any)=>error.getResponse().code==='LAST_ADMIN');
+  assert.equal((await database.pool.query("SELECT active FROM staff WHERE id='STAFF-104'")).rows[0].active,true);
+});
+
 test('a display name shared by two accounts cannot be used to sign in',async()=>{
   const {pinHash}=await import('../../src/backend/src/auth/auth.js');
-  for(const [id,number,pin] of [['STAFF-TWIN-1','TWIN-001','5111'],['STAFF-TWIN-2','TWIN-002','5222']])
+  for(const [id,number,pin] of [['STAFF-TWIN-1','TWIN-001','511111'],['STAFF-TWIN-2','TWIN-002','522222']])
     await database.pool.query('INSERT INTO staff(id,staff_number,role,pin_hash,profile) VALUES($1,$2,$3,$4,$5)',
       [id,number,'nurse',pinHash(pin),JSON.stringify({name:'Synthetic Twin Name'})]);
   const attempt=(identifier:string,pin:string)=>fetch(`${base}/api/auth/login`,{method:'POST',
     headers:{'Content-Type':'application/json'},body:JSON.stringify({identifier,pin})}).then(r=>r.status);
   // Neither PIN works through the ambiguous name, so the wrong account is never chosen.
-  assert.equal(await attempt('Synthetic Twin Name','5111'),401);
-  assert.equal(await attempt('synthetic twin name','5222'),401);
-  assert.equal(await attempt('STAFF-TWIN-1','5111'),201);
-  assert.equal(await attempt('twin-002','5222'),201);
+  assert.equal(await attempt('Synthetic Twin Name','511111'),401);
+  assert.equal(await attempt('synthetic twin name','522222'),401);
+  assert.equal(await attempt('STAFF-TWIN-1','511111'),201);
+  assert.equal(await attempt('twin-002','522222'),201);
 });
 
 test('failed PINs are throttled per account across identifier forms and shared with unlock',async()=>{
   const attempt=(identifier:string,pin:string)=>fetch(`${base}/api/auth/login`,{method:'POST',
     headers:{'Content-Type':'application/json'},body:JSON.stringify({identifier,pin})});
-  const forms=['STAFF-104','KNH-OPS-005','Samuel Kiprop'];
+  // A dedicated non-administrator account, so the PIN budget is tested without MFA.
+  const {pinHash}=await import('../../src/backend/src/auth/auth.js');
+  await database.pool.query("INSERT INTO staff(id,staff_number,role,pin_hash,profile) VALUES('STAFF-THROTTLE','THR-001','nurse',$1,$2)",
+    [pinHash('456789'),JSON.stringify({name:'Synthetic Throttle Nurse'})]);
+  const forms=['STAFF-THROTTLE','THR-001','Synthetic Throttle Nurse'];
   // A success clears earlier failures.
-  for(let i=0;i<9;i++)assert.equal((await attempt(forms[i%3],'0000')).status,401);
-  const login=await attempt('STAFF-104','4567');
+  for(let i=0;i<9;i++)assert.equal((await attempt(forms[i%3],'000000')).status,401);
+  const login=await attempt('STAFF-THROTTLE','456789');
   assert.equal(login.status,201);
   const session=login.headers.get('set-cookie')!.split(';')[0];
   // Ten failures, through any identifier form, exhaust the account budget...
-  for(let i=0;i<10;i++)assert.equal((await attempt(forms[i%3],'0000')).status,401);
+  for(let i=0;i<10;i++)assert.equal((await attempt(forms[i%3],'000000')).status,401);
   // ...after which even the correct PIN is not checked, so a lucky guess is not confirmed.
-  const blocked=await attempt('KNH-OPS-005','4567');
+  const blocked=await attempt('THR-001','456789');
   assert.equal(blocked.status,429);
   assert.equal((await blocked.json()).code,'ACCOUNT_RATE_LIMITED');
   // Unlocking a terminal draws on the same budget.
   await fetch(`${base}/api/auth/lock`,{method:'POST',headers:{Cookie:session,'Content-Type':'application/json'},body:'{}'});
   const unlock=(pin:string)=>fetch(`${base}/api/auth/unlock`,{method:'POST',headers:{Cookie:session,'Content-Type':'application/json'},body:JSON.stringify({pin})});
-  assert.equal((await unlock('4567')).status,429);
+  assert.equal((await unlock('456789')).status,429);
   // The budget renews once the window expires.
   const {hash}=await import('../../src/backend/src/database/db.js');
-  await database.pool.query("UPDATE auth_rate_limits SET expires_at=now()-interval '1 second' WHERE key_hash=$1",[hash('account:STAFF-104')]);
-  assert.equal((await unlock('4567')).status,201);
-  assert.equal((await attempt('STAFF-104','4567')).status,201);
+  await database.pool.query("UPDATE auth_rate_limits SET expires_at=now()-interval '1 second' WHERE key_hash=$1",[hash('account:STAFF-THROTTLE')]);
+  assert.equal((await unlock('456789')).status,201);
+  assert.equal((await attempt('STAFF-THROTTLE','456789')).status,201);
   // Unknown identifiers get the same response, so throttling does not reveal which accounts exist.
-  for(let i=0;i<10;i++)assert.equal((await attempt('NOT-A-STAFF-ID','0000')).status,401);
-  assert.equal((await attempt('not-a-staff-id','0000')).status,429);
+  for(let i=0;i<10;i++)assert.equal((await attempt('NOT-A-STAFF-ID','000000')).status,401);
+  assert.equal((await attempt('not-a-staff-id','000000')).status,429);
 });
 
 test('worker recovery is bounded after repeated hard interruptions',async()=>{
@@ -559,7 +730,7 @@ test('API Gateway v2 adapter preserves session cookies, JSON bodies and clinical
       body:body===undefined?undefined:JSON.stringify(body),isBase64Encoded:false};
   }
   const context={callbackWaitsForEmptyEventLoop:false,getRemainingTimeInMillis:()=>30000} as Context;
-  const login:any=await adapter(event('/api/auth/login','POST',{identifier:'STAFF-101',pin:'1234'}),context,()=>{});
+  const login:any=await adapter(event('/api/auth/login','POST',{identifier:'STAFF-101',pin:'123456'}),context,()=>{});
   assert.equal(login.statusCode,201);
   assert.match(login.cookies[0],/HttpOnly/i);
   const cookies=[login.cookies[0].split(';')[0]];
@@ -594,7 +765,7 @@ test('actual Lambda handler bootstraps NestJS and enforces origin protection aga
     assert.equal((await handler(event('/api/health'),context)).statusCode,200);
     assert.equal(context.callbackWaitsForEmptyEventLoop,false);
     assert.equal((await handler(event('/api/health','GET',undefined,{'x-afyaflow-origin-token':'forged'}),context)).statusCode,403);
-    const credentials={identifier:'STAFF-101',pin:'1234'};
+    const credentials={identifier:'STAFF-101',pin:'123456'};
     assert.equal((await handler(event('/api/auth/login','POST',credentials,{origin:'https://untrusted.example.test'}),context)).statusCode,403);
     const login=await handler(event('/api/auth/login','POST',credentials,{origin:'https://app.example.test'}),context);
     assert.equal(login.statusCode,201);
@@ -637,7 +808,7 @@ test('OpenAI Responses adapter drives real MCP tools and preserves the human app
 
 
 test('Historical import is repeatable, source-labelled, isolated and read-only through API and database',async()=>{
-  const login=await fetch(`${base}/api/auth/login`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({identifier:'STAFF-102',pin:'2345'})});
+  const login=await fetch(`${base}/api/auth/login`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({identifier:'STAFF-102',pin:'234567'})});
   assert.equal(login.status,201);const researchCookie=login.headers.get('set-cookie')!.split(';')[0];
   const beforeQueue=(await workflow.queue()).queue.length;
   const first=await importMimicDemo(database),second=await importMimicDemo(database);
@@ -818,7 +989,7 @@ test('MCP context is visit-bound and recorded changes create one follow-up witho
 
 test('follow-up API rejects anonymous and nonclinical actions without exposing staff credentials',async()=>{
   assert.equal((await fetch(`${base}/api/followups`)).status,401);
-  const login=await fetch(`${base}/api/auth/login`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({identifier:'STAFF-102',pin:'2345'})});
+  const login=await fetch(`${base}/api/auth/login`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({identifier:'STAFF-102',pin:'234567'})});
   const clinicalCookie=login.headers.get('set-cookie')!.split(';')[0];
   const directory=await fetch(`${base}/api/followups/staff`,{headers:{Cookie:clinicalCookie}});
   assert.equal(directory.status,200);const people=await directory.json();

@@ -112,19 +112,80 @@ external-network failures fail the job even if the containers are healthy; inspe
 the current deployment before retrying. Database migrations are never automatically
 reversed. Manual recovery may require the pre-migration dump.
 
-Synthetic seeding is disabled by default. To create public demonstration accounts,
-an operator must explicitly invoke the release with `SEED_SYNTHETIC=true` or run
-the existing seed command with its production override. Never seed real data.
-Then verify sign-in, registration, a real Bedrock proposal, human approval, queue,
-and routing. Health checks alone do not verify these workflows.
+Synthetic seeding is disabled by default. To create the synthetic staff accounts and
+records, an operator must explicitly invoke the release with `SEED_SYNTHETIC=true` or
+run the existing seed command with its production override. Seeded accounts cannot
+sign in until an operator issues PINs (below). Never seed real data. Then verify
+sign-in, registration, a real Bedrock proposal, human approval, queue, and routing.
+Health checks alone do not verify these workflows.
+
+## Staff accounts and PINs
+
+No PINs are published. Staff PINs are six digits; accounts created by the production
+seed, and any account whose PIN predates six-digit PINs, cannot sign in until a PIN
+is issued. Issue PINs on the host through Systems Manager Session Manager (AWS
+Console → EC2 → the instance → Connect → Session Manager):
+
+```sh
+sudo -i
+cd /opt/afyaflow
+admin() { docker compose --env-file .env --project-name afyaflow exec -T app \
+  node dist/src/backend/src/admin/staff-admin.js "$@"; }
+admin list                    # staff IDs, numbers, roles, names (MFA = authenticator enrolled)
+admin reset-pin STAFF-102     # prints a new PIN once and ends that person's sessions
+admin enroll-mfa STAFF-104    # administrators: prints an authenticator setup key once
+admin remove-mfa STAFF-104    # lost phone: blocks admin sign-in until re-enrolled
+```
+
+Administrator accounts also need an authenticator app (Google Authenticator,
+Microsoft Authenticator or similar). Run `enroll-mfa` with the administrator
+present; they choose "Enter a setup key" in the app, type the key and select
+time-based. Without enrolment an administrator cannot sign in (`MFA_NOT_ENROLLED`).
+Re-running `enroll-mfa` replaces the previous app.
+
+Give each PIN to its owner privately (not by email or chat history). The PIN is stored
+only as a salted hash and the `STAFF_PIN_RESET` audit event never contains it. Close
+the session window afterwards so the PIN is not left on screen.
 
 ## Persistence and cleanup
 
 Database and TLS state use named Docker volumes on the encrypted root disk.
-Releases never run `docker compose down --volumes`. Backups are local dumps retained
-for seven days; they do not protect against loss of the disk or server account.
-Add off-host backups before keeping valuable data. No production recovery promise
-is implied by this demo configuration.
+Releases never run `docker compose down --volumes`. Each release also keeps a local
+pre-migration dump for seven days.
+
+### Off-host backups
+
+The stack creates a private S3 bucket (output `BackupBucketName`): encrypted
+(SSE-S3), versioned, public access blocked, non-TLS requests and unencrypted uploads
+denied, backups expiring after 35 days. The host role can write and read backups
+but cannot delete them. Releases install a systemd timer that runs
+`/opt/afyaflow/backup.sh backup` daily at 02:30 Nairobi time and upload one backup
+immediately.
+
+The bucket needs a one-time stack update by an operator with CloudFormation
+permissions. It adds the bucket, its policy and an IAM policy statement; it does not
+replace the instance or its disk. Unspecified parameters keep their current values:
+
+```sh
+aws cloudformation deploy --region eu-west-1 --stack-name afyaflow-staging \
+  --template-file deploy/ec2/template.yaml --capabilities CAPABILITY_IAM
+```
+
+Until then, releases print a warning and continue without off-host backups. After
+the next release, check them from Session Manager:
+
+```sh
+sudo -i
+systemctl list-timers afyaflow-backup.timer   # next scheduled run
+journalctl -u afyaflow-backup --since today    # last results
+/opt/afyaflow/backup.sh restore-test           # restore the newest backup into a scratch database
+```
+
+Run `restore-test` after setup and at least monthly; it restores into a separate
+`afyaflow_restore_check` database, verifies migrations and staff records, and drops
+it. To recover for real, download a backup with `aws s3 cp` and restore it with
+`pg_restore` into the `afyaflow` database during a maintenance window. No production
+recovery promise is implied by this demo configuration.
 
 The root disk, ECR repository, and OIDC provider are deliberately retained when
 the stack/instance is deleted or replaced. Retained disks/images still incur

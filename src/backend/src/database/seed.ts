@@ -4,6 +4,12 @@ import { pinHash } from '../auth/auth.js';
 import { SYNTHETIC_STAFF_FIXTURES } from '../../../shared/contracts/auth.js';
 import { HOSPITAL_DEPARTMENTS } from '../../../shared/contracts/routing.js';
 import { createDemoState } from '../../../shared/fixtures/demo.js';
+import { randomBytes } from 'node:crypto';
+
+/** Fixture PIN outside production; in production a random secret no PIN can match. */
+export function seedPinHash(fixturePin: string, production: boolean) {
+  return pinHash(production ? randomBytes(32).toString('hex') : fixturePin);
+}
 
 export async function seed(database: Database) {
   if (
@@ -13,6 +19,10 @@ export async function seed(database: Database) {
     throw new Error(
       'Synthetic seeding is disabled in production unless ALLOW_SYNTHETIC_SEED=true.',
     );
+  // The fixture PINs are in the public repository. In production the accounts get a random
+  // 64-character secret that no PIN can match, so they stay unusable until an operator issues
+  // a PIN with `staff-admin reset-pin`.
+  const production = process.env.NODE_ENV === 'production';
   await database.transaction(async (db) => {
     await db.query('SELECT pg_advisory_xact_lock(741093)');
     for (const staff of SYNTHETIC_STAFF_FIXTURES) {
@@ -23,7 +33,7 @@ export async function seed(database: Database) {
           staff.id,
           staff.staffNumber,
           staff.role,
-          pinHash(pin),
+          seedPinHash(pin, production),
           JSON.stringify(profile),
         ],
       );

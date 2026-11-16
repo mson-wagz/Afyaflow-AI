@@ -26,11 +26,22 @@ research records are read-only and excluded from the synthetic clinical queue.
 6. Run `npm run dev:backend` and, in another terminal,
    `npm run dev --prefix src/frontend`. Open http://localhost:5173.
 
-Seed accounts are Jane/nurse (STAFF-101, PIN 1234), Kamau/clinician (STAFF-102, 2345),
-Faith/clerk (STAFF-103, 3456) and Samuel/admin (STAFF-104, 4567). These are publicly
-known development fixtures, not production staff accounts. Their PINs are hashed
-with salted scrypt in the database. Synthetic seeding retains existing records and
-is disabled in production unless `ALLOW_SYNTHETIC_SEED=true` is explicitly set.
+**Local development accounts.** Outside production, the seed creates the fixtures in
+`src/shared/contracts/auth.js` with their six-digit development PINs: STAFF-101
+(nurse), STAFF-102 (clinician), STAFF-103 (clerk) and STAFF-104 (admin). Read the PINs
+from that file. They are public in this repository, so in production
+(`NODE_ENV=production`) the seed instead gives each account a random 64-character
+secret that no PIN can match. PINs are hashed with salted scrypt. Synthetic seeding
+retains existing records and is disabled in production unless
+`ALLOW_SYNTHETIC_SEED=true` is explicitly set.
+
+**Issuing PINs.** `npm run staff:admin -- list` lists accounts and
+`npm run staff:admin -- reset-pin <staffId>` issues a random six-digit PIN (never a
+repeated digit or straight run), prints it once, ends that person's sessions and
+records a `STAFF_PIN_RESET` audit event without the PIN. `enroll-mfa <staffId>`
+prints an authenticator setup key for an administrator (required for admin sign-in;
+TOTP in `auth/totp.js`) and `remove-mfa <staffId>` removes it. Deployed servers run the
+compiled `dist/src/backend/src/admin/staff-admin.js`; see deploy/ec2/README.md.
 
 ## What works
 

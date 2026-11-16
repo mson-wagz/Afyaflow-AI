@@ -9,3 +9,4 @@ export { default as RegistrationDraftPanel } from './RegistrationDraftPanel';
 export { default as QueueViewPanel } from './QueueViewPanel';
 export { default as SecurityAuditView } from './SecurityAuditView';
 export * from './apiAdapter';
+export { default as StaffAccountsView } from './StaffAccountsView';

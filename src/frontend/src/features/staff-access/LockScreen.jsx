@@ -1,6 +1,7 @@
 import React, { useState, useRef, useContext } from 'react';
 import useAuth from './useAuth';
 import { SyncContext } from '../../offline/SyncContext.jsx';
+import { PIN_LENGTH } from '../../../../shared/contracts/auth.js';
 import { Button, Input, Badge, Alert } from '../../components';
 
 /**
@@ -30,8 +31,8 @@ export default function LockScreen() {
     if (e) e.preventDefault();
     setError('');
 
-    if (!pin || pin.trim().length !== 4) {
-      setError('Please enter your 4-digit PIN');
+    if (!pin || pin.trim().length !== PIN_LENGTH) {
+      setError(`Please enter your ${PIN_LENGTH}-digit PIN`);
       return;
     }
 
@@ -173,7 +174,7 @@ export default function LockScreen() {
                 marginBottom: '0.5rem',
               }}
             >
-              Enter 4-digit Staff PIN
+              Enter {PIN_LENGTH}-digit Staff PIN
             </label>
             <input
               id="terminal-unlock-pin"
@@ -183,10 +184,10 @@ export default function LockScreen() {
               type="password"
               inputMode="numeric"
               pattern="[0-9]*"
-              maxLength={4}
+              maxLength={PIN_LENGTH}
               value={pin}
               onChange={(e) => {setPin(e.target.value);setError('');}}
-              placeholder="••••"
+              placeholder="••••••"
               autoFocus
               className="form-input"
               style={{
@@ -210,7 +211,7 @@ export default function LockScreen() {
               variant="primary"
               fullWidth
               loading={loading}
-              disabled={loading || pin.length !== 4}
+              disabled={loading || pin.length !== PIN_LENGTH}
             >
               Unlock Session
             </Button>

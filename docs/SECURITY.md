@@ -27,7 +27,11 @@ policies, risk analysis, training, contracts and incident handling (see
 | Unique user identification | 164.312(a)(2)(i) | Every staff member signs in with their own ID and PIN; server sessions record the staff ID on every action. `src/backend/src/auth/auth.ts` |
 | Role-based access | 164.312(a)(1) | The database role is authoritative; clinical actions require a clinical role; the AI agent has no approval tool. |
 | Automatic logoff | 164.312(a)(2)(iii) | The browser locks after 1-30 minutes of inactivity; the server locks any session with no request for `SESSION_IDLE_MINUTES` (default 15); sessions expire after 8 hours. |
-| Sign-in protection | 164.312(d) | Per-address and per-account throttling of PIN attempts; PINs stored as salted scrypt hashes; session tokens stored only as SHA-256 hashes. `src/backend/src/auth/rate-limit.ts` |
+| Sign-in protection | 164.312(d) | Six-digit PINs (none published; production seeds are unusable until an operator issues PINs); per-address and per-account throttling; PINs stored as salted scrypt hashes; session tokens stored only as SHA-256 hashes. `src/backend/src/auth/` |
+| Multi-factor authentication | 164.312(d) | Administrators also enter a single-use authenticator-app code (RFC 6238 TOTP), enrolled out of band by the system operator. `src/backend/src/auth/totp.ts` |
+| Account lifecycle | 164.308(a)(3)(ii)(C), (a)(5)(ii)(D) | Administrators deactivate and reactivate accounts, reset PINs and end sessions, each with an audited reason; the last administrator cannot be removed. `src/backend/src/admin/staff-accounts.ts` |
+| Backup and recovery | 164.308(a)(7)(ii)(A), (D) | Daily encrypted, versioned off-host backups to S3 (35 days) with a restore test command; local pre-migration dumps. `deploy/ec2/backup.sh` |
+| Emergency access and downtime | 164.312(a)(2)(ii), 164.308(a)(7) | Documented paper downtime procedure and access-recovery paths. [Emergency access](compliance/EMERGENCY_ACCESS.md) |
 | Audit of changes | 164.312(b) | Every write records an audit event in the same transaction. |
 | Audit of access | 164.312(b) | Every view of patient records is logged (staff, route, patient IDs, time) in `access_log`; data is withheld if access cannot be logged; administrators review via `GET /api/audit/access`. `src/backend/src/audit/access-log.ts` |
 | Integrity | 164.312(c)(1) | Database triggers make observations, decisions, transfers, audit events and the access log append-only; version checks reject stale writes. |
@@ -39,37 +43,49 @@ policies, risk analysis, training, contracts and incident handling (see
 | Local voice processing | Minimum necessary | Speech is transcribed in the browser; audio is never uploaded. |
 | AI vendor | 164.314(a) | Staging inference uses Amazon Bedrock, a HIPAA-eligible service covered by the AWS BAA once accepted. |
 
+## Data location
+
+**Decision (16 November 2026): data is processed and stored in AWS `eu-west-1`
+(Ireland).** The EC2 host, its database, the off-host backups and Amazon Bedrock all
+run there. Bedrock does not store prompts or completions while model invocation
+logging is off, which it is.
+
+Before real patient data is used, this transfer of Kenyan health data outside Kenya
+must be approved by the facility's data protection officer and documented: the lawful
+basis, the safeguards relied on (AWS contractual and technical protections, encryption
+in transit and at rest, access controls and logging), and how patients are informed.
+
+## Compliance records
+
+- [Incident record: repository compromise, October-November 2026](compliance/INCIDENT-2026-10-repository-compromise.md)
+- [Risk register](compliance/RISK_REGISTER.md) (draft)
+- [Data retention and disposal](compliance/DATA_RETENTION.md) (draft)
+- [Emergency access and downtime procedure](compliance/EMERGENCY_ACCESS.md) (draft)
+
 ## Outstanding work
 
 ### Technical
 
-1. **Stronger authentication.** PINs are four digits with no second factor, and the
-   synthetic demo accounts (including administrator) have published PINs. Real data
-   needs longer secrets or MFA, at least for administrators, and no published accounts.
-2. **Backups and disaster recovery.** Database dumps are kept for 7 days on the same
-   disk as the database and restores have not been tested. Copy encrypted backups off
-   the host (for example to S3 with versioning) and test restoration.
-3. **Data location.** Bedrock runs in `eu-west-1` (Ireland). Transferring Kenyan
-   health data abroad requires a lawful basis and safeguards under the Data
-   Protection Act; confirm with the facility and its data protection officer.
-4. **Content-Security-Policy enforcement.** Verify the deployed site reports no
-   violations, then set `CSP_MODE=enforce` (see `deploy/ec2/README.md`).
-5. **Emergency access and staff lifecycle.** There is no documented break-glass
-   procedure and no account deactivation or PIN reset workflow.
+1. **Off-host backup activation.** Run the one-time CloudFormation stack update that
+   creates the backup bucket, then a restore test (`deploy/ec2/README.md`).
+2. **Issue PINs and enrol administrator authenticators** on the deployed site after
+   the six-digit PIN release (`deploy/ec2/README.md`, "Staff accounts and PINs").
+3. **Content-Security-Policy enforcement.** Verify the deployed site reports no
+   violations, then set `CSP_MODE=enforce`.
+4. **Repository protection.** Add a ruleset blocking force pushes and requiring
+   reviewed pull requests on all branches (see the incident record).
 
 ### Organisational
 
 - Accept the AWS Business Associate Addendum (AWS Artifact) and use only
   HIPAA-eligible services for patient data.
-- Register with the Office of the Data Protection Commissioner and complete a data
-  protection impact assessment.
-- Write a risk analysis, security policies, workforce training and a sanctions policy;
-  name a security officer.
-- Maintain an incident response procedure. The repository compromise of
-  October-November 2026 (an automated process rewrote every branch to add a hidden
-  payload; removed in PR #30) should be recorded as a security incident. It involved
-  no patient data.
-- Define patient notice and consent, and data retention and disposal periods.
+- Register with the Office of the Data Protection Commissioner, complete a data
+  protection impact assessment, and obtain DPO approval for the data location above.
+- Complete the risk analysis from the draft register, and write security policies,
+  workforce training and a sanctions policy; name a security officer.
+- Close the open actions in the incident record.
+- Set clinical retention periods and adopt the emergency access procedure.
+- Define patient notice and consent.
 - Complete clinical validation: the scoring protocol is an unvalidated synthetic
   fixture.
 

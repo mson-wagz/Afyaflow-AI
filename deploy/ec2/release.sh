@@ -78,6 +78,38 @@ mv .env.deploy .env
 rm -f secrets/openai-api-key
 rmdir secrets 2>/dev/null || true
 
+# Daily encrypted off-host backups to the stack's S3 bucket (template output BackupBucketName).
+# Until the stack is updated to create the bucket, releases continue without them.
+if [[ -n "${BACKUP_BUCKET:-}" ]]; then
+  [[ "$BACKUP_BUCKET" =~ ^[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$ ]] || exit 1
+  printf 'BACKUP_BUCKET=%s\nAWS_REGION=%s\n' "$BACKUP_BUCKET" "$AWS_REGION" > backup.env
+  chmod 700 backup.sh
+  cat > /etc/systemd/system/afyaflow-backup.service <<'UNIT'
+[Unit]
+Description=AfyaFlow off-host database backup
+After=docker.service
+[Service]
+Type=oneshot
+ExecStart=/opt/afyaflow/backup.sh backup
+UNIT
+  cat > /etc/systemd/system/afyaflow-backup.timer <<'UNIT'
+[Unit]
+Description=Daily AfyaFlow off-host database backup
+[Timer]
+# 02:30 in Nairobi (UTC+3).
+OnCalendar=*-*-* 23:30:00 UTC
+Persistent=true
+RandomizedDelaySec=10m
+[Install]
+WantedBy=timers.target
+UNIT
+  systemctl daemon-reload
+  systemctl enable --now afyaflow-backup.timer
+  ./backup.sh backup || echo 'WARNING: the first off-host backup failed; the daily timer will retry. Check: journalctl -u afyaflow-backup' >&2
+else
+  echo 'WARNING: off-host backups are not configured. Update the CloudFormation stack to create the backup bucket (deploy/ec2/README.md).' >&2
+fi
+
 # Avoid unlimited disk growth on a small host. Keep the previous application image.
 find backups -type f -name '*.dump' -mtime +7 -delete
 docker image prune --force >/dev/null

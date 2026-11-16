@@ -37,6 +37,7 @@ The scoring fixture remains **unvalidated**. This is a research/development demo
 - **Offline intake:** browser-local registration drafts and reconnect replay. Clinical decisions require online server acknowledgement. Drafts and queued registrations belong to the staff member who created them and are removed from the browser at sign-out (with confirmation if any are unsynced).
 - **Audit history:** persisted staff decisions and workflow events, with append-only database protection for observations, decisions, transfers, and audit records.
 - **Read-access logging:** every view of patient records is recorded (who, which patients, which screen, when) in an append-only access log, reviewable by administrators; data is withheld if access cannot be recorded.
+- **Staff account management:** administrators deactivate and reactivate accounts, reset PINs (shown once) and end sessions, each with a recorded reason; administrators sign in with a PIN plus an authenticator-app code.
 
 Capacity and staffing figures are synthetic, not live hospital telemetry. The frontend is responsive and includes a web manifest; service-worker caching, reliable offline app loading, and installability across target devices remain to be implemented or verified.
 
@@ -155,12 +156,9 @@ Open **http://localhost:5173**. The backend listens on port 3000 by default, and
 
 ### Synthetic development accounts
 
-- **Nurse:** `STAFF-101`, PIN `1234` — Jane Mwangi.
-- **Clinician:** `STAFF-102`, PIN `2345` — Kamau Otieno.
-- **Clerk:** `STAFF-103`, PIN `3456` — Faith Achieng.
-- **Administrator:** `STAFF-104`, PIN `4567` — Samuel Mutua.
+`npm run db:seed` creates four synthetic staff accounts (nurse, clinician, clerk and administrator). Their local development PINs are documented in [backend setup](src/backend/README.md). In production the seed gives these accounts random, unusable secrets; an operator issues real PINs privately (see [EC2 deployment](deploy/ec2/README.md#staff-accounts-and-pins)). No deployed PINs are published.
 
-These public fixture credentials are for synthetic demonstrations only. Clerks can register demographics and complaints; recording measurements and clinical decisions requires a clinical role. Administrative accounts cannot register visits.
+Clerks can register demographics and complaints; recording measurements and clinical decisions requires a clinical role. Administrative accounts cannot register visits.
 
 ### Browser-only demonstration mode
 

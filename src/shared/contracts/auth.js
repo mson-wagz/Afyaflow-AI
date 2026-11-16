@@ -79,8 +79,14 @@ export const SESSION_STATUS = {
   EXPIRED: 'expired',
 };
 
+/** Staff PINs are exactly this many digits (sign-in, unlock, resets). */
+export const PIN_LENGTH = 6;
+export const PIN_PATTERN = new RegExp(`^\\d{${PIN_LENGTH}}$`);
+
 /**
- * Synthetic staff fixtures for development, testing, and evaluation
+ * Synthetic staff fixtures for local development, tests and the browser-only demo.
+ * Their PINs are never used in production: the production seed assigns random PINs and an
+ * operator issues real ones with `staff-admin reset-pin` (see src/backend/README.md).
  */
 export const SYNTHETIC_STAFF_FIXTURES = [
   {
@@ -93,7 +99,7 @@ export const SYNTHETIC_STAFF_FIXTURES = [
     facilityId: 'FAC-KEN-01',
     facilityName: 'Kenyatta National Hospital',
     department: 'Emergency & Triage',
-    pin: '1234',
+    pin: '123456',
     avatarInitials: 'JM',
   },
   {
@@ -106,7 +112,7 @@ export const SYNTHETIC_STAFF_FIXTURES = [
     facilityId: 'FAC-KEN-01',
     facilityName: 'Kenyatta National Hospital',
     department: 'Emergency Medicine',
-    pin: '2345',
+    pin: '234567',
     avatarInitials: 'KO',
   },
   {
@@ -119,7 +125,7 @@ export const SYNTHETIC_STAFF_FIXTURES = [
     facilityId: 'FAC-KEN-01',
     facilityName: 'Kenyatta National Hospital',
     department: 'Front Desk & Patient Admissions',
-    pin: '3456',
+    pin: '345678',
     avatarInitials: 'FA',
   },
   {
@@ -132,7 +138,7 @@ export const SYNTHETIC_STAFF_FIXTURES = [
     facilityId: 'FAC-KEN-01',
     facilityName: 'Kenyatta National Hospital',
     department: 'Hospital Administration',
-    pin: '4567',
+    pin: '456789',
     avatarInitials: 'SK',
   },
 ];
@@ -161,7 +167,7 @@ export function isClinicalRole(role) {
 /**
  * Validates sign-in credentials input
  * @param {string} identifier Staff ID or Staff Number
- * @param {string} pin 4-digit numeric PIN
+ * @param {string} pin numeric PIN of PIN_LENGTH digits
  * @returns {{ valid: boolean, error?: string }}
  */
 export function validateSignInCredentials(identifier, pin) {
@@ -171,8 +177,8 @@ export function validateSignInCredentials(identifier, pin) {
   if (!pin || pin.trim().length === 0) {
     return { valid: false, error: 'Staff PIN is required' };
   }
-  if (!/^\d{4}$/.test(pin.trim())) {
-    return { valid: false, error: 'PIN must be exactly 4 digits' };
+  if (!PIN_PATTERN.test(pin.trim())) {
+    return { valid: false, error: `PIN must be exactly ${PIN_LENGTH} digits` };
   }
   return { valid: true };
 }

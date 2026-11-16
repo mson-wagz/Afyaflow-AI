@@ -60,8 +60,35 @@ class DeploymentTests(unittest.TestCase):
         parameters = json.loads(send[send.index("--parameters") + 1])
         payload = parameters["commands"][3].split()[2]
         with tarfile.open(fileobj=io.BytesIO(base64.b64decode(payload)), mode="r:gz") as archive:
-            self.assertEqual(set(archive.getnames()), {"compose.yaml", "Caddyfile", "release.sh"})
+            self.assertEqual(set(archive.getnames()), {"compose.yaml", "Caddyfile", "release.sh", "backup.sh"})
         self.assertEqual(send[send.index("--instance-ids") + 1], "i-synthetic")
+        # Before the stack has a backup bucket, releases run with backups unconfigured.
+        self.assertIn("BACKUP_BUCKET='' bash /opt/afyaflow/release.sh", parameters["commands"][4])
+
+    def _release_with_outputs(self, outputs):
+        health = unittest.mock.MagicMock()
+        health.__enter__.return_value.status = 200
+        health.__enter__.return_value.read.return_value = b'{"status":"ok","database":"postgresql","agentProvider":"bedrock"}'
+        with patch.object(deployment, "aws", side_effect=[outputs, {"Command": {"CommandId": "synthetic"}}, {"Status": "Success"}]) as aws, \
+             patch.object(deployment.time, "sleep"), \
+             patch.object(deployment.urllib.request, "urlopen", return_value=health):
+            deployment.main()
+        return aws
+
+    def test_backup_bucket_from_the_stack_is_passed_to_the_release(self):
+        outputs = {"Stacks": [{"Outputs": OUTPUTS["Stacks"][0]["Outputs"] + [
+            {"OutputKey": "BackupBucketName", "OutputValue": "afyaflow-staging-backupbucket-1abc"}]}]}
+        send = self._release_with_outputs(outputs).call_args_list[1].args
+        command = json.loads(send[send.index("--parameters") + 1])["commands"][4]
+        self.assertIn("BACKUP_BUCKET=afyaflow-staging-backupbucket-1abc bash /opt/afyaflow/release.sh", command)
+
+    def test_invalid_backup_bucket_never_sends_a_host_command(self):
+        outputs = {"Stacks": [{"Outputs": OUTPUTS["Stacks"][0]["Outputs"] + [
+            {"OutputKey": "BackupBucketName", "OutputValue": "bucket;touch /tmp/unexpected"}]}]}
+        with patch.object(deployment, "aws", return_value=outputs) as aws:
+            with self.assertRaises(ValueError):
+                deployment.main()
+        self.assertEqual(aws.call_count, 1)
 
     def test_arbitrary_json_is_not_a_healthy_api(self):
         health = unittest.mock.MagicMock()

@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import useAuth from './useAuth';
 import { Button, Input, Card, Alert } from '../../components';
+import { PIN_LENGTH } from '../../../../shared/contracts/auth.js';
 
 /**
  * Staff Sign-In Screen
@@ -14,6 +15,9 @@ export default function SignInScreen() {
   const [pin, setPin] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  // Administrators are asked for an authenticator-app code after a correct PIN.
+  const [needsCode, setNeedsCode] = useState(false);
+  const [otp, setOtp] = useState('');
 
   const handleSubmit = async (e) => {
     if (e) e.preventDefault();
@@ -23,15 +27,21 @@ export default function SignInScreen() {
       setError('Staff identifier is required');
       return;
     }
-    if (!pin.trim() || pin.trim().length !== 4) {
-      setError('A 4-digit PIN is required');
+    if (!pin.trim() || pin.trim().length !== PIN_LENGTH) {
+      setError(`A ${PIN_LENGTH}-digit PIN is required`);
+      return;
+    }
+    if (needsCode && !/^\d{6}$/.test(otp.trim())) {
+      setError('Enter the 6-digit code from your authenticator app');
       return;
     }
 
     setLoading(true);
     try {
-      const result = await signIn(identifier, pin);
+      const result = await signIn(identifier, pin, needsCode ? otp.trim() : undefined);
       if (!result.success) {
+        if (result.code === 'MFA_REQUIRED') { setNeedsCode(true); setOtp(''); return; }
+        if (result.code === 'INVALID_MFA_CODE') setOtp('');
         setError(result.error || 'Sign-in failed. Please check your credentials.');
       }
     } catch {
@@ -117,7 +127,7 @@ export default function SignInScreen() {
               id="staff-identifier"
               label="Staff ID or Staff Number"
               value={identifier}
-              onChange={(e) => setIdentifier(e.target.value)}
+              onChange={(e) => { setIdentifier(e.target.value); setNeedsCode(false); setOtp(''); }}
               placeholder="e.g. KNH-NURSE-042 or STAFF-101"
               required
               autoComplete="username"
@@ -126,17 +136,34 @@ export default function SignInScreen() {
 
             <Input
               id="staff-pin"
-              label="4-digit Security PIN"
+              label={`${PIN_LENGTH}-digit Security PIN`}
               type="password"
               inputMode="numeric"
               pattern="[0-9]*"
-              maxLength={4}
+              maxLength={PIN_LENGTH}
               value={pin}
               onChange={(e) => setPin(e.target.value)}
-              placeholder="••••"
+              placeholder="••••••"
               required
               autoComplete="current-password"
             />
+
+            {needsCode && (
+              <Input
+                id="staff-otp"
+                label="Authenticator code"
+                inputMode="numeric"
+                pattern="[0-9]*"
+                maxLength={6}
+                value={otp}
+                onChange={(e) => setOtp(e.target.value)}
+                placeholder="123456"
+                required
+                autoFocus
+                autoComplete="one-time-code"
+                hint="Administrator accounts need the 6-digit code from your authenticator app"
+              />
+            )}
 
             <div style={{ marginTop: '1.25rem' }}>
               <Button

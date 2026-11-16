@@ -20,9 +20,15 @@ eight-hour absolute expiry still applies.
 
 ## Authentication
 
-- `POST /auth/login`: `{ identifier, pin }`; seeded identifiers and PINs are synthetic.
+- `POST /auth/login`: `{ identifier, pin, otp? }`. PINs are exactly six digits (400
+  otherwise). Administrators must also send `otp`, the current 6-digit code from their
+  enrolled authenticator app (RFC 6238 TOTP, 30-second steps, one step of drift). After
+  a correct PIN: 403 `MFA_NOT_ENROLLED` if no authenticator is enrolled, 401
+  `MFA_REQUIRED` if `otp` is missing, 401 `INVALID_MFA_CODE` if it is wrong or was
+  already used. Wrong codes count toward the per-account limit. A wrong PIN is always
+  401 `INVALID_CREDENTIALS`, whatever the role.
 - `GET /auth/me`: current staff and lock status.
-- `POST /auth/lock`, `/auth/unlock` (`{ pin }`), `/auth/logout`.
+- `POST /auth/lock`, `/auth/unlock` (`{ pin }`, PIN only), `/auth/logout`.
 
 ## Patient and observation workflow
 
@@ -77,6 +83,28 @@ official filesystem MCP server. General filesystem tools are not exposed to the 
 - `GET /audit/access?patientId=`: administrators only. The newest 200 read-access
   records, optionally for one patient: who viewed which records, through which route
   and when. Other roles receive 403; a malformed `patientId` is 400.
+
+## Staff accounts (administrators only)
+
+Other roles receive 403. Every change takes `{ reason }` (5-500 characters, else 400),
+writes an audit event naming the administrator, and refuses the administrator's own
+account (400 `SELF_ACTION`).
+
+- `GET /staff`: accounts with role, `active`, `mfaEnrolled` and open session count.
+  Never includes PIN hashes or authenticator secrets; system accounts are omitted.
+- `POST /staff/:id/deactivate`: blocks sign-in (403 `ACCOUNT_DEACTIVATED` after a
+  correct PIN), ends all sessions and removes the person from follow-up owners. The
+  last active administrator cannot be deactivated (409 `LAST_ADMIN`); repeating the
+  current state is 409 `NO_CHANGE`. Audit: `STAFF_DEACTIVATED`.
+- `POST /staff/:id/reactivate`: restores sign-in. Audit: `STAFF_REACTIVATED`.
+- `POST /staff/:id/end-sessions`: signs the person out everywhere without changing
+  their PIN (lost or shared device). Audit: `STAFF_SESSIONS_ENDED`.
+- `POST /staff/:id/reset-pin`: returns `{ data: { pin } }` once: a random six-digit
+  PIN that is not a repeated digit or straight run. Ends the person's sessions.
+  Not idempotency-stored, so the PIN is never saved in plain text. Audit:
+  `STAFF_PIN_RESET` (without the PIN).
+
+Authenticator enrolment for administrators is operator-only (`staff-admin enroll-mfa`).
 
 Read access is audited. Every route that returns patient records (visits, evidence,
 queue, proposals, decisions, agent runs and traces, routing, deterioration,

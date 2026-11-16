@@ -15,20 +15,20 @@ test('A server-rejected PIN stays on the lock screen and permits a successful re
     if(path==='/api/auth/unlock') {
       unlocks++;
       const {pin}=JSON.parse(options.body);
-      return pin==='2345'?Response.json({success:true,staff}):Response.json({code:'INVALID_PIN',message:'Incorrect PIN.'},{status:401});
+      return pin==='234567'?Response.json({success:true,staff}):Response.json({code:'INVALID_PIN',message:'Incorrect PIN.'},{status:401});
     }
     if(path==='/api/research/cases')return Response.json({metadata:{description:'Historical research',limitations:[]},total:0,subjects:0,cases:[]});
     throw new Error(`Unexpected request: ${path}`);
   }));
   render(<App />);
-  const field=await screen.findByLabelText('Enter 4-digit Staff PIN');
-  fireEvent.change(field,{target:{value:'0000'}});
+  const field=await screen.findByLabelText('Enter 6-digit Staff PIN');
+  fireEvent.change(field,{target:{value:'000000'}});
   fireEvent.click(screen.getByRole('button',{name:'Unlock Session'}));
   expect(await screen.findByText('Incorrect PIN. Please re-enter your PIN.')).toBeInTheDocument();
   expect(screen.getByRole('heading',{name:'Terminal Locked'})).toBeInTheDocument();
   expect(screen.queryByRole('heading',{name:'Staff Sign In'})).not.toBeInTheDocument();
   expect(field).toHaveValue('');expect(field).toHaveFocus();
-  fireEvent.change(field,{target:{value:'2345'}});
+  fireEvent.change(field,{target:{value:'234567'}});
   fireEvent.click(screen.getByRole('button',{name:'Unlock Session'}));
   await waitFor(()=>expect(screen.queryByRole('heading',{name:'Terminal Locked'})).not.toBeInTheDocument());
   expect(await screen.findByText(/No historical cases have been imported/)).toBeInTheDocument();

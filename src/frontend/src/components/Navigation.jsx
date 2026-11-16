@@ -10,6 +10,7 @@ export default function Navigation({
   isClinical = false,
   pendingSyncCount = 0,
   competitionMode = false,
+  isAdmin = false,
 }) {
   const navItems = [
     {
@@ -66,12 +67,20 @@ export default function Navigation({
       requiresClinical: false,
       description: 'Active sessions, locks, and permission logs',
     },
+    {
+      id: 'staff-accounts',
+      label: 'Staff Accounts',
+      icon: '👥',
+      requiresClinical: false,
+      adminOnly: true,
+      description: 'Deactivate accounts, reset PINs, end sessions',
+    },
   ];
 
   return (
     <nav aria-label="Main application navigation">
       <ul className="nav-list">
-        {navItems.filter(item=>!competitionMode || item.id!=='research').map((item) => {
+        {navItems.filter(item=>(!competitionMode || item.id!=='research') && (!item.adminOnly || isAdmin)).map((item) => {
           const isActive = currentView === item.id;
           const isRestrictedForUser = item.requiresClinical && !isClinical;
 

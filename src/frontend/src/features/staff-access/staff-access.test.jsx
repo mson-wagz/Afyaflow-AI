@@ -33,7 +33,7 @@ describe('Staff Access and App Shell Feature Specification Tests', () => {
       expect(identifierInput).toBeInTheDocument();
       expect(identifierInput).toHaveAttribute('type', 'text');
 
-      const pinInput = screen.getByLabelText(/4-digit Security PIN/i);
+      const pinInput = screen.getByLabelText(/6-digit Security PIN/i);
       expect(pinInput).toBeInTheDocument();
       expect(pinInput).toHaveAttribute('type', 'password');
 
@@ -63,10 +63,10 @@ describe('Staff Access and App Shell Feature Specification Tests', () => {
 
     it('rejects invalid PIN with descriptive error', async () => {
       const nurse = SYNTHETIC_STAFF_FIXTURES[0];
-      const result = await apiSignIn(nurse.staffNumber, '9999');
+      const result = await apiSignIn(nurse.staffNumber, '999999');
 
       expect(result.success).toBe(false);
-      expect(result.error).toMatch(/Invalid 4-digit security PIN/i);
+      expect(result.error).toMatch(/Invalid security PIN/i);
     });
 
     it('obscures patient data on shared device lock and restores draft upon unlock', async () => {
@@ -95,8 +95,8 @@ describe('Staff Access and App Shell Feature Specification Tests', () => {
       expect(screen.queryByRole('textbox', {name:/Patient Full Name/i})).not.toBeInTheDocument();
 
       // Attempt unlock with wrong PIN
-      const pinInput = screen.getByLabelText(/Enter 4-digit Staff PIN/i);
-      fireEvent.change(pinInput, { target: { value: '0000' } });
+      const pinInput = screen.getByLabelText(/Enter 6-digit Staff PIN/i);
+      fireEvent.change(pinInput, { target: { value: '000000' } });
 
       const unlockBtn = screen.getByRole('button', { name: /Unlock Session/i });
       fireEvent.click(unlockBtn);
@@ -105,8 +105,8 @@ describe('Staff Access and App Shell Feature Specification Tests', () => {
         expect(screen.getByText(/Incorrect PIN/i)).toBeInTheDocument();
       });
 
-      // Unlock with correct PIN (Nurse Jane's PIN is 1234)
-      fireEvent.change(pinInput, { target: { value: '1234' } });
+      // Unlock with correct PIN (Nurse Jane's PIN is 123456)
+      fireEvent.change(pinInput, { target: { value: '123456' } });
       fireEvent.click(unlockBtn);
 
       // Verify session unlocked and draft patient data preserved intact

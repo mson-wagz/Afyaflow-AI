@@ -1,5 +1,6 @@
 import { Controller, Get, Post, Body, Param, Query, Req, Res, Headers, Inject, UseGuards, UseInterceptors, UnauthorizedException } from '@nestjs/common';
 import { AccessLogged, AccessLogInterceptor, listAccess } from './audit/access-log.js';
+import { listStaff, setStaffActive, endStaffSessions, adminResetPin } from './admin/staff-accounts.js';
 import type { Request, Response } from 'express';
 import { AuthService, SessionGuard, StaffRequest } from './auth/auth.js';
 import { WorkflowService, requestKey } from './modules/workflow.service.js';
@@ -59,6 +60,12 @@ export class ApiController {
   @Post('deterioration/decisions') @UseGuards(SessionGuard) reassess(@Req()req:StaffRequest,@Body()body:unknown,@Headers('idempotency-key')key:string) {return this.workflow.reassess(req.staff,body,requestKey(key));}
   @Get('audit') @UseGuards(SessionGuard) @AccessLogged() audit(@Req()req:StaffRequest) {return this.workflow.audit(req.staff);}
   @Get('audit/access') @UseGuards(SessionGuard) @AccessLogged() accessLog(@Req()req:StaffRequest,@Query('patientId')patientId?:string) {return listAccess(this.database,req.staff,patientId);}
+  // Staff account management (administrators only; each change needs a reason and is audited).
+  @Get('staff') @UseGuards(SessionGuard) staffList(@Req()req:StaffRequest) {return listStaff(this.database,req.staff);}
+  @Post('staff/:id/deactivate') @UseGuards(SessionGuard) deactivate(@Req()req:StaffRequest,@Param('id')staffId:string,@Body()body:unknown) {return setStaffActive(this.database,req.staff,staffId,false,body);}
+  @Post('staff/:id/reactivate') @UseGuards(SessionGuard) reactivate(@Req()req:StaffRequest,@Param('id')staffId:string,@Body()body:unknown) {return setStaffActive(this.database,req.staff,staffId,true,body);}
+  @Post('staff/:id/end-sessions') @UseGuards(SessionGuard) endSessions(@Req()req:StaffRequest,@Param('id')staffId:string,@Body()body:unknown) {return endStaffSessions(this.database,req.staff,staffId,body);}
+  @Post('staff/:id/reset-pin') @UseGuards(SessionGuard) resetPin(@Req()req:StaffRequest,@Param('id')staffId:string,@Body()body:unknown) {return adminResetPin(this.database,req.staff,staffId,body);}
   @Get('followups') @UseGuards(SessionGuard) @AccessLogged() followupList(@Req()req:StaffRequest) {return this.followups.list(req.staff);}
   @Get('followups/staff') @UseGuards(SessionGuard) followupStaff(@Req()req:StaffRequest) {return this.followups.staff(req.staff);}
   @Get('followups/:id/history') @UseGuards(SessionGuard) @AccessLogged() followupHistory(@Req()req:StaffRequest,@Param('id')taskId:string) {return this.followups.history(req.staff,taskId);}

@@ -50,13 +50,13 @@ describe('Browser API client unit tests', () => {
   it('keeps an incorrect unlock PIN retryable without expiring the session', async () => {
     respond({code:'INVALID_PIN',message:'Incorrect PIN.'},401);
     const dispatch=vi.spyOn(window,'dispatchEvent');
-    await expect(api('/auth/unlock',{method:'POST',body:{pin:'0000'}})).rejects.toMatchObject({code:'INVALID_PIN',status:401});
+    await expect(api('/auth/unlock',{method:'POST',body:{pin:'000000'}})).rejects.toMatchObject({code:'INVALID_PIN',status:401});
     expect(dispatch).not.toHaveBeenCalled();
   });
   it('still expires a genuinely expired session during unlock', async () => {
     respond({code:'SESSION_EXPIRED',message:'Session expired. Sign in again.'},401);
     const dispatch=vi.spyOn(window,'dispatchEvent');
-    await expect(api('/auth/unlock',{method:'POST',body:{pin:'1234'}})).rejects.toBeInstanceOf(ApiError);
+    await expect(api('/auth/unlock',{method:'POST',body:{pin:'123456'}})).rejects.toBeInstanceOf(ApiError);
     expect(dispatch).toHaveBeenCalledWith(expect.objectContaining({type:'afyaflow-session-expired'}));
   });
 

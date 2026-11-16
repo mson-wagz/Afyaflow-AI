@@ -49,6 +49,14 @@ export async function migrate(database: Database) {
       await db.query(await readFile('src/backend/src/database/007_session_activity.sql','utf8'));
       await db.query("INSERT INTO schema_migrations(version) VALUES('007')");
     }
+    if (!(await db.query("SELECT 1 FROM schema_migrations WHERE version='008'")).rowCount) {
+      await db.query(await readFile('src/backend/src/database/008_staff_mfa.sql','utf8'));
+      await db.query("INSERT INTO schema_migrations(version) VALUES('008')");
+    }
+    if (!(await db.query("SELECT 1 FROM schema_migrations WHERE version='009'")).rowCount) {
+      await db.query(await readFile('src/backend/src/database/009_staff_lifecycle.sql','utf8'));
+      await db.query("INSERT INTO schema_migrations(version) VALUES('009')");
+    }
   });
 }
 if (
