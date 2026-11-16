@@ -5,10 +5,12 @@ env.backends.onnx.wasm.numThreads=1;
 env.backends.onnx.wasm.proxy=false;
 let transcriber;
 async function load(id) {
+  // Concurrent requests share one download, but a failed one (e.g. a network drop) is forgotten
+  // so the next attempt retries instead of replaying the same rejection until the page reloads.
   transcriber ||= pipeline('automatic-speech-recognition',SPEECH_MODEL.id,{revision:SPEECH_MODEL.revision,
     device:'wasm',dtype:'q8',progress_callback:p=>{
       if(p.status==='progress')self.postMessage({id,type:'progress',progress:Math.round(p.progress || 0)});
-    }});
+    }}).catch(error=>{transcriber=undefined;throw error;});
   return transcriber;
 }
 self.onmessage=async({data})=>{

@@ -52,6 +52,8 @@ async function decision(proposal:any,key=randomUUID()) {
 }
 before(async () => {
   process.env.AGENT_WORKER_DISABLED='true';
+  // The suite registers many visits as one nurse; the quota test lowers these itself.
+  config.agentRunsPerStaffHour=100000;config.agentRunsPerHour=100000;
   await database.pool.query(`CREATE SCHEMA "${schema}"`);
   await database.pool.end();
   Object.defineProperty(database,'pool',{value:new Pool({connectionString:process.env.DATABASE_URL,options:`-c search_path=${schema}`})});
@@ -115,6 +117,57 @@ test('routing enforces clinical permission and assessment/department versions',a
   const key=randomUUID();const a=await workflow.transfer(nurse,body,key),b=await workflow.transfer(nurse,body,key);
   assert.equal(a.data.transferId,b.data.transferId);
   assert.match((await workflow.queue()).queue.find(v=>v.visitId===visit.id)!.assignedDepartment,/General Outpatient/);
+});
+test('deterioration compares each visit with its own previous observations',async () => {
+  const single=await register(),repeated=await register();
+  const vitals={heartRate:128,systolicBp:120,diastolicBp:80,respiratoryRate:16,temperature:37,spO2:98,avpu:'Alert',mobility:'Walking normally'};
+  await workflow.observations(nurse,repeated.data.id,{vitals,expectedVersion:1},randomUUID());
+  const items=await workflow.deterioration();
+  const one=items.find(i=>i.patientId===single.data.id)!,two=items.find(i=>i.patientId===repeated.data.id)!;
+  assert.equal(one.latestObservation,null);assert.equal(one.comparison,null);assert.equal(one.baselineObservation.heartRate,75);
+  assert.equal(two.baselineObservation.heartRate,75);assert.equal(two.latestObservation.heartRate,128);
+  assert.equal(two.observationVersion,2);assert.ok(two.comparison);
+  await assert.rejects(workflow.trace('RUN-does-not-exist'),(error:any)=>error.getStatus()===404);
+});
+test('manual escalation only raises urgency',async () => {
+  const result=await register(),proposal=await assess(result.data.id);
+  await workflow.decide(nurse,{patientId:proposal.patientId,proposalId:proposal.proposalId,observationVersion:proposal.observationVersion,
+    decision:'OVERRIDDEN',overridePriority:'YELLOW',reason:'Synthetic override to a known starting priority.'},randomUUID());
+  const escalate=(targetPriority:string)=>workflow.reassess(nurse,{patientId:result.data.id,observationVersion:1,action:'ESCALATE',
+    targetPriority,reason:'Synthetic deterioration review.'},randomUUID());
+  for(const lower of ['GREEN','YELLOW'])
+    await assert.rejects(escalate(lower),(error:any)=>error.getStatus()===400 && error.getResponse().code==='NOT_AN_ESCALATION');
+  assert.equal((await workflow.visits()).find(v=>v.id===result.data.id)!.approvedPriority.code,'YELLOW');
+  assert.equal((await escalate('ORANGE')).data.newPriority.code,'ORANGE');
+});
+test('transfers occupy and release department beds and bump department versions',async () => {
+  const template=(await database.pool.query("SELECT data FROM departments WHERE id='DEP-GOPD'")).rows[0].data;
+  for(const [id,name] of [['DEP-TEST-A','Synthetic Ward A'],['DEP-TEST-B','Synthetic Ward B']])
+    await database.pool.query('INSERT INTO departments(id,data) VALUES($1,$2)',[id,JSON.stringify({...template,name,status:'OPEN',totalBeds:1,occupiedBeds:0})]);
+  const approvedVisit=async()=>{const r=await register();await decision(await assess(r.data.id));return (await workflow.visits()).find(v=>v.id===r.data.id)!;};
+  const first=await approvedVisit(),second=await approvedVisit();
+  const ward=async(id:string)=>(await workflow.departments()).find(d=>d.id===id)!;
+  const move=(visit:any,departmentId:string,departmentVersion:number)=>workflow.transfer(nurse,{patientId:visit.id,departmentId,
+    assessmentVersion:visit.assessmentVersion,departmentVersion,rationale:'Synthetic capacity check.'},randomUUID());
+  const code=(expected:string)=>(error:any)=>error.getResponse().code===expected;
+  // Taking the only bed fills the ward and changes its version.
+  const moved=await move(first,'DEP-TEST-A',1);
+  assert.equal(moved.data.previousDepartment,'Triage Holding');
+  assert.deepEqual([(await ward('DEP-TEST-A')).occupiedBeds,(await ward('DEP-TEST-A')).version],[1,2]);
+  // A view from before that transfer is stale; a fresh one sees the ward is full.
+  await assert.rejects(move(second,'DEP-TEST-A',1),code('STALE_ROUTE'));
+  await assert.rejects(move(second,'DEP-TEST-A',2),code('DEPARTMENT_UNAVAILABLE'));
+  // Moving the first patient on releases the bed they held.
+  await move(first,'DEP-TEST-B',1);
+  assert.deepEqual([(await ward('DEP-TEST-A')).occupiedBeds,(await ward('DEP-TEST-A')).version],[0,3]);
+  assert.deepEqual([(await ward('DEP-TEST-B')).occupiedBeds,(await ward('DEP-TEST-B')).version],[1,2]);
+  await move(second,'DEP-TEST-A',3);
+  assert.equal((await ward('DEP-TEST-A')).occupiedBeds,1);
+  // Re-transferring to the current department is refused rather than double-counting a bed.
+  await assert.rejects(move(first,'DEP-TEST-B',2),code('ALREADY_IN_DEPARTMENT'));
+  assert.equal((await ward('DEP-TEST-B')).occupiedBeds,1);
+  const audit=(await database.pool.query("SELECT details FROM audit_events WHERE visit_id=$1 AND event_type='DEPARTMENT_TRANSFERRED' ORDER BY timestamp",[first.id])).rows;
+  assert.deepEqual(audit.map(a=>a.details.previousDepartmentId),[null,'DEP-TEST-A']);
 });
 test('PostgreSQL transaction rollback leaves neither visit change nor audit event',async () => {
   const before=(await database.pool.query("SELECT * FROM visits WHERE id='SYN-PT-8821'")).rows[0];
@@ -343,6 +396,53 @@ test('shared auth throttling is atomic and permits a new window after expiry',as
   const {hash}=await import('../../src/backend/src/database/db.js');
   await database.pool.query("UPDATE auth_rate_limits SET expires_at=now()-interval '1 second' WHERE key_hash=$1",[hash(source)]);
   assert.equal(await allowAuthAttempt(database,source),true);
+});
+
+test('model quota keeps clinical writes, records review-required runs and refuses explicit requests',async()=>{
+  const {hash}=await import('../../src/backend/src/database/db.js');
+  const reset=()=>database.pool.query('DELETE FROM auth_rate_limits WHERE key_hash=ANY($1)',[[hash('agent-runs:global'),hash(`agent-runs:staff:${nurse.id}`),hash(`agent-runs:staff:${clinician.id}`)]]);
+  const previous={staff:config.agentRunsPerStaffHour,global:config.agentRunsPerHour};
+  try {
+    await reset();config.agentRunsPerStaffHour=2;
+    const first=await register(),second=await register();
+    for(const visit of [first,second])
+      assert.equal((await database.pool.query('SELECT status FROM agent_runs WHERE id=$1',[visit.data.agentRunId])).rows[0].status,'QUEUED');
+    // Over the per-staff limit, the visit and observations are still saved...
+    const third=await register();
+    const run=(await database.pool.query('SELECT * FROM agent_runs WHERE id=$1',[third.data.agentRunId])).rows[0];
+    assert.equal(run.status,'FAILED');assert.match(run.error,/hourly AI assessment limit/);
+    assert.equal((await database.pool.query('SELECT count(*) FROM agent_outbox WHERE run_id=$1',[run.id])).rows[0].count,'0');
+    assert.equal((await workflow.visits()).find(v=>v.id===third.data.id)!.assessmentStatus,'REVIEW_REQUIRED');
+    // ...an idempotent retry of the same registration is not charged again...
+    const key=randomUUID();
+    config.agentRunsPerStaffHour=100000;
+    const replayed=await workflow.register(nurse,intake,key);
+    assert.deepEqual(await workflow.register(nurse,intake,key),replayed);
+    // ...and an explicit retry over the deployment-wide limit is refused without changing the run.
+    await reset();config.agentRunsPerHour=1;
+    await register();
+    await assert.rejects(workflow.requestAssessment(clinician,third.data.id),(error:any)=>error.getStatus()===429 && error.getResponse().code==='AGENT_QUOTA_EXCEEDED');
+    assert.equal((await database.pool.query('SELECT status FROM agent_runs WHERE id=$1',[run.id])).rows[0].status,'FAILED');
+    // Re-requesting an already queued run reuses it and is not charged.
+    assert.equal((await workflow.requestAssessment(clinician,first.data.id)).data.status,'QUEUED');
+    // A new window allows the retry.
+    await reset();
+    assert.equal((await workflow.requestAssessment(clinician,third.data.id)).data.status,'QUEUED');
+  } finally {config.agentRunsPerStaffHour=previous.staff;config.agentRunsPerHour=previous.global;}
+});
+
+test('a display name shared by two accounts cannot be used to sign in',async()=>{
+  const {pinHash}=await import('../../src/backend/src/auth/auth.js');
+  for(const [id,number,pin] of [['STAFF-TWIN-1','TWIN-001','5111'],['STAFF-TWIN-2','TWIN-002','5222']])
+    await database.pool.query('INSERT INTO staff(id,staff_number,role,pin_hash,profile) VALUES($1,$2,$3,$4,$5)',
+      [id,number,'nurse',pinHash(pin),JSON.stringify({name:'Synthetic Twin Name'})]);
+  const attempt=(identifier:string,pin:string)=>fetch(`${base}/api/auth/login`,{method:'POST',
+    headers:{'Content-Type':'application/json'},body:JSON.stringify({identifier,pin})}).then(r=>r.status);
+  // Neither PIN works through the ambiguous name, so the wrong account is never chosen.
+  assert.equal(await attempt('Synthetic Twin Name','5111'),401);
+  assert.equal(await attempt('synthetic twin name','5222'),401);
+  assert.equal(await attempt('STAFF-TWIN-1','5111'),201);
+  assert.equal(await attempt('twin-002','5222'),201);
 });
 
 test('failed PINs are throttled per account across identifier forms and shared with unlock',async()=>{

@@ -22,7 +22,7 @@ Open **About the data and its limitations** for attribution. **Download adapted 
 
 ## 1. Sign in
 
-Open the supplied application URL, or `http://localhost:5173` locally. Enter a staff identifier and four-digit PIN, then sign in.
+Open the supplied application URL, or `http://localhost:5173` locally. Enter a staff identifier and four-digit PIN, then sign in. The identifier can be your staff ID, staff number or full name; if another account shares your name, sign in with your staff ID or number.
 
 Synthetic development accounts:
 
@@ -204,6 +204,7 @@ does not make the scores clinically validated.
 - **Sign-in fails:** check identifier/PIN, backend connectivity, and whether demo accounts were seeded. Repeated attempts can trigger temporary throttling: 20 attempts per minute from one network address, and 10 incorrect PINs per account within 15 minutes. Incorrect unlock PINs count toward the same account limit. A successful sign-in or unlock clears the account count; otherwise wait 15 minutes.
 - **Validation passes but registration fails:** check demographic/complaint errors and role permissions. Measurement validation checks only that section.
 - **No proposed priority:** inspect run status and missing evidence; ask the developer to check model access. Unsupported populations need staff review.
+- **"Hourly AI assessment limit has been reached":** each deployment caps new and retried AI assessments per staff account (default 20 per hour) and overall (default 100 per hour). Registration and observations are still saved and the visit shows as requiring review. Request the assessment again later, or make a reasoned manual decision.
 - **Override denied:** use an authorised clinical account or ask an authorised staff member to review.
 - **Stale decision:** refresh and review the latest observation version.
 - **Outbox replay fails:** restore an unlocked session and review validation/permission errors. Retain the item until confirmed.

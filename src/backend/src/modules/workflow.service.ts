@@ -1,5 +1,6 @@
 /* eslint-disable @typescript-eslint/no-unsafe-assignment */
-import { Injectable, Inject, BadRequestException, ConflictException, NotFoundException } from '@nestjs/common';
+import { Injectable, Inject, BadRequestException, ConflictException, NotFoundException, HttpException, HttpStatus } from '@nestjs/common';
+import { consumeWindow } from '../auth/rate-limit.js';
 import { z } from 'zod';
 import { Database, audit, id, idempotent, hash } from '../database/db.js';
 import { Staff, parse, requireClinical } from '../auth/auth.js';
@@ -112,8 +113,31 @@ export function requestKey(value: unknown) {
   return value;
 }
 
-/** Queues an agent run for a visit's observation version (re-queues failed runs). */
-export async function enqueue(db: PoolClient, visitId: string, version: number) {
+export const AGENT_QUOTA_MESSAGE = 'The hourly AI assessment limit has been reached. Retry the assessment later or make a reasoned manual decision.';
+
+/** Counts one model run against the per-staff and deployment-wide hourly limits. */
+async function consumeAgentQuota(db: PoolClient, staffId: string | null) {
+  const hour = 3600;
+  if (staffId && !(await consumeWindow(db, `agent-runs:staff:${staffId}`, { limit: config.agentRunsPerStaffHour, windowSeconds: hour }))) return false;
+  return consumeWindow(db, 'agent-runs:global', { limit: config.agentRunsPerHour, windowSeconds: hour });
+}
+
+/**
+ * Queues an agent run for a visit's observation version (re-queues failed runs).
+ * A new or retried run consumes model quota. When quota is exhausted, `reject` throws 429;
+ * `record` keeps the caller's clinical write and stores a FAILED run that requires staff review.
+ */
+export async function enqueue(db: PoolClient, visitId: string, version: number, staffId: string | null = null, onQuota: 'record' | 'reject' = 'record') {
+  const existing = (await db.query('SELECT status FROM agent_runs WHERE visit_id=$1 AND observation_version=$2', [visitId, version])).rows[0];
+  if ((!existing || existing.status === 'FAILED') && !(await consumeAgentQuota(db, staffId))) {
+    if (onQuota === 'reject') throw new HttpException({ code: 'AGENT_QUOTA_EXCEEDED', message: AGENT_QUOTA_MESSAGE }, HttpStatus.TOO_MANY_REQUESTS);
+    const failed = (await db.query(`INSERT INTO agent_runs(id,visit_id,observation_version,model,provider,status,error,finished_at) VALUES($1,$2,$3,$4,$5,'FAILED',$6,now())
+      ON CONFLICT(visit_id,observation_version) DO UPDATE SET status='FAILED',error=EXCLUDED.error,finished_at=now(),lease_until=null RETURNING *`,
+      [id('RUN'), visitId, version, config.model, config.provider, AGENT_QUOTA_MESSAGE])).rows[0];
+    await db.query("UPDATE visits SET assessment_status='REVIEW_REQUIRED' WHERE id=$1 AND observation_version=$2", [visitId, version]);
+    await audit(db, staffId, 'AGENT_QUOTA_EXCEEDED', { runId: failed.id, observationVersion: version }, visitId);
+    return failed;
+  }
   const run = (await db.query(`INSERT INTO agent_runs(id,visit_id,observation_version,model,provider,status) VALUES($1,$2,$3,$4,$5,'QUEUED')
     ON CONFLICT(visit_id,observation_version) DO UPDATE SET status=CASE WHEN agent_runs.status='FAILED' THEN 'QUEUED' ELSE agent_runs.status END,
     error=CASE WHEN agent_runs.status='FAILED' THEN null ELSE agent_runs.error END,
@@ -171,7 +195,7 @@ export class WorkflowService {
       await db.query('INSERT INTO visits(id,name,age,gender,complaint,registered_by,arrival_at,source_data) VALUES($1,$2,$3,$4,$5,$6,$7,$8)',
         [visitId, name, age, gender, presentingComplaint, staff.id, arrivalTime || recordedAt, JSON.stringify(voiceReview ? { intake: { ...voiceReview, reviewedBy: staff.id } } : {})]);
       await db.query('INSERT INTO observations(id,visit_id,version,vitals,recorded_by) VALUES($1,$2,1,$3,$4)', [id('OBS'), visitId, JSON.stringify(vitals), staff.id]);
-      const run = await enqueue(db, visitId, 1);
+      const run = await enqueue(db, visitId, 1, staff.id);
       await audit(db, staff.id, 'PATIENT_REGISTERED', { observationVersion: 1, runId: run.id, ...(voiceReview ? { voiceReview } : {}) }, visitId);
       return {
         success: true, isDuplicate: false, data: {
@@ -197,7 +221,7 @@ export class WorkflowService {
       for (const task of staleFollowups.rows) await audit(db, staff.id, 'FOLLOWUP_STALE', { followupId: task.id, newObservationVersion: version }, visitId);
       await db.query("UPDATE agent_runs SET status='SUPERSEDED' WHERE visit_id=$1 AND status IN ('QUEUED','WAITING_FOR_REVIEW','REVIEW_REQUIRED')", [visitId]);
       await db.query("UPDATE visits SET observation_version=$2,assessment_status='AWAITING_ASSESSMENT',updated_at=now() WHERE id=$1", [visitId, version]);
-      const run = await enqueue(db, visitId, version);
+      const run = await enqueue(db, visitId, version, staff.id);
       await audit(db, staff.id, 'OBSERVATIONS_RECORDED', { version, runId: run.id }, visitId);
       return { success: true, data: { visitId, observationVersion: version, agentRunId: run.id } };
     }));
@@ -218,30 +242,40 @@ export class WorkflowService {
     const rows = (await this.database.pool.query(`SELECT p.*,r.model,r.status run_status FROM proposals p JOIN agent_runs r ON r.id=p.run_id
       JOIN visits v ON v.id=p.visit_id WHERE v.data_source='synthetic' AND p.status='PENDING'
       AND r.status IN ('WAITING_FOR_REVIEW','REVIEW_REQUIRED') ORDER BY p.created_at`)).rows;
-    return Promise.all(rows.map(async (p) => {
-      const visit = visits.find((v) => v.id === p.visit_id)!;
+    const visitsById = new Map(visits.map((v) => [v.id, v]));
+    const traces = await this.traces(rows.map((p) => p.run_id));
+    return rows.map((p) => {
+      const visit = visitsById.get(p.visit_id)!;
       return {
         ...visit, patientId: visit.id, proposalId: p.id, patientName: visit.name, observations: visit.vitals,
         observationVersion: p.observation_version, isStale: p.observation_version !== visit.observationVersion,
         proposal: p.data.proposal, protocol: p.data.protocol || protocol, summary: p.data.summary,
-        toolTrace: await this.trace(p.run_id), runStatus: p.run_status,
+        toolTrace: traces.get(p.run_id), runStatus: p.run_status,
       };
-    }));
+    });
   }
 
   /** Tool-call trace for an agent run. */
   async trace(runId: string) {
-    const run = (await this.database.pool.query('SELECT * FROM agent_runs WHERE id=$1', [runId])).rows[0];
-    if (!run) throw new NotFoundException('Agent run not found.');
-    if (isCompetitionMode()) {
-      const visit = (await this.database.pool.query('SELECT data_source FROM visits WHERE id=$1', [run.visit_id])).rows[0];
-      if (visit?.data_source !== 'synthetic' || run.provider !== 'ollama') throw new NotFoundException('Agent run not found.');
-    }
-    const calls = (await this.database.pool.query('SELECT * FROM tool_traces WHERE run_id=$1 ORDER BY timestamp,step', [runId])).rows;
-    return {
-      runId, model: run.model, provider: run.provider, status: run.status, error: run.error,
-      timestamp: iso(run.created_at), toolCalls: calls.map((c) => ({ tool: c.tool, inputs: c.inputs, outputs: c.outputs, durationMs: c.duration_ms, timestamp: iso(c.timestamp) })),
-    };
+    return (await this.traces([runId])).get(runId);
+  }
+
+  /** Tool-call traces for several runs in two queries; every requested run must exist and be visible. */
+  private async traces(runIds: string[]) {
+    const result = new Map<string, any>();
+    if (!runIds.length) return result;
+    const runs = (await this.database.pool.query(`SELECT r.*,v.data_source FROM agent_runs r LEFT JOIN visits v ON v.id=r.visit_id
+      WHERE r.id=ANY($1)`, [runIds])).rows;
+    const visible = runs.filter((run) => !isCompetitionMode() || (run.data_source === 'synthetic' && run.provider === 'ollama'));
+    if (visible.length !== new Set(runIds).size) throw new NotFoundException('Agent run not found.');
+    const calls = new Map<string, any[]>(visible.map((run) => [run.id, []]));
+    for (const c of (await this.database.pool.query('SELECT * FROM tool_traces WHERE run_id=ANY($1) ORDER BY timestamp,step', [runIds])).rows)
+      calls.get(c.run_id)!.push({ tool: c.tool, inputs: c.inputs, outputs: c.outputs, durationMs: c.duration_ms, timestamp: iso(c.timestamp) });
+    for (const run of visible) result.set(run.id, {
+      runId: run.id, model: run.model, provider: run.provider, status: run.status, error: run.error,
+      timestamp: iso(run.created_at), toolCalls: calls.get(run.id),
+    });
+    return result;
   }
 
   /** Latest 100 agent runs for workflow visits. */
@@ -302,7 +336,7 @@ export class WorkflowService {
       const visit = (await db.query('SELECT * FROM visits WHERE id=$1 FOR UPDATE', [visitId])).rows[0];
       if (!visit) throw new NotFoundException('Visit not found.');
       if (isCompetitionMode()) requireWorkflowVisit(visit);
-      const run = await enqueue(db, visitId, visit.observation_version);
+      const run = await enqueue(db, visitId, visit.observation_version, staff.id, 'reject');
       await audit(db, staff.id, 'ASSESSMENT_REQUESTED', { runId: run.id }, visitId);
       return { success: true, data: { runId: run.id, status: run.status } };
     });
@@ -343,7 +377,8 @@ export class WorkflowService {
 
   /** All committed clinical decisions, newest first. */
   async decisions() {
-    return (await this.database.pool.query('SELECT data FROM decisions ORDER BY timestamp DESC')).rows.map((r) => r.data);
+    // Display history only; the full record stays in the append-only decisions table.
+    return (await this.database.pool.query('SELECT data FROM decisions ORDER BY timestamp DESC LIMIT 200')).rows.map((r) => r.data);
   }
 
   /** All departments, flattened for API/routing use. */
@@ -366,33 +401,57 @@ export class WorkflowService {
     }));
   }
 
-  /** Transfer a patient to a department with clinician approval. */
+  /**
+   * Transfer a patient to a department with clinician approval.
+   * Occupies a bed in the target department and releases the bed held in the previous one,
+   * bumping both department versions so stale routing views are refused.
+   */
   async transfer(staff: Staff, body: unknown, key: string) {
     requireClinical(staff); const input = parse(transferSchema, body);
     return this.database.transaction((db) => idempotent(db, staff.id, 'transfer', key, input, async () => {
       const visit = (await db.query('SELECT * FROM visits WHERE id=$1 FOR UPDATE', [input.patientId])).rows[0];
-      const department = (await db.query('SELECT * FROM departments WHERE id=$1 FOR UPDATE', [input.departmentId])).rows[0];
-      if (!visit || !department) throw new NotFoundException('Visit or department not found.');
+      if (!visit) throw new NotFoundException('Visit or department not found.');
+      // Lock target and previous departments in id order so concurrent opposite transfers cannot deadlock.
+      const ids = [...new Set([input.departmentId, visit.department_id].filter(Boolean))];
+      const locked = (await db.query('SELECT * FROM departments WHERE id=ANY($1) ORDER BY id FOR UPDATE', [ids])).rows;
+      const department = locked.find((d) => d.id === input.departmentId);
+      if (!department) throw new NotFoundException('Visit or department not found.');
       requireWorkflowVisit(visit);
       if (!visit.approved_priority || visit.assessment_version !== input.assessmentVersion || department.version !== input.departmentVersion)
         throw new ConflictException({ code: 'STALE_ROUTE', message: 'Approved assessment or department availability changed. Refresh routing.' });
+      if (visit.department_id === department.id)
+        throw new ConflictException({ code: 'ALREADY_IN_DEPARTMENT', message: `The patient is already assigned to ${department.data.name}.` });
       if (department.data.status === 'CLOSED' || department.data.occupiedBeds >= department.data.totalBeds)
         throw new ConflictException({ code: 'DEPARTMENT_UNAVAILABLE', message: 'No available capacity. Escalate for manual routing; urgency is unchanged.' });
+      const previous = locked.find((d) => d.id === visit.department_id) || null;
       const record = {
         transferId: id('TRF'), patientId: visit.id, patientName: visit.name, department: department.data.name,
+        previousDepartment: previous?.data.name ?? visit.assigned_department,
         approvedPriority: priority(visit.approved_priority), clinicianName: staff.name, timestamp: new Date().toISOString(), rationale: input.rationale, serverAcknowledged: true,
       };
       await db.query('INSERT INTO transfers(id,visit_id,staff_id,department_id,data) VALUES($1,$2,$3,$4,$5)', [record.transferId, visit.id, staff.id, department.id, JSON.stringify(record)]);
       await db.query('UPDATE visits SET department_id=$2,assigned_department=$3,updated_at=now() WHERE id=$1', [visit.id, department.id, department.data.name]);
-      await audit(db, staff.id, 'DEPARTMENT_TRANSFERRED', { transferId: record.transferId, departmentId: department.id }, visit.id);
+      await db.query(`UPDATE departments SET data=jsonb_set(data,'{occupiedBeds}',to_jsonb((data->>'occupiedBeds')::int+$2)),
+        version=version+1,updated_at=now() WHERE id=$1`, [department.id, 1]);
+      if (previous)
+        await db.query(`UPDATE departments SET data=jsonb_set(data,'{occupiedBeds}',to_jsonb(greatest((data->>'occupiedBeds')::int-1,0))),
+          version=version+1,updated_at=now() WHERE id=$1`, [previous.id]);
+      await audit(db, staff.id, 'DEPARTMENT_TRANSFERRED', { transferId: record.transferId, departmentId: department.id, previousDepartmentId: previous?.id ?? null }, visit.id);
       return { success: true, data: record };
     }));
   }
 
   /** Compare each visit's latest two observations to flag deterioration. */
   async deterioration() {
-    return Promise.all((await this.visits()).map(async (visit) => {
-      const observations = (await this.database.pool.query('SELECT * FROM observations WHERE visit_id=$1 ORDER BY version DESC LIMIT 2', [visit.id])).rows;
+    // Visits first: observations are append-only, so every listed visit has its rows in the second query.
+    const visits = await this.visits();
+    // The latest two observation versions of every workflow visit, in one query.
+    const recent = new Map<string, any[]>();
+    for (const row of (await this.database.pool.query(`SELECT * FROM (SELECT o.*,row_number() OVER (PARTITION BY o.visit_id ORDER BY o.version DESC) recency
+      FROM observations o JOIN visits v ON v.id=o.visit_id WHERE v.data_source='synthetic') ranked WHERE recency<=2 ORDER BY visit_id,version DESC`)).rows)
+      recent.set(row.visit_id, [...(recent.get(row.visit_id) || []), row]);
+    return visits.map((visit) => {
+      const observations = recent.get(visit.id)!;
       const latest = { ...observations[0].vitals, id: observations[0].id, recordedAt: iso(observations[0].recorded_at) };
       const baseline = observations[1] ? { ...observations[1].vitals, id: observations[1].id, recordedAt: iso(observations[1].recorded_at) } : latest;
       return {
@@ -401,7 +460,7 @@ export class WorkflowService {
         observationVersion: visit.observationVersion, comparison: observations[1] ? compareObservationsForDeterioration(baseline, latest) : null,
         ageInfo: calculateObservationAge(latest.recordedAt), status: visit.assessmentStatus,
       };
-    }));
+    });
   }
 
   /** Clinician reassessment: manually escalate priority or dismiss a deterioration alert. */
@@ -416,6 +475,11 @@ export class WorkflowService {
       requireWorkflowVisit(visit);
       if (visit.observation_version !== input.observationVersion) throw new ConflictException('Observation version changed.');
       if (input.action === 'ESCALATE' && !input.targetPriority) throw new BadRequestException('A manual escalation priority is required.');
+      // Escalation only raises urgency; lowering a priority must go through a reviewed triage decision.
+      const urgency = { RED: 1, ORANGE: 2, YELLOW: 3, GREEN: 4 } as const;
+      if (input.action === 'ESCALATE' && visit.approved_priority &&
+        urgency[input.targetPriority as keyof typeof urgency] >= urgency[visit.approved_priority as keyof typeof urgency])
+        throw new BadRequestException({ code: 'NOT_AN_ESCALATION', message: `Escalation must be more urgent than the current ${visit.approved_priority} priority. Use a triage review to lower or keep a priority.` });
       const code = input.action === 'ESCALATE' ? input.targetPriority : visit.approved_priority;
       if (input.action === 'ESCALATE') {
         await db.query("UPDATE visits SET approved_priority=$2,assessment_version=assessment_version+1,assessment_status='APPROVED',updated_at=now() WHERE id=$1", [visit.id, code]);

@@ -17,7 +17,12 @@ export const config = {
   region:process.env.AWS_REGION || 'eu-west-1',provider,bedrockModel,openaiModel,model:provider==='ollama'?policy.ollamaModel:provider==='openai'?openaiModel:bedrockModel,
   agentTimeout:Number(process.env.AGENT_TIMEOUT_MS || 90000),maxSteps:Number(process.env.AGENT_MAX_STEPS || 8),
   secureCookies:process.env.NODE_ENV === 'production',
+  // Bounds paid model calls: each new or retried assessment counts once.
+  agentRunsPerStaffHour:Number(process.env.AGENT_RUNS_PER_STAFF_HOUR || 20),
+  agentRunsPerHour:Number(process.env.AGENT_RUNS_PER_HOUR || 100),
 };
+for (const [name,value] of [['AGENT_RUNS_PER_STAFF_HOUR',config.agentRunsPerStaffHour],['AGENT_RUNS_PER_HOUR',config.agentRunsPerHour]] as const)
+  if(!Number.isInteger(value) || value<1 || value>100000) throw new Error(`${name} must be an integer between 1 and 100000.`);
 if(!Number.isInteger(config.databasePoolMax) || config.databasePoolMax<1 || config.databasePoolMax>20)
   throw new Error('DATABASE_POOL_MAX must be between 1 and 20.');
 export const databaseSsl = process.env.DATABASE_SSL === 'true'
