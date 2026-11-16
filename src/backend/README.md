@@ -45,6 +45,12 @@ The model retrieves evidence and saves a pending recommendation. The separate
 proposal controls approve, reject or override it. An agent failure leaves the
 patient visible and supports a reasoned manual clinician assessment.
 
+Reads of patient records are logged by `audit/access-log.ts`: routes marked
+`@AccessLogged()` record the staff member, route and returned patient IDs in the
+append-only `access_log` table (migration 006) before responding, once per view
+per 5 minutes, and withhold the data if the record cannot be written. Mark any new
+route that returns patient data with `@AccessLogged()`.
+
 PostgreSQL transactions combine domain changes and audit events. Version checks
 prevent stale approvals/transfers. Retry keys serialize concurrent submissions.
 Agent leases, run-scoped tools and finite deadlines prevent unbounded execution;

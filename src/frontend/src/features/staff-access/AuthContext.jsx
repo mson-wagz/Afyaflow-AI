@@ -17,8 +17,9 @@ export const AuthContext = createContext(null);
 
 import { api, useBackend, errorResult } from '../../api/client.js';
 import { apiRefreshAuditLogs } from './apiAdapter.js';
+import { LOCAL_DRAFT_KEY, clearPatientDataFor } from '../../offline/browserData.js';
 
-const DRAFT_STORAGE_KEY = 'afyaflow_local_draft_v1';
+const DRAFT_STORAGE_KEY = LOCAL_DRAFT_KEY;
 const SESSION_STORAGE_KEY = 'afyaflow_session_v1';
 
 export function AuthProvider({ children }) {
@@ -84,8 +85,15 @@ export function AuthProvider({ children }) {
     }).catch(() => {if(!cancelled){updateStaff(null);setSessionStatus(SESSION_STATUS.UNAUTHENTICATED);}})
       .finally(()=>{if(!cancelled)setRestoring(false);});
     const expired=()=>{updateStaff(null);setSessionStatus(SESSION_STATUS.UNAUTHENTICATED);};
+    // The server locks idle sessions; mirror it so patient data is hidden behind the PIN screen.
+    const serverLocked=()=>{
+      setSessionStatus(status=>status===SESSION_STATUS.UNAUTHENTICATED?status:SESSION_STATUS.LOCKED);
+      setLockTimestamp(new Date().toLocaleTimeString());
+    };
     window.addEventListener('afyaflow-session-expired',expired);
-    return ()=>{cancelled=true;window.removeEventListener('afyaflow-session-expired',expired);};
+    window.addEventListener('afyaflow-session-locked',serverLocked);
+    return ()=>{cancelled=true;window.removeEventListener('afyaflow-session-expired',expired);
+      window.removeEventListener('afyaflow-session-locked',serverLocked);};
   }, [updateStaff,refreshLogs]);
 
   // Locking function
@@ -150,9 +158,13 @@ export function AuthProvider({ children }) {
     return result;
   };
 
-  // Sign Out handler
+  // Sign Out handler: ends the server session and removes this staff member's patient data
+  // (drafts and offline-queued registrations) from the browser. Callers confirm discarding
+  // unsynced registrations first (offline/browserData.js).
   const signOut = () => {
     if(useBackend)api('/auth/logout',{method:'POST',body:{}}).catch(error=>setAuthError('Server sign-out could not be confirmed: '+error.message));
+    clearPatientDataFor(staff?.id);
+    setLocalDraft(null);
     updateStaff(null);
     setSessionStatus(SESSION_STATUS.UNAUTHENTICATED);
     setLockTimestamp(null);
@@ -171,13 +183,9 @@ export function AuthProvider({ children }) {
     return result;
   };
 
-  // Switch account from lock screen
-  const switchAccount = () => {
-    // Preserve local drafts or notify user
-    setSessionStatus(SESSION_STATUS.UNAUTHENTICATED);
-    updateStaff(null);
-    setLockTimestamp(null);
-  };
+  // Switch account from the lock screen: a full sign-out, so the previous staff member's server
+  // session ends and their patient data leaves the device before someone else signs in.
+  const switchAccount = signOut;
 
   // Draft operations
   const saveDraft = useCallback((draftData) => {

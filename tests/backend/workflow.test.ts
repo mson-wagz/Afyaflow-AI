@@ -239,6 +239,59 @@ async function get(path:string,session:string) {
   return response.json();
 }
 
+test('the server locks sessions left idle and unlocking with the PIN resumes them',async()=>{
+  const session=await loginAs('STAFF-103','3456');
+  const token=session.split('=')[1];
+  const {hash}=await import('../../src/backend/src/database/db.js');
+  const lastSeen=()=>database.pool.query('SELECT last_seen_at,locked FROM sessions WHERE token_hash=$1',[hash(token)]).then(r=>r.rows[0]);
+  const queue=()=>fetch(`${base}/api/queue`,{headers:{Cookie:session}});
+  // Activity within the idle window keeps the session open and refreshes it (at most once a minute).
+  await database.pool.query("UPDATE sessions SET last_seen_at=now()-interval '5 minutes' WHERE token_hash=$1",[hash(token)]);
+  const before=(await lastSeen()).last_seen_at;
+  assert.equal((await queue()).status,200);
+  assert.ok((await lastSeen()).last_seen_at>before);
+  // No requests for longer than SESSION_IDLE_MINUTES: the next request finds the session locked.
+  await database.pool.query("UPDATE sessions SET last_seen_at=now()-make_interval(mins=>$2+1) WHERE token_hash=$1",[hash(token),config.sessionIdleMinutes]);
+  const refused=await queue();
+  assert.equal(refused.status,403);assert.equal((await refused.json()).code,'SESSION_LOCKED');
+  assert.equal((await lastSeen()).locked,true);
+  const me=await (await fetch(`${base}/api/auth/me`,{headers:{Cookie:session}})).json();
+  assert.equal(me.locked,true);
+  assert.equal((await database.pool.query("SELECT count(*) FROM audit_events WHERE staff_id='STAFF-103' AND event_type='SESSION_IDLE_LOCK'")).rows[0].count,'1');
+  // The PIN unlocks it and restarts the idle clock.
+  const unlock=await fetch(`${base}/api/auth/unlock`,{method:'POST',headers:{Cookie:session,'Content-Type':'application/json'},body:JSON.stringify({pin:'3456'})});
+  assert.equal(unlock.status,201);
+  assert.equal((await queue()).status,200);
+});
+
+test('reading patient records is access-logged once per view and reviewable by administrators only',async()=>{
+  const session=await loginAs('STAFF-102','2345');
+  const rows=(route:string)=>database.pool.query("SELECT * FROM access_log WHERE staff_id='STAFF-102' AND route=$1 ORDER BY accessed_at",[route]).then(r=>r.rows);
+  const before=(await rows('GET /api/visits')).length;
+  const visits=await get('/visits',session);await get('/visits',session);
+  // Polling the same view is recorded once per window, with the patients it returned.
+  const logged=await rows('GET /api/visits');
+  assert.equal(logged.length,before+1);
+  assert.deepEqual([...logged.at(-1).patient_ids].sort(),visits.map((v:any)=>v.id).sort());
+  // A single-record view records that patient.
+  const target=visits[0].id;
+  await get(`/visits/${target}/evidence`,session);
+  assert.deepEqual((await rows('GET /api/visits/:id/evidence')).at(-1).patient_ids,[target]);
+  // Administrators can see who viewed a patient; other roles cannot.
+  const admin=await loginAs('STAFF-104','4567');
+  const viewers=await get(`/audit/access?patientId=${encodeURIComponent(target)}`,admin);
+  assert.ok(viewers.some((v:any)=>v.staffId==='STAFF-102' && v.route==='GET /api/visits/:id/evidence'));
+  assert.equal((await fetch(`${base}/api/audit/access`,{headers:{Cookie:session}})).status,403);
+  assert.equal((await fetch(`${base}/api/audit/access?patientId=${encodeURIComponent("x' OR 1=1")}`,{headers:{Cookie:admin}})).status,400);
+  // The log is append-only, and data is withheld when access cannot be recorded.
+  await assert.rejects(database.pool.query("UPDATE access_log SET staff_id='STAFF-101'"),/append-only/);
+  await database.pool.query('ALTER TABLE access_log RENAME TO access_log_unavailable');
+  try {
+    const refused=await fetch(`${base}/api/queue`,{headers:{Cookie:session}});
+    assert.equal(refused.status,503);assert.equal((await refused.json()).code,'ACCESS_NOT_RECORDED');
+  } finally {await database.pool.query('ALTER TABLE access_log_unavailable RENAME TO access_log');}
+});
+
 test('HTTP journey connects registration, MCP evidence, clinician approval, routing and audit',async()=>{
   const session=await loginAs('STAFF-102','2345');
   const key=randomUUID();

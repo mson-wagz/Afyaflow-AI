@@ -10,11 +10,12 @@ import { apiRegisterPatient } from './apiAdapter';
 import { SyncContext } from '../../offline/SyncContext.jsx';
 import { useBackend } from '../../api/client.js';
 
-const DRAFT_KEY_PREFIX = 'afyaflow_patient_reg_draft_v1';
+import { REGISTRATION_DRAFT_PREFIX, registrationDraftKey } from '../../offline/browserData.js';
 
 export default function useRegistration(currentStaff) {
   const sync = useContext(SyncContext);
-  const REGISTRATION_DRAFT_KEY=useBackend?DRAFT_KEY_PREFIX+'_'+currentStaff?.id:DRAFT_KEY_PREFIX;
+  // Drafts are per staff member and removed at sign-out (offline/browserData.js).
+  const REGISTRATION_DRAFT_KEY=useBackend?registrationDraftKey(currentStaff?.id):REGISTRATION_DRAFT_PREFIX;
   const [formData, setFormData] = useState(() => {
     try {
       const saved = localStorage.getItem(REGISTRATION_DRAFT_KEY);

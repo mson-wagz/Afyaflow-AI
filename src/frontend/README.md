@@ -20,7 +20,9 @@ them; tabs on the same browser origin can read the saved state. Separate devices
 browser profiles and origins do not share records. Concurrent multi-tab writes are
 not a substitute for backend transactions. Use synthetic data only.
 
-Registration while offline saves a pending intake in `afyaflow_sync_outbox_v1`.
+Registration while offline saves a pending intake in `afyaflow_sync_outbox_v1`,
+tagged with the capturing staff member; only they see or sync it, and signing out
+removes their drafts and queued items from the browser (`src/offline/browserData.js`).
 Reconnect invokes the registration adapter with the draft's stable retry key before
 marking it saved. Invalid drafts remain failed for retry; unsupported draft types
 are not silently confirmed. Clinical decisions, reassessments and transfers require

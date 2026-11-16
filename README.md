@@ -12,6 +12,7 @@ The scoring fixture remains **unvalidated**. This is a research/development demo
 
 ## Documentation
 
+- [Security and privacy safeguards](docs/SECURITY.md): how patient data is protected, HIPAA and Kenya Data Protection Act mapping, and work outstanding before real patient data.
 - [Data sources and research use](docs/DATA_SOURCES.md): dataset provenance, licensing, mappings, missing fields, import/export and AI use.
 - [Application user guide](docs/USER_GUIDE.md): sign-in, registration, assessments, decisions, queues, routing, and offline drafts.
 - [Backend setup](src/backend/README.md): local PostgreSQL, Bedrock configuration, and development accounts.
@@ -25,7 +26,7 @@ The scoring fixture remains **unvalidated**. This is a research/development demo
 
 - **Historical research library:** verified public MIMIC-IV-ED Demo import, source inspection, JSON export, explicit MCP-backed AI research reviews and separation from operational demonstrations.
 
-- **Staff access:** server-backed sign-in, HttpOnly cookie sessions, locking, logout, role checks, and shared authentication throttling.
+- **Staff access:** server-backed sign-in, HttpOnly cookie sessions, locking, logout, role checks, and shared authentication throttling. Sessions idle for 15 minutes (`SESSION_IDLE_MINUTES`) are locked by the server as well as the browser.
 - **Registration:** demographic and complaint validation, timestamped observations, staff attribution, draft retention, and retry-safe submission.
 - **Measurement feedback:** visible success, missing-value warnings, and range errors. Passing entry checks does not establish clinical normality or save a visit.
 - **Agent assessments:** durable jobs, versioned evidence, bounded execution, actual model/tool traces, and persisted proposals for human review.
@@ -33,8 +34,9 @@ The scoring fixture remains **unvalidated**. This is a research/development demo
 - **Hospital queue:** approved priorities, waiting times, department filtering, workload snapshots, and visible stale-data states.
 - **Deterioration review:** compare observation versions and support authorised, reasoned reassessment. The app does not measure vital signs itself.
 - **Routing:** review synthetic department availability/capacity and explicitly commit a transfer with version checks.
-- **Offline intake:** browser-local registration drafts and reconnect replay. Clinical decisions require online server acknowledgement.
+- **Offline intake:** browser-local registration drafts and reconnect replay. Clinical decisions require online server acknowledgement. Drafts and queued registrations belong to the staff member who created them and are removed from the browser at sign-out (with confirmation if any are unsynced).
 - **Audit history:** persisted staff decisions and workflow events, with append-only database protection for observations, decisions, transfers, and audit records.
+- **Read-access logging:** every view of patient records is recorded (who, which patients, which screen, when) in an append-only access log, reviewable by administrators; data is withheld if access cannot be recorded.
 
 Capacity and staffing figures are synthetic, not live hospital telemetry. The frontend is responsive and includes a web manifest; service-worker caching, reliable offline app loading, and installability across target devices remain to be implemented or verified.
 

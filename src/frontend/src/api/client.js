@@ -13,6 +13,8 @@ export async function api(path,options={}) {
     // Missing/expired sessions, including on unlock, still require sign-in.
     const incorrectUnlockPin=path==='/auth/unlock' && body.code==='INVALID_PIN';
     if(response.status===401 && !incorrectUnlockPin) window.dispatchEvent(new Event('afyaflow-session-expired'));
+    // The server locked the session (inactivity or another tab): show the lock screen.
+    if(response.status===403 && body.code==='SESSION_LOCKED') window.dispatchEvent(new Event('afyaflow-session-locked'));
     throw new ApiError(response.status,body);
   }
   return body;

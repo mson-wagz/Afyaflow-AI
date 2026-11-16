@@ -1,5 +1,7 @@
-import React from 'react';
+import React, { useContext } from 'react';
 import useAuth from './useAuth';
+import { SyncContext } from '../../offline/SyncContext.jsx';
+import { confirmDiscardUnsynced } from '../../offline/browserData.js';
 import { Modal, Button, Badge } from '../../components';
 import { ROLE_PERMISSIONS } from '../../../../shared/contracts/auth.js';
 
@@ -7,6 +9,7 @@ import { ROLE_PERMISSIONS } from '../../../../shared/contracts/auth.js';
  * Staff Profile & Terminal Settings Modal
  */
 export default function StaffProfileModal({ isOpen, onClose }) {
+  const pendingCount = useContext(SyncContext)?.pendingCount ?? 0;
   const {
     staff,
     signOut,
@@ -38,6 +41,7 @@ export default function StaffProfileModal({ isOpen, onClose }) {
           <Button
             variant="danger"
             onClick={() => {
+              if (!confirmDiscardUnsynced(pendingCount)) return;
               onClose();
               signOut();
             }}

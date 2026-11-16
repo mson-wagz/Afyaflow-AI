@@ -272,7 +272,7 @@ export class WorkflowService {
     for (const c of (await this.database.pool.query('SELECT * FROM tool_traces WHERE run_id=ANY($1) ORDER BY timestamp,step', [runIds])).rows)
       calls.get(c.run_id)!.push({ tool: c.tool, inputs: c.inputs, outputs: c.outputs, durationMs: c.duration_ms, timestamp: iso(c.timestamp) });
     for (const run of visible) result.set(run.id, {
-      runId: run.id, model: run.model, provider: run.provider, status: run.status, error: run.error,
+      runId: run.id, patientId: run.visit_id, model: run.model, provider: run.provider, status: run.status, error: run.error,
       timestamp: iso(run.created_at), toolCalls: calls.get(run.id),
     });
     return result;

@@ -12,12 +12,15 @@ import { getCurrentInvoke } from '@codegenie/serverless-express';
 import { Database } from './database/db.js';
 import { allowAuthAttempt } from './auth/rate-limit.js';
 import { trustedCloudFrontSource, trustedProxySource } from './auth/ingress.js';
+import { securityHeaders } from './security-headers.js';
 
 export async function createApp() {
   const app=await NestFactory.create<NestExpressApplication>(AppModule,{logger:process.env.NODE_ENV==='test'?false:['error','warn','log']});
   app.enableShutdownHooks();
   // Parse before async middleware so Lambda's synthetic request stream is consumed in time.
   app.useBodyParser('json',{limit:'100kb'});
+  // Before any other middleware so errors, rejections and static files carry the headers too.
+  app.use(securityHeaders({hsts:config.secureCookies,enforceCsp:config.cspMode==='enforce'}));
   const database=app.get(Database);
   if(config.mode==='competition') {
     const unsafe=await database.pool.query(`SELECT EXISTS(SELECT 1 FROM visits WHERE data_source<>'synthetic')

@@ -14,6 +14,7 @@ import { QueueView } from './features/queue';
 import { DeteriorationView } from './features/deterioration';
 import { RoutingView } from './features/routing';
 import { SyncProvider, useOfflineSync, OfflineSyncView } from './offline';
+import { confirmDiscardUnsynced } from './offline/browserData.js';
 import { Header, Navigation } from './components';
 import { SESSION_STATUS } from '../../shared/contracts/auth.js';
 
@@ -51,7 +52,7 @@ function AppShell() {
       <Header
         staff={staff}
         onLock={lockSession}
-        onSignOut={signOut}
+        onSignOut={() => { if (confirmDiscardUnsynced(pendingCount)) signOut(); }}
         onOpenProfile={() => setProfileOpen(true)}
         hasDraft={hasDraft}
         isOnline={isOnline}

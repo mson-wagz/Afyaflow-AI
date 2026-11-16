@@ -2,11 +2,18 @@ import React, { createContext, useContext, useState, useEffect, useCallback, use
 import { SYNC_STATUS, SYNC_ITEM_TYPES } from '../../../shared/contracts/offline.js';
 import { setDemoOffline, isDemoOnline } from '../demo/store.js';
 import { apiRegisterPatient } from '../features/registration/apiAdapter.js';
+import { AuthContext } from '../features/staff-access/AuthContext.jsx';
+import { SYNC_OUTBOX_KEY, SIGNED_OUT_EVENT, ownsItem } from './browserData.js';
 
-const SYNC_STORAGE_KEY = 'afyaflow_sync_outbox_v1';
+const SYNC_STORAGE_KEY = SYNC_OUTBOX_KEY;
 export const SyncContext = createContext(null);
 
 export function SyncProvider({ children }) {
+  // Queued registrations belong to the staff member who created them: only they see and sync
+  // them, so a registration is never attributed to whoever happens to sign in next.
+  const staffId = useContext(AuthContext)?.staff?.id;
+  const staffIdRef = useRef(staffId);
+  staffIdRef.current = staffId;
   const [isOnline, setIsOnline] = useState(() => navigator.onLine);
   const [simulatedOffline, setOffline] = useState(false);
   const [outbox, setOutbox] = useState(() => {
@@ -50,7 +57,7 @@ export function SyncProvider({ children }) {
     try {
       for (const item of [...outboxRef.current]) {
         if (!isDemoOnline()) break;
-        if (item.status === SYNC_STATUS.CONFIRMED) continue;
+        if (item.status === SYNC_STATUS.CONFIRMED || !staffIdRef.current || !ownsItem(item, staffIdRef.current)) continue;
         let result;
         try {
           result = item.type === SYNC_ITEM_TYPES.REGISTRATION_DRAFT
@@ -71,7 +78,17 @@ export function SyncProvider({ children }) {
     } finally { syncingRef.current = false; setIsSyncing(false); }
   }, [saveOutbox]);
 
-  useEffect(() => { if (effectiveOnline) syncOutbox(); }, [effectiveOnline, syncOutbox]);
+  useEffect(() => { if (effectiveOnline && staffId) syncOutbox(); }, [effectiveOnline, syncOutbox, staffId]);
+
+  // Sign-out removes the departing staff member's items from storage; reload what remains.
+  useEffect(() => {
+    const reload = () => {
+      try { const next = JSON.parse(localStorage.getItem(SYNC_STORAGE_KEY) || '[]'); outboxRef.current = next; setOutbox(next); }
+      catch { outboxRef.current = []; setOutbox([]); }
+    };
+    window.addEventListener(SIGNED_OUT_EVENT, reload);
+    return () => window.removeEventListener(SIGNED_OUT_EVENT, reload);
+  }, []);
 
   const queueItem = useCallback((type, title, payload, idempotencyKey) => {
     if (type === SYNC_ITEM_TYPES.CLINICAL_DECISION)
@@ -80,19 +97,20 @@ export function SyncProvider({ children }) {
     const existing = outboxRef.current.find(item => item.syncId === syncId);
     if (existing) return existing;
     const item = {syncId,type,title,payload,status:SYNC_STATUS.PENDING_SYNC,
-      createdAt:new Date().toISOString(),retryCount:0};
+      createdAt:new Date().toISOString(),retryCount:0,staffId:staffIdRef.current};
     saveOutbox([item,...outboxRef.current]);
     if (isDemoOnline()) syncOutbox();
     return item;
   }, [saveOutbox, syncOutbox]);
 
   const clearConfirmed = useCallback(() => {
-    saveOutbox(outboxRef.current.filter(item => item.status !== SYNC_STATUS.CONFIRMED));
+    saveOutbox(outboxRef.current.filter(item => item.status !== SYNC_STATUS.CONFIRMED || !ownsItem(item, staffIdRef.current)));
   }, [saveOutbox]);
 
+  const visible = staffId ? outbox.filter(item => ownsItem(item, staffId)) : [];
   return <SyncContext.Provider value={{isOnline:effectiveOnline,rawBrowserOnline:isOnline,
-    simulatedOffline,setSimulatedOffline,outbox,isSyncing,lastSyncResult,
-    pendingCount:outbox.filter(item => item.status !== SYNC_STATUS.CONFIRMED).length,
+    simulatedOffline,setSimulatedOffline,outbox:visible,isSyncing,lastSyncResult,
+    pendingCount:visible.filter(item => item.status !== SYNC_STATUS.CONFIRMED).length,
     syncOutbox,queueItem,clearConfirmed}}>{children}</SyncContext.Provider>;
 }
 
