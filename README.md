@@ -14,6 +14,8 @@ The scoring fixture remains **unvalidated**. This is a research/development demo
 
 - [Security and privacy safeguards](docs/SECURITY.md): how patient data is protected, HIPAA and Kenya Data Protection Act mapping, and work outstanding before real patient data.
 - [Data sources and research use](docs/DATA_SOURCES.md): dataset provenance, licensing, mappings, missing fields, import/export and AI use.
+- [Outcome metrics](docs/OUTCOME_METRICS.md), [queue ordering](docs/QUEUE_ORDERING.md) and [interoperability (FHIR export)](docs/INTEROPERABILITY.md).
+- For Kenyatta National Hospital: [SATS clinical review pack](docs/SATS_CLINICAL_REVIEW.md), [pilot evaluation protocol](docs/PILOT_PROTOCOL.md) and [Kenya regulatory checklist](docs/compliance/KENYA_REGULATORY_CHECKLIST.md).
 - [Application user guide](docs/USER_GUIDE.md): sign-in, registration, assessments, decisions, queues, routing, and offline drafts.
 - [Backend setup](src/backend/README.md): local PostgreSQL, Bedrock configuration, and development accounts.
 - [Lambda deployment guide](deploy/lambda/README.md): AWS prerequisites, SAM deployment, migrations, and staging checks.
