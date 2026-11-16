@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useT } from '../../i18n';
 import { useBackend, mutation } from '../../api/client.js';
 import useQueue from './useQueue';
 import { Card, Button, Badge, Alert, Modal } from '../../components';
@@ -13,6 +14,7 @@ import { DISPOSITIONS, dispositionsForRole } from '../../../../shared/contracts/
  * - Polling failure handling with a visibly stale last-confirmed snapshot.
  */
 export default function QueueView({ isClinical = false, staffRole }) {
+  const t = useT();
   const [tieError, setTieError] = useState('');
   const [busy, setBusy] = useState(false);
   const [outcomeFor, setOutcomeFor] = useState(null);
@@ -42,9 +44,9 @@ export default function QueueView({ isClinical = false, staffRole }) {
   // A clinician chooses which clinically tied patient to see first (reason required, audited).
   const seeFirst = async (pt) => {
     setTieError('');
-    const reason = window.prompt(`Why should ${pt.patientName} be seen first among the tied patients?`);
+    const reason = window.prompt(t('Why should {name} be seen first among the tied patients?', { name: pt.patientName }));
     if (reason === null) return;
-    if (reason.trim().length < 5) { setTieError('Enter a reason of at least 5 characters.'); return; }
+    if (reason.trim().length < 5) { setTieError(t('Enter a reason of at least 5 characters.')); return; }
     setTieBusy(true);
     try {
       await mutation('/queue/precedence', {
@@ -71,9 +73,8 @@ export default function QueueView({ isClinical = false, staffRole }) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
       {level1Tied > 0 && (
-        <Alert variant="danger" title={`${level1Tied} Level 1 patients are clinically tied`}>
-          They have the same severity and arrival time, and each needs immediate care. Call additional clinicians
-          to see them in parallel; the order shown is only who to start with.
+        <Alert variant="danger" title={t('{n} Level 1 patients are clinically tied', { n: level1Tied })}>
+          {t('They have the same severity and arrival time, and each needs immediate care. Call additional clinicians to see them in parallel; the order shown is only who to start with.')}
         </Alert>
       )}
       {tieError && <Alert variant="danger" onClose={() => setTieError('')}>{tieError}</Alert>}
@@ -179,11 +180,11 @@ export default function QueueView({ isClinical = false, staffRole }) {
 
       {/* Main Queue Table */}
       <Card
-        title="Live Approved Queue"
-        subtitle={`Visits ordered by approved clinical priority and arrival timestamp (${queue.length} displayed)`}
+        title={t('Live Approved Queue')}
+        subtitle={t('Visits ordered by approved clinical priority and arrival timestamp ({n} displayed)', { n: queue.length })}
         actions={
           <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-            <span style={{ fontSize: '0.8rem', color: 'var(--color-text-muted)' }}>Department:</span>
+            <span style={{ fontSize: '0.8rem', color: 'var(--color-text-muted)' }}>{t('Department:')}</span>
             <select
               value={departmentFilter}
               onChange={(e) => setDepartmentFilter(e.target.value)}
@@ -191,7 +192,7 @@ export default function QueueView({ isClinical = false, staffRole }) {
               style={{ minHeight: '34px', padding: '0.2rem 0.5rem', fontSize: '0.85rem' }}
               aria-label="Filter queue by department"
             >
-              <option value="ALL">All Departments</option>
+              <option value="ALL">{t('All Departments')}</option>
               <option value="Emergency">Emergency Medicine</option>
               <option value="Surgical">Surgical Triage</option>
               <option value="Triage">Triage Holding</option>
@@ -204,13 +205,13 @@ export default function QueueView({ isClinical = false, staffRole }) {
           <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.875rem' }}>
             <thead>
               <tr style={{ borderBottom: '2px solid var(--color-border)', color: 'var(--color-text-muted)' }}>
-                <th style={{ padding: '0.75rem 0.5rem' }}>Order</th>
-                <th style={{ padding: '0.75rem 0.5rem' }}>Patient & Visit ID</th>
-                <th style={{ padding: '0.75rem 0.5rem' }}>Wait Time</th>
-                <th style={{ padding: '0.75rem 0.5rem' }}>Approved Priority</th>
-                <th style={{ padding: '0.75rem 0.5rem' }}>Assessment & AI Proposal Status</th>
-                <th style={{ padding: '0.75rem 0.5rem' }}>Department Bay</th>
-                <th style={{ padding: '0.75rem 0.5rem' }}>Seen & Outcome</th>
+                <th style={{ padding: '0.75rem 0.5rem' }}>{t('Order')}</th>
+                <th style={{ padding: '0.75rem 0.5rem' }}>{t('Patient & Visit ID')}</th>
+                <th style={{ padding: '0.75rem 0.5rem' }}>{t('Wait Time')}</th>
+                <th style={{ padding: '0.75rem 0.5rem' }}>{t('Approved Priority')}</th>
+                <th style={{ padding: '0.75rem 0.5rem' }}>{t('Assessment & AI Proposal Status')}</th>
+                <th style={{ padding: '0.75rem 0.5rem' }}>{t('Department Bay')}</th>
+                <th style={{ padding: '0.75rem 0.5rem' }}>{t('Seen & Outcome')}</th>
               </tr>
             </thead>
             <tbody>
@@ -227,20 +228,20 @@ export default function QueueView({ isClinical = false, staffRole }) {
                     {/* The reason compares with the entry directly above in the full order; hide it when a filter hides that entry. */}
                     {pt.tieBreak && queue[idx - 1]?.queueOrder?.rank === pt.queueOrder?.rank - 1 && (
                       <div style={{ fontSize: '0.7rem', fontWeight: 400, maxWidth: '11rem', marginTop: '2px' }}>
-                        Same level as above: {pt.tieBreak}
+                        {t('Same level as above: {reason}', { reason: pt.tieBreak })}
                       </div>
                     )}
                     {pt.clinicalTie && (
                       <div style={{ marginTop: '4px', fontWeight: 400 }}>
-                        <Badge variant="warning">Tied {pt.clinicalTie.position} of {pt.clinicalTie.size}</Badge>
+                        <Badge variant="warning">{t('Tied {position} of {size}', pt.clinicalTie)}</Badge>
                         {pt.queuePrecedence && (
                           <div style={{ fontSize: '0.7rem', maxWidth: '11rem' }}>
-                            Seen first: {pt.queuePrecedence.byName} — {pt.queuePrecedence.reason}
+                            {t('Seen first: {name} — {reason}', { name: pt.queuePrecedence.byName, reason: pt.queuePrecedence.reason })}
                           </div>
                         )}
                         {isClinical && useBackend && pt.clinicalTie.position > 1 && (
                           <div style={{ marginTop: '4px' }}>
-                            <Button size="sm" variant="outline" disabled={tieBusy} onClick={() => seeFirst(pt)}>See first</Button>
+                            <Button size="sm" variant="outline" disabled={tieBusy} onClick={() => seeFirst(pt)}>{t('See first')}</Button>
                           </div>
                         )}
                       </div>
@@ -268,26 +269,26 @@ export default function QueueView({ isClinical = false, staffRole }) {
                           fontWeight: 700,
                         }}
                       >
-                        ● {pt.approvedPriority.level ? `Level ${pt.approvedPriority.level} · ` : ''}{pt.approvedPriority.label}
+                        ● {pt.approvedPriority.level ? `${t('Level {level}', { level: pt.approvedPriority.level })} · ` : ''}{pt.approvedPriority.label}
                       </span>
                     ) : (
-                      <Badge variant="draft">Awaiting Approval</Badge>
+                      <Badge variant="draft">{t('Awaiting Approval')}</Badge>
                     )}
                   </td>
                   <td style={{ padding: '0.75rem 0.5rem' }}>
                     {pt.pendingProposal ? (
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
                         <Badge variant="warning">
-                          Pending Proposal: {pt.pendingProposal.priority?.code || 'REVIEW REQUIRED'}
+                          {t('Pending Proposal: {priority}', { priority: pt.pendingProposal.priority?.code || 'REVIEW REQUIRED' })}
                         </Badge>
                         <span style={{ fontSize: '0.7rem', color: 'var(--color-text-subtle)' }}>
-                          * Does not change approved order
+                          {t('* Does not change approved order')}
                         </span>
                       </div>
                     ) : pt.assessmentStatus === 'AWAITING_ASSESSMENT' ? (
-                      <Badge variant="admin">Awaiting Assessment</Badge>
+                      <Badge variant="admin">{t('Awaiting Assessment')}</Badge>
                     ) : (
-                      <Badge variant="online">{pt.assessmentStatus === 'REJECTED_REQUIRES_REASSESSMENT' ? 'Reassessment Required' : (useBackend?'Confirmed Server State':'Saved Demo State')}</Badge>
+                      <Badge variant="online">{pt.assessmentStatus === 'REJECTED_REQUIRES_REASSESSMENT' ? t('Reassessment Required') : (useBackend?t('Confirmed Server State'):'Saved Demo State')}</Badge>
                     )}
                   </td>
                   <td style={{ padding: '0.75rem 0.5rem', color: 'var(--color-text-muted)' }}>
@@ -295,15 +296,15 @@ export default function QueueView({ isClinical = false, staffRole }) {
                   </td>
                   <td style={{ padding: '0.75rem 0.5rem' }}>
                     {pt.seenAt
-                      ? <div style={{ fontSize: '0.75rem' }}>Seen {formatClock(pt.seenAt)}{pt.seenByName ? ` by ${pt.seenByName}` : ''}</div>
-                      : <div style={{ fontSize: '0.75rem', color: 'var(--color-text-subtle)' }}>Not yet seen</div>}
+                      ? <div style={{ fontSize: '0.75rem' }}>{pt.seenByName ? t('Seen {time} by {name}', { time: formatClock(pt.seenAt), name: pt.seenByName }) : t('Seen {time}', { time: formatClock(pt.seenAt) })}</div>
+                      : <div style={{ fontSize: '0.75rem', color: 'var(--color-text-subtle)' }}>{t('Not yet seen')}</div>}
                     {useBackend && (
                       <div style={{ display: 'flex', gap: '0.35rem', flexWrap: 'wrap', marginTop: '4px' }}>
                         {isClinical && !pt.seenAt && (
-                          <Button size="sm" variant="outline" disabled={busy} onClick={() => markSeen(pt)}>Mark seen</Button>
+                          <Button size="sm" variant="outline" disabled={busy} onClick={() => markSeen(pt)}>{t('Mark seen')}</Button>
                         )}
                         {outcomeChoices.length > 0 && (
-                          <Button size="sm" variant="outline" disabled={busy} onClick={() => openOutcome(pt)}>Record outcome</Button>
+                          <Button size="sm" variant="outline" disabled={busy} onClick={() => openOutcome(pt)}>{t('Record outcome')}</Button>
                         )}
                       </div>
                     )}
@@ -315,24 +316,24 @@ export default function QueueView({ isClinical = false, staffRole }) {
         </div>
       </Card>
 
-      <Modal isOpen={Boolean(outcomeFor)} onClose={() => setOutcomeFor(null)} title={outcomeFor ? `Record outcome: ${outcomeFor.patientName}` : ''}
+      <Modal isOpen={Boolean(outcomeFor)} onClose={() => setOutcomeFor(null)} title={outcomeFor ? t('Record outcome: {name}', { name: outcomeFor.patientName }) : ''}
         footer={(
           <>
-            <Button variant="outline" onClick={() => setOutcomeFor(null)}>Cancel</Button>
-            <Button disabled={busy || !disposition} onClick={submitOutcome}>Close visit</Button>
+            <Button variant="outline" onClick={() => setOutcomeFor(null)}>{t('Cancel')}</Button>
+            <Button disabled={busy || !disposition} onClick={submitOutcome}>{t('Close visit')}</Button>
           </>
         )}>
-        <label htmlFor="outcome-disposition" style={{ display: 'block', fontWeight: 600, marginBottom: '0.25rem' }}>Outcome</label>
+        <label htmlFor="outcome-disposition" style={{ display: 'block', fontWeight: 600, marginBottom: '0.25rem' }}>{t('Outcome')}</label>
         <select id="outcome-disposition" value={disposition} onChange={(e) => setDisposition(e.target.value)} style={{ width: '100%', padding: '0.5rem' }}>
-          <option value="">Choose an outcome…</option>
+          <option value="">{t('Choose an outcome…')}</option>
           {outcomeChoices.filter((code) => code !== 'LEFT_WITHOUT_BEING_SEEN' || !outcomeFor?.seenAt).map((code) => (
-            <option key={code} value={code}>{DISPOSITIONS[code].label}</option>
+            <option key={code} value={code}>{t(DISPOSITIONS[code].label)}</option>
           ))}
         </select>
-        <label htmlFor="outcome-note" style={{ display: 'block', fontWeight: 600, margin: '0.75rem 0 0.25rem' }}>Note (optional)</label>
+        <label htmlFor="outcome-note" style={{ display: 'block', fontWeight: 600, margin: '0.75rem 0 0.25rem' }}>{t('Note (optional)')}</label>
         <textarea id="outcome-note" value={note} onChange={(e) => setNote(e.target.value)} rows={3} maxLength={1000} style={{ width: '100%', padding: '0.5rem' }} />
         <p style={{ fontSize: '0.8rem', color: 'var(--color-text-muted)', marginTop: '0.5rem' }}>
-          Closing removes the patient from the queue, releases their bed and cancels open rechecks. It cannot be undone.
+          {t('Closing removes the patient from the queue, releases their bed and cancels open rechecks. It cannot be undone.')}
         </p>
       </Modal>
     </div>

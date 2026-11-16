@@ -1,0 +1,105 @@
+/**
+ * Kiswahili interface text, keyed by the English original.
+ *
+ * DRAFT: these translations have not yet been reviewed by Swahili-speaking clinical staff.
+ * Clinical terms in particular (triage levels, outcomes) must be checked at KNH before use.
+ * Untranslated text falls back to English.
+ */
+export const SW = {
+  // Sign-in
+  'Emergency Triage & Patient Flow Assistant': 'Msaidizi wa Kupanga Wagonjwa wa Dharura kwa Kipaumbele',
+  'Kenyatta National Hospital • Triage Station': 'Hospitali ya Taifa ya Kenyatta • Kituo cha Kupanga Wagonjwa',
+  'Staff Sign In': 'Kuingia kwa Mhudumu',
+  'Sign in with your assigned Kenyan facility credentials': 'Ingia kwa kutumia vitambulisho ulivyopewa na kituo chako',
+  'Staff ID or Staff Number': 'Kitambulisho au Nambari ya Mhudumu',
+  'e.g. KNH-NURSE-042 or STAFF-101': 'mf. KNH-NURSE-042 au STAFF-101',
+  'Use your assigned hospital staff code': 'Tumia nambari ya mhudumu uliyopewa na hospitali',
+  '{n}-digit Security PIN': 'PIN ya usalama ya tarakimu {n}',
+  'Authenticator code': 'Nambari ya programu ya uthibitishaji',
+  'Administrator accounts need the 6-digit code from your authenticator app': 'Akaunti za wasimamizi zinahitaji nambari ya tarakimu 6 kutoka kwenye programu yako ya uthibitishaji',
+  'Sign In to Station': 'Ingia Kituoni',
+
+  // Header
+  'Clinical Staff': 'Mhudumu wa Afya',
+  'Administrative': 'Utawala',
+  'Lock Terminal': 'Funga Kifaa',
+  'Lock shared device terminal': 'Funga kifaa kinachotumiwa na wengi',
+  'Lock shared terminal to protect patient confidentiality': 'Funga kifaa ili kulinda usiri wa wagonjwa',
+  'Sign Out': 'Toka',
+  'Sign out of AfyaFlow AI': 'Toka kwenye AfyaFlow AI',
+
+  // Navigation
+  'Historical Research Cases': 'Kesi za Utafiti wa Kihistoria',
+  'MIMIC-IV-ED Demo source records and research reviews': 'Rekodi za MIMIC-IV-ED Demo na tathmini za utafiti',
+  'Patient Registration': 'Usajili wa Mgonjwa',
+  'Intake and timestamped vital observations': 'Usajili na vipimo muhimu vyenye muda',
+  'Triage & Prioritisation': 'Kupanga kwa Kipaumbele',
+  'SATS protocol scoring and clinical decisions': 'Alama za SATS na maamuzi ya kitabibu',
+  'Hospital Queue': 'Foleni ya Hospitali',
+  'Approved ordering and waiting times': 'Mpangilio ulioidhinishwa na muda wa kusubiri',
+  'Deterioration Review': 'Ukaguzi wa Kuzorota kwa Hali',
+  'Surveillance of recorded vitals deltas': 'Ufuatiliaji wa mabadiliko ya vipimo muhimu',
+  'Department Routing': 'Kupeleka Idarani',
+  'Facility capacity snapshots and patient transfers': 'Nafasi za idara na uhamisho wa wagonjwa',
+  'Operations': 'Uendeshaji',
+  'Workload, waiting times and AI decision figures': 'Mzigo wa kazi, muda wa kusubiri na takwimu za AI',
+  'Offline Sync & Outbox': 'Usawazishaji Nje ya Mtandao',
+  'PWA outbox, retry triggers and sync state': 'Rekodi zinazosubiri kutumwa na hali ya usawazishaji',
+  'Staff Access & Audit': 'Ufikiaji wa Wahudumu na Ukaguzi',
+  'Active sessions, locks, and permission logs': 'Vipindi vilivyo hai, kufunga na kumbukumbu za ruhusa',
+  'Staff Accounts': 'Akaunti za Wahudumu',
+  'Deactivate accounts, reset PINs, end sessions': 'Zima akaunti, badilisha PIN, maliza vipindi',
+  'Clinical': 'Kitabibu',
+  'Restricted': 'Imezuiliwa',
+  '{n} pending': '{n} zinasubiri',
+
+  // Queue
+  '{n} Level 1 patients are clinically tied': 'Wagonjwa {n} wa Kiwango cha 1 wako sawa kitabibu',
+  'They have the same severity and arrival time, and each needs immediate care. Call additional clinicians to see them in parallel; the order shown is only who to start with.':
+    'Wana ukali sawa na walifika wakati mmoja, na kila mmoja anahitaji huduma ya haraka. Ita wahudumu zaidi wawaone kwa pamoja; mpangilio unaonyesha tu nani aanze.',
+  'Why should {name} be seen first among the tied patients?': 'Kwa nini {name} aonwe kwanza kati ya wagonjwa walio sawa?',
+  'Enter a reason of at least 5 characters.': 'Andika sababu yenye angalau herufi 5.',
+  'Live Approved Queue': 'Foleni Iliyoidhinishwa',
+  'Visits ordered by approved clinical priority and arrival timestamp ({n} displayed)': 'Wagonjwa wamepangwa kwa kipaumbele kilichoidhinishwa na muda wa kufika ({n} wanaonyeshwa)',
+  'Department:': 'Idara:',
+  'All Departments': 'Idara Zote',
+  'Order': 'Nafasi',
+  'Patient & Visit ID': 'Mgonjwa na Nambari ya Ziara',
+  'Wait Time': 'Muda wa Kusubiri',
+  'Approved Priority': 'Kipaumbele Kilichoidhinishwa',
+  'Assessment & AI Proposal Status': 'Tathmini na Pendekezo la AI',
+  'Department Bay': 'Idara',
+  'Seen & Outcome': 'Ameonwa na Matokeo',
+  'Same level as above: {reason}': 'Kiwango sawa na aliye juu: {reason}',
+  'Tied {position} of {size}': 'Sawa {position} kati ya {size}',
+  'Seen first: {name} — {reason}': 'Aonwe kwanza: {name} — {reason}',
+  'See first': 'Aonwe kwanza',
+  'Level {level}': 'Kiwango {level}',
+  'Awaiting Approval': 'Inasubiri Kuidhinishwa',
+  'Awaiting Assessment': 'Inasubiri Tathmini',
+  'Reassessment Required': 'Tathmini Mpya Inahitajika',
+  'Confirmed Server State': 'Imethibitishwa na Seva',
+  'Pending Proposal: {priority}': 'Pendekezo Linasubiri: {priority}',
+  '* Does not change approved order': '* Haibadilishi mpangilio ulioidhinishwa',
+  'Seen {time}': 'Ameonwa {time}',
+  'Seen {time} by {name}': 'Ameonwa {time} na {name}',
+  'Not yet seen': 'Bado hajaonwa',
+  'Mark seen': 'Weka ameonwa',
+  'Record outcome': 'Rekodi matokeo',
+  'Record outcome: {name}': 'Rekodi matokeo: {name}',
+  'Cancel': 'Ghairi',
+  'Close visit': 'Funga ziara',
+  'Outcome': 'Matokeo',
+  'Choose an outcome…': 'Chagua matokeo…',
+  'Note (optional)': 'Maelezo (si lazima)',
+  'Closing removes the patient from the queue, releases their bed and cancels open rechecks. It cannot be undone.':
+    'Kufunga kunamtoa mgonjwa kwenye foleni, kunaachia kitanda chake na kufuta ukaguzi uliopangwa. Haiwezi kutenduliwa.',
+
+  // Outcomes
+  'Admitted': 'Amelazwa',
+  'Discharged': 'Ameruhusiwa kwenda nyumbani',
+  'Died in A&E': 'Amefariki katika idara ya dharura',
+  'Left without being seen': 'Aliondoka kabla ya kuonwa',
+  'Left against medical advice': 'Aliondoka kinyume na ushauri wa daktari',
+  'Transferred to another facility': 'Amehamishiwa kituo kingine',
+};

@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useT, LanguageSwitcher } from '../../i18n';
 import useAuth from './useAuth';
 import { Button, Input, Card, Alert } from '../../components';
 import { PIN_LENGTH } from '../../../../shared/contracts/auth.js';
@@ -10,6 +11,7 @@ import { PIN_LENGTH } from '../../../../shared/contracts/auth.js';
  * "Build sign-in, session expiry and lock screens from reviewed authentication contracts."
  */
 export default function SignInScreen() {
+  const t = useT();
   const { signIn } = useAuth();
   const [identifier, setIdentifier] = useState('');
   const [pin, setPin] = useState('');
@@ -83,7 +85,7 @@ export default function SignInScreen() {
           </div>
           <h1 style={{ fontSize: '1.75rem', fontWeight: 800 }}>AfyaFlow AI</h1>
           <p style={{ color: '#94a3b8', fontSize: '0.925rem', marginTop: '0.25rem' }}>
-            Emergency Triage & Patient Flow Assistant
+            {t('Emergency Triage & Patient Flow Assistant')}
           </p>
           <div
             style={{
@@ -96,8 +98,9 @@ export default function SignInScreen() {
               color: '#cbd5e1',
             }}
           >
-            Kenyatta National Hospital • Triage Station
+            {t('Kenyatta National Hospital • Triage Station')}
           </div>
+          <div style={{ marginTop: '0.75rem' }}><LanguageSwitcher dark /></div>
         </div>
 
         <Card
@@ -109,10 +112,10 @@ export default function SignInScreen() {
         >
           <div style={{ padding: '0.5rem 0' }}>
             <h2 style={{ fontSize: '1.2rem', fontWeight: 700, marginBottom: '0.25rem' }}>
-              Staff Sign In
+              {t('Staff Sign In')}
             </h2>
             <p style={{ fontSize: '0.85rem', color: 'var(--color-text-muted)' }}>
-              Sign in with your assigned Kenyan facility credentials
+              {t('Sign in with your assigned Kenyan facility credentials')}
             </p>
           </div>
 
@@ -125,18 +128,18 @@ export default function SignInScreen() {
           <form onSubmit={handleSubmit} style={{ marginTop: '1rem' }}>
             <Input
               id="staff-identifier"
-              label="Staff ID or Staff Number"
+              label={t('Staff ID or Staff Number')}
               value={identifier}
               onChange={(e) => { setIdentifier(e.target.value); setNeedsCode(false); setOtp(''); }}
-              placeholder="e.g. KNH-NURSE-042 or STAFF-101"
+              placeholder={t('e.g. KNH-NURSE-042 or STAFF-101')}
               required
               autoComplete="username"
-              hint="Use your assigned hospital staff code"
+              hint={t('Use your assigned hospital staff code')}
             />
 
             <Input
               id="staff-pin"
-              label={`${PIN_LENGTH}-digit Security PIN`}
+              label={t('{n}-digit Security PIN', { n: PIN_LENGTH })}
               type="password"
               inputMode="numeric"
               pattern="[0-9]*"
@@ -151,7 +154,7 @@ export default function SignInScreen() {
             {needsCode && (
               <Input
                 id="staff-otp"
-                label="Authenticator code"
+                label={t('Authenticator code')}
                 inputMode="numeric"
                 pattern="[0-9]*"
                 maxLength={6}
@@ -161,7 +164,7 @@ export default function SignInScreen() {
                 required
                 autoFocus
                 autoComplete="one-time-code"
-                hint="Administrator accounts need the 6-digit code from your authenticator app"
+                hint={t('Administrator accounts need the 6-digit code from your authenticator app')}
               />
             )}
 
@@ -173,7 +176,7 @@ export default function SignInScreen() {
                 loading={loading}
                 disabled={loading}
               >
-                Sign In to Station
+                {t('Sign In to Station')}
               </Button>
             </div>
           </form>

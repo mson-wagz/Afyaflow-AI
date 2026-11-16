@@ -13,6 +13,7 @@ The scoring fixture remains **unvalidated**. This is a research/development demo
 ## Documentation
 
 - **Start here:** [Quick guide: what's new](docs/QUICK_GUIDE.md), a plain-language walkthrough of recent features for staff, supervisors and IT.
+- **For the judges:** [unit economics and team fact sheet](docs/UNIT_ECONOMICS.md) and [integration map](docs/INTEGRATION_MAP.md).
 - [Security and privacy safeguards](docs/SECURITY.md): how patient data is protected, HIPAA and Kenya Data Protection Act mapping, and work outstanding before real patient data.
 - [Data sources and research use](docs/DATA_SOURCES.md): dataset provenance, licensing, mappings, missing fields, import/export and AI use.
 - [Outcome metrics](docs/OUTCOME_METRICS.md), [queue ordering](docs/QUEUE_ORDERING.md) and [interoperability (FHIR export)](docs/INTEROPERABILITY.md).
@@ -40,12 +41,16 @@ The scoring fixture remains **unvalidated**. This is a research/development demo
 - **Hospital queue:** approved priorities, waiting times, department filtering, workload snapshots, and visible stale-data states.
 - **Deterioration review:** compare observation versions and support authorised, reasoned reassessment. The app does not measure vital signs itself.
 - **Routing:** review synthetic department availability/capacity and explicitly commit a transfer with version checks.
+- **Opens offline:** a service worker caches the application shell (never API responses or patient data), so the app loads on a weak or dropped connection once it has been opened online.
+- **English and Kiswahili:** a language switch on the sign-in screen and header; sign-in, navigation and the queue (including outcomes) are translated. The Kiswahili is a draft awaiting review by Swahili-speaking clinical staff.
+- **Cost meter:** every run trace shows model calls, tokens and cost; the Operations dashboard shows tokens per answer and cost per completed triage ([unit economics](docs/UNIT_ECONOMICS.md)).
+- **SMS escalation (sandbox):** texts the on-call clinician when a Level 1 patient waits unseen ([integration map](docs/INTEGRATION_MAP.md)).
 - **Offline intake:** browser-local registration drafts and reconnect replay. Clinical decisions require online server acknowledgement. Drafts and queued registrations belong to the staff member who created them and are removed from the browser at sign-out (with confirmation if any are unsynced).
 - **Audit history:** persisted staff decisions and workflow events, with append-only database protection for observations, decisions, transfers, and audit records.
 - **Read-access logging:** every view of patient records is recorded (who, which patients, which screen, when) in an append-only access log, reviewable by administrators; data is withheld if access cannot be recorded.
 - **Staff account management:** administrators deactivate and reactivate accounts, reset PINs (shown once) and end sessions, each with a recorded reason; administrators sign in with a PIN plus an authenticator-app code.
 
-Capacity and staffing figures are synthetic, not live hospital telemetry. The frontend is responsive and includes a web manifest; service-worker caching, reliable offline app loading, and installability across target devices remain to be implemented or verified.
+Capacity and staffing figures are synthetic, not live hospital telemetry. The frontend is responsive, includes a web manifest and loads offline through its service worker; installability and offline loading on KNH's actual devices remain to be verified.
 
 ## Technologies used
 

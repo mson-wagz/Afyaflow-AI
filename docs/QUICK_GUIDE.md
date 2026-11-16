@@ -99,7 +99,23 @@ pathway and need a manual decision.
 
 More: [SATS clinical review pack](SATS_CLINICAL_REVIEW.md)
 
-## 5. Practice accounts
+## 5. Kiswahili and working offline
+
+- **Language:** use **Language / Lugha** on the sign-in screen or at the top of the app to
+  switch between English and Kiswahili. Sign-in, the menu and the queue (including recording
+  outcomes) are translated; other screens are still in English. The Kiswahili is a draft:
+  tell your supervisor if any wording is unclear.
+- **Weak connection:** once you have opened AfyaFlow online, it opens again on this device
+  even without a connection. Registrations saved offline wait in **Offline Sync & Outbox**
+  and send when the connection returns. Approving a priority still needs a connection.
+
+## 6. Seeing what the AI costs
+
+On **Triage & Prioritisation**, press **View Run Trace** on any assessment to see each step
+the AI took, how many tokens it used and what it cost. **Operations → AI cost to serve**
+shows the cost per completed triage. Details: [Unit economics](UNIT_ECONOMICS.md).
+
+## 7. Practice accounts
 
 There are now two accounts for each role, so you can practise handovers between colleagues.
 On a local practice server the PINs are listed in `src/shared/contracts/auth.js`. On the
