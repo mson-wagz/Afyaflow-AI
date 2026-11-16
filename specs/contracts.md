@@ -20,9 +20,15 @@ eight-hour absolute expiry still applies.
 
 ## Authentication
 
-- `POST /auth/login`: `{ identifier, pin }`; seeded identifiers and PINs are synthetic.
+- `POST /auth/login`: `{ identifier, pin, otp? }`. PINs are exactly six digits (400
+  otherwise). Administrators must also send `otp`, the current 6-digit code from their
+  enrolled authenticator app (RFC 6238 TOTP, 30-second steps, one step of drift). After
+  a correct PIN: 403 `MFA_NOT_ENROLLED` if no authenticator is enrolled, 401
+  `MFA_REQUIRED` if `otp` is missing, 401 `INVALID_MFA_CODE` if it is wrong or was
+  already used. Wrong codes count toward the per-account limit. A wrong PIN is always
+  401 `INVALID_CREDENTIALS`, whatever the role.
 - `GET /auth/me`: current staff and lock status.
-- `POST /auth/lock`, `/auth/unlock` (`{ pin }`), `/auth/logout`.
+- `POST /auth/lock`, `/auth/unlock` (`{ pin }`, PIN only), `/auth/logout`.
 
 ## Patient and observation workflow
 

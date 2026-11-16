@@ -131,9 +131,17 @@ sudo -i
 cd /opt/afyaflow
 admin() { docker compose --env-file .env --project-name afyaflow exec -T app \
   node dist/src/backend/src/admin/staff-admin.js "$@"; }
-admin list                    # staff IDs, numbers, roles, names
+admin list                    # staff IDs, numbers, roles, names (MFA = authenticator enrolled)
 admin reset-pin STAFF-102     # prints a new PIN once and ends that person's sessions
+admin enroll-mfa STAFF-104    # administrators: prints an authenticator setup key once
+admin remove-mfa STAFF-104    # lost phone: blocks admin sign-in until re-enrolled
 ```
+
+Administrator accounts also need an authenticator app (Google Authenticator,
+Microsoft Authenticator or similar). Run `enroll-mfa` with the administrator
+present; they choose "Enter a setup key" in the app, type the key and select
+time-based. Without enrolment an administrator cannot sign in (`MFA_NOT_ENROLLED`).
+Re-running `enroll-mfa` replaces the previous app.
 
 Give each PIN to its owner privately (not by email or chat history). The PIN is stored
 only as a salted hash and the `STAFF_PIN_RESET` audit event never contains it. Close

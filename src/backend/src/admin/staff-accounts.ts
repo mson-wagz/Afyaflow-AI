@@ -4,6 +4,33 @@ import { Database, audit, hash } from '../database/db.js';
 import { pinHash } from '../auth/auth.js';
 import { PIN_LENGTH } from '../../../shared/contracts/auth.js';
 import { accountKey } from '../auth/rate-limit.js';
+import { generateTotpSecret, otpauthUri } from '../auth/totp.js';
+
+/**
+ * Enrols (or re-enrols) an authenticator app: stores a new TOTP secret, ends existing sessions
+ * and returns the secret and otpauth URI to show once. Re-enrolling invalidates the old app.
+ */
+export async function enrolMfa(database: Database, staffId: string, actorId: string | null) {
+  const secret = generateTotpSecret();
+  const staffNumber = await database.transaction(async (db) => {
+    const updated = await db.query('UPDATE staff SET mfa_secret=$2,mfa_enrolled_at=now(),mfa_last_step=NULL WHERE id=$1 RETURNING staff_number', [staffId, secret]);
+    if (!updated.rowCount) throw new NotFoundException({ code: 'STAFF_NOT_FOUND', message: 'Staff account not found.' });
+    await db.query('DELETE FROM sessions WHERE staff_id=$1', [staffId]);
+    await audit(db, actorId, 'STAFF_MFA_ENROLLED', { staffId, via: actorId ? 'admin' : 'operator-cli' });
+    return updated.rows[0].staff_number as string;
+  });
+  return { secret, uri: otpauthUri(secret, staffNumber) };
+}
+
+/** Removes an authenticator app (lost phone). Administrators then cannot sign in until re-enrolled. */
+export async function removeMfa(database: Database, staffId: string, actorId: string | null) {
+  await database.transaction(async (db) => {
+    const updated = await db.query('UPDATE staff SET mfa_secret=NULL,mfa_enrolled_at=NULL,mfa_last_step=NULL WHERE id=$1', [staffId]);
+    if (!updated.rowCount) throw new NotFoundException({ code: 'STAFF_NOT_FOUND', message: 'Staff account not found.' });
+    await db.query('DELETE FROM sessions WHERE staff_id=$1', [staffId]);
+    await audit(db, actorId, 'STAFF_MFA_REMOVED', { staffId, via: actorId ? 'admin' : 'operator-cli' });
+  });
+}
 
 /** Rejects PINs that are trivially guessable: one repeated digit or a straight run. */
 export function isWeakPin(pin: string) {

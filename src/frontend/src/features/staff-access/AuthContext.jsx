@@ -146,9 +146,9 @@ export function AuthProvider({ children }) {
   }, [sessionStatus, resetInactivityTimer]);
 
   // Sign In handler
-  const signIn = async (identifier, pin) => {
+  const signIn = async (identifier, pin, otp) => {
     setLastPermissionError(null); setAuthError('');
-    const result = await apiSignIn(identifier, pin);
+    const result = await apiSignIn(identifier, pin, otp);
     if (result.success) {
       updateStaff(result.staff);
       setSessionStatus(SESSION_STATUS.AUTHENTICATED);

@@ -230,6 +230,17 @@ async function loginAs(identifier:string,pin:string) {
   assert.equal(response.status,201);
   return response.headers.get('set-cookie')!.split(';')[0];
 }
+// Administrators need an authenticator code. Tests enrol a fixed secret and allow the current
+// code again (clearing the replay marker) so several admin sign-ins can share one 30-second step.
+const ADMIN_TEST_SECRET='JBSWY3DPEHPK3PXPJBSWY3DPEHPK3PXP';
+async function adminLogin() {
+  const {totpCode,totpStep}=await import('../../src/backend/src/auth/totp.js');
+  await database.pool.query("UPDATE staff SET mfa_secret=$1,mfa_last_step=NULL WHERE id='STAFF-104'",[ADMIN_TEST_SECRET]);
+  const response=await fetch(`${base}/api/auth/login`,{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({identifier:'STAFF-104',pin:'456789',otp:totpCode(ADMIN_TEST_SECRET,totpStep(Date.now()))})});
+  assert.equal(response.status,201);
+  return response.headers.get('set-cookie')!.split(';')[0];
+}
 async function post(path:string,session:string,body:unknown,key=randomUUID()) {
   return fetch(`${base}/api${path}`,{method:'POST',headers:{Cookie:session,'Content-Type':'application/json','Idempotency-Key':key},body:JSON.stringify(body)});
 }
@@ -278,7 +289,7 @@ test('reading patient records is access-logged once per view and reviewable by a
   await get(`/visits/${target}/evidence`,session);
   assert.deepEqual((await rows('GET /api/visits/:id/evidence')).at(-1).patient_ids,[target]);
   // Administrators can see who viewed a patient; other roles cannot.
-  const admin=await loginAs('STAFF-104','456789');
+  const admin=await adminLogin();
   const viewers=await get(`/audit/access?patientId=${encodeURIComponent(target)}`,admin);
   assert.ok(viewers.some((v:any)=>v.staffId==='STAFF-102' && v.route==='GET /api/visits/:id/evidence'));
   assert.equal((await fetch(`${base}/api/audit/access`,{headers:{Cookie:session}})).status,403);
@@ -520,6 +531,65 @@ test('PINs are six digits, production seeds are unusable and operators issue str
   await assert.rejects(run(database,['delete-everything'],()=>{}),/Usage/);
 });
 
+test('authenticator codes follow RFC 6238 and are single-use',async()=>{
+  const {totpCode,verifyTotp,base32Encode,base32Decode,totpStep,otpauthUri}=await import('../../src/backend/src/auth/totp.js');
+  // RFC 6238 appendix B, SHA1 seed "12345678901234567890".
+  const seed=base32Encode(Buffer.from('12345678901234567890'));
+  assert.equal(seed,'GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ');
+  assert.equal(totpCode(seed,totpStep(59_000),8),'94287082');
+  assert.equal(totpCode(seed,totpStep(1_111_111_109_000),8),'07081804');
+  assert.equal(base32Decode(seed).toString(),'12345678901234567890');
+  const at=1_700_000_000_000,step=totpStep(at);
+  assert.equal(verifyTotp(seed,totpCode(seed,step),null,at),step);
+  // One step of clock drift either way is tolerated; two is not.
+  assert.equal(verifyTotp(seed,totpCode(seed,step-1),null,at),step-1);
+  assert.equal(verifyTotp(seed,totpCode(seed,step+1),null,at),step+1);
+  assert.equal(verifyTotp(seed,totpCode(seed,step-2),null,at),null);
+  // A code is not accepted again once its step has been used.
+  assert.equal(verifyTotp(seed,totpCode(seed,step),step,at),null);
+  assert.equal(verifyTotp(seed,'12345',null,at),null);
+  assert.match(otpauthUri(seed,'KNH-OPS-005'),/^otpauth:\/\/totp\/AfyaFlow%3AKNH-OPS-005\?secret=GEZDG.*&issuer=AfyaFlow&algorithm=SHA1&digits=6&period=30$/);
+});
+
+test('administrators must enrol an authenticator and present a fresh code at sign-in',async()=>{
+  const {totpCode,totpStep}=await import('../../src/backend/src/auth/totp.js');
+  const {run}=await import('../../src/backend/src/admin/staff-admin.js');
+  const attempt=(body:object)=>fetch(`${base}/api/auth/login`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+  const code=async(response:Response)=>(await response.json()).code;
+  const admin={identifier:'STAFF-104',pin:'456789'};
+  await database.pool.query("UPDATE staff SET mfa_secret=NULL,mfa_last_step=NULL WHERE id='STAFF-104'");
+  // Not enrolled: a correct PIN is still refused.
+  let response=await attempt(admin);
+  assert.equal(response.status,403);assert.equal(await code(response),'MFA_NOT_ENROLLED');
+  // A wrong PIN never reveals whether a code would be needed.
+  response=await attempt({...admin,pin:'000000'});
+  assert.equal(await code(response),'INVALID_CREDENTIALS');
+  const lines:string[]=[];
+  await run(database,['enroll-mfa','STAFF-104'],line=>lines.push(line));
+  const secret=lines[0].match(/: ([A-Z2-7]{32})$/)![1];
+  assert.match(lines[1],/^otpauth URI \(for QR code tools\): otpauth:\/\/totp\//);
+  response=await attempt(admin);
+  assert.equal(response.status,401);assert.equal(await code(response),'MFA_REQUIRED');
+  const current=totpCode(secret,totpStep(Date.now()));
+  response=await attempt({...admin,otp:current==='000000'?'000001':'000000'});
+  assert.equal(await code(response),'INVALID_MFA_CODE');
+  assert.equal((await attempt({...admin,otp:current})).status,201);
+  // The same code cannot be replayed.
+  response=await attempt({...admin,otp:current});
+  assert.equal(response.status,401);assert.equal(await code(response),'INVALID_MFA_CODE');
+  // Other roles sign in with a PIN alone.
+  assert.equal((await attempt({identifier:'STAFF-101',pin:'123456'})).status,201);
+  const listed:string[]=[];await run(database,['list'],line=>listed.push(line));
+  assert.ok(listed.some(line=>line.startsWith('STAFF-104')&&line.endsWith('\tMFA')));
+  // Removing the authenticator (lost phone) blocks administrator sign-in until re-enrolled.
+  await run(database,['remove-mfa','STAFF-104'],()=>{});
+  response=await attempt({...admin,otp:totpCode(secret,totpStep(Date.now())+1)});
+  assert.equal(await code(response),'MFA_NOT_ENROLLED');
+  const events=(await database.pool.query("SELECT event_type FROM audit_events WHERE details->>'staffId'='STAFF-104' AND event_type LIKE 'STAFF_MFA_%' ORDER BY timestamp")).rows.map(r=>r.event_type);
+  assert.deepEqual(events.slice(-2),['STAFF_MFA_ENROLLED','STAFF_MFA_REMOVED']);
+  assert.ok(!JSON.stringify(await database.pool.query("SELECT details FROM audit_events WHERE event_type LIKE 'STAFF_MFA_%'").then(r=>r.rows)).includes(secret));
+});
+
 test('a display name shared by two accounts cannot be used to sign in',async()=>{
   const {pinHash}=await import('../../src/backend/src/auth/auth.js');
   for(const [id,number,pin] of [['STAFF-TWIN-1','TWIN-001','511111'],['STAFF-TWIN-2','TWIN-002','522222']])
@@ -537,16 +607,20 @@ test('a display name shared by two accounts cannot be used to sign in',async()=>
 test('failed PINs are throttled per account across identifier forms and shared with unlock',async()=>{
   const attempt=(identifier:string,pin:string)=>fetch(`${base}/api/auth/login`,{method:'POST',
     headers:{'Content-Type':'application/json'},body:JSON.stringify({identifier,pin})});
-  const forms=['STAFF-104','KNH-OPS-005','Samuel Kiprop'];
+  // A dedicated non-administrator account, so the PIN budget is tested without MFA.
+  const {pinHash}=await import('../../src/backend/src/auth/auth.js');
+  await database.pool.query("INSERT INTO staff(id,staff_number,role,pin_hash,profile) VALUES('STAFF-THROTTLE','THR-001','nurse',$1,$2)",
+    [pinHash('456789'),JSON.stringify({name:'Synthetic Throttle Nurse'})]);
+  const forms=['STAFF-THROTTLE','THR-001','Synthetic Throttle Nurse'];
   // A success clears earlier failures.
   for(let i=0;i<9;i++)assert.equal((await attempt(forms[i%3],'000000')).status,401);
-  const login=await attempt('STAFF-104','456789');
+  const login=await attempt('STAFF-THROTTLE','456789');
   assert.equal(login.status,201);
   const session=login.headers.get('set-cookie')!.split(';')[0];
   // Ten failures, through any identifier form, exhaust the account budget...
   for(let i=0;i<10;i++)assert.equal((await attempt(forms[i%3],'000000')).status,401);
   // ...after which even the correct PIN is not checked, so a lucky guess is not confirmed.
-  const blocked=await attempt('KNH-OPS-005','456789');
+  const blocked=await attempt('THR-001','456789');
   assert.equal(blocked.status,429);
   assert.equal((await blocked.json()).code,'ACCOUNT_RATE_LIMITED');
   // Unlocking a terminal draws on the same budget.
@@ -555,9 +629,9 @@ test('failed PINs are throttled per account across identifier forms and shared w
   assert.equal((await unlock('456789')).status,429);
   // The budget renews once the window expires.
   const {hash}=await import('../../src/backend/src/database/db.js');
-  await database.pool.query("UPDATE auth_rate_limits SET expires_at=now()-interval '1 second' WHERE key_hash=$1",[hash('account:STAFF-104')]);
+  await database.pool.query("UPDATE auth_rate_limits SET expires_at=now()-interval '1 second' WHERE key_hash=$1",[hash('account:STAFF-THROTTLE')]);
   assert.equal((await unlock('456789')).status,201);
-  assert.equal((await attempt('STAFF-104','456789')).status,201);
+  assert.equal((await attempt('STAFF-THROTTLE','456789')).status,201);
   // Unknown identifiers get the same response, so throttling does not reveal which accounts exist.
   for(let i=0;i<10;i++)assert.equal((await attempt('NOT-A-STAFF-ID','000000')).status,401);
   assert.equal((await attempt('not-a-staff-id','000000')).status,429);

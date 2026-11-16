@@ -24,6 +24,8 @@ Open **About the data and its limitations** for attribution. **Download adapted 
 
 Open the supplied application URL, or `http://localhost:5173` locally. Enter a staff identifier and six-digit PIN, then sign in. The identifier can be your staff ID, staff number or full name; if another account shares your name, sign in with your staff ID or number.
 
+**Administrators** also need an authenticator app on their phone. After a correct PIN the sign-in screen asks for the 6-digit **Authenticator code**; each code works once. The system operator sets up the app with you. If you lose the phone, ask the operator to remove and re-enrol it. Unlocking a locked terminal needs only your PIN.
+
 Your PIN is issued to you privately by an administrator or the system operator; no PINs are published. Keep it to yourself and ask for a new one if you think someone else knows it. Developers running the app locally use the development accounts described in the [backend setup](../src/backend/README.md); those PINs do not work on any deployed site.
 
 Nurses and clinicians can record measurements, request assessments, approve/reject/override proposals, reassess patients, and authorise transfers. Clerks can register demographics and complaints and view queues; they cannot record clinical measurements or commit clinical decisions. Administrators can inspect broader audit history but cannot register visits or approve clinical decisions.

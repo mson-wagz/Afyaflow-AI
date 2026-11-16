@@ -1,10 +1,10 @@
 import * as demo from './demoAdapter.js';
 import { api, useBackend, errorResult } from '../../api/client.js';
 let audit=[];
-export async function apiSignIn(identifier,pin) {
+export async function apiSignIn(identifier,pin,otp) {
   if(!useBackend)return demo.apiSignIn(identifier,pin);
-  try {const result=await api('/auth/login',{method:'POST',body:{identifier,pin}});audit=await api('/audit');return result;}
-  catch(error){return {success:false,error:error.message};}
+  try {const result=await api('/auth/login',{method:'POST',body:{identifier,pin,...(otp?{otp}:{})}});audit=await api('/audit');return result;}
+  catch(error){return {success:false,error:error.message,code:error.code};}
 }
 export async function apiUnlockSession(staffId,pin) {
   if(!useBackend)return demo.apiUnlockSession(staffId,pin);

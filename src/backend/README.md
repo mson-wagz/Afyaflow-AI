@@ -38,7 +38,9 @@ retains existing records and is disabled in production unless
 **Issuing PINs.** `npm run staff:admin -- list` lists accounts and
 `npm run staff:admin -- reset-pin <staffId>` issues a random six-digit PIN (never a
 repeated digit or straight run), prints it once, ends that person's sessions and
-records a `STAFF_PIN_RESET` audit event without the PIN. Deployed servers run the
+records a `STAFF_PIN_RESET` audit event without the PIN. `enroll-mfa <staffId>`
+prints an authenticator setup key for an administrator (required for admin sign-in;
+TOTP in `auth/totp.js`) and `remove-mfa <staffId>` removes it. Deployed servers run the
 compiled `dist/src/backend/src/admin/staff-admin.js`; see deploy/ec2/README.md.
 
 ## What works
