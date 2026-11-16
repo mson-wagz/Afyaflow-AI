@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import {
   apiGetPendingTriageProposals,
   apiSubmitClinicalDecision,
@@ -21,19 +21,24 @@ export default function useTriage(currentStaff) {
   const [targetOverridePriority, setTargetOverridePriority] = useState('ORANGE');
   const [decisionCase, setDecisionCase] = useState(null);
 
+  // Polling must not update state after the screen has closed (a slow response can arrive later).
+  const mounted = useRef(true);
+  useEffect(() => { mounted.current = true; return () => { mounted.current = false; }; }, []);
+
   const loadProposals = useCallback(async () => {
     setLoading(true);
     try {
       const data = await apiGetPendingTriageProposals();
+      if (!mounted.current) return;
       setProposals(data);
       setDecisionHistory(apiGetTriageDecisionHistory());
       if (data.length > 0 && !data.some(p => p.patientId === selectedPatientId)) {
         setSelectedPatientId(data[0].patientId);
       }
     } catch (error) {
-      setActionError({code:error.code || 'LOAD_ERROR',message:error.message});
+      if (mounted.current) setActionError({code:error.code || 'LOAD_ERROR',message:error.message});
     } finally {
-      setLoading(false);
+      if (mounted.current) setLoading(false);
     }
   }, [selectedPatientId]);
 
