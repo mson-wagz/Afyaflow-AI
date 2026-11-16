@@ -93,6 +93,61 @@ Resources:
                 Resource:
                   - !Sub arn:${AWS::Partition}:bedrock:eu-*::foundation-model/amazon.nova-lite-v1:0
                   - !Sub arn:${AWS::Partition}:bedrock:${AWS::Region}:${AWS::AccountId}:inference-profile/eu.amazon.nova-lite-v1:0
+              # Off-host database backups: write and read for restore tests, never delete.
+              - Effect: Allow
+                Action: [s3:PutObject, s3:GetObject]
+                Resource: !Sub ${BackupBucket.Arn}/database/*
+              - Effect: Allow
+                Action: s3:ListBucket
+                Resource: !GetAtt BackupBucket.Arn
+                Condition:
+                  StringLike: {s3:prefix: [database/*]}
+  BackupBucket:
+    Type: AWS::S3::Bucket
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault: {SSEAlgorithm: AES256}
+            BucketKeyEnabled: true
+      VersioningConfiguration: {Status: Enabled}
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      OwnershipControls:
+        Rules: [{ObjectOwnership: BucketOwnerEnforced}]
+      LifecycleConfiguration:
+        Rules:
+          - Id: ExpireDatabaseBackups
+            Status: Enabled
+            Prefix: database/
+            ExpirationInDays: 35
+            NoncurrentVersionExpiration: {NoncurrentDays: 7}
+            AbortIncompleteMultipartUpload: {DaysAfterInitiation: 1}
+  BackupBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref BackupBucket
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Sid: DenyInsecureTransport
+            Effect: Deny
+            Principal: '*'
+            Action: s3:*
+            Resource: [!GetAtt BackupBucket.Arn, !Sub '${BackupBucket.Arn}/*']
+            Condition:
+              Bool: {aws:SecureTransport: 'false'}
+          - Sid: DenyUnencryptedUploads
+            Effect: Deny
+            Principal: '*'
+            Action: s3:PutObject
+            Resource: !Sub ${BackupBucket.Arn}/*
+            Condition:
+              StringNotEquals: {s3:x-amz-server-side-encryption: AES256}
   HostProfile:
     Type: AWS::IAM::InstanceProfile
     Properties: {Roles: [!Ref HostRole]}
@@ -190,3 +245,4 @@ Outputs:
   PublicIp: {Value: !GetAtt Host.PublicIp}
   RepositoryUri: {Value: !GetAtt Repository.RepositoryUri}
   GithubDeployRoleArn: {Value: !GetAtt GithubDeployRole.Arn}
+  BackupBucketName: {Value: !Ref BackupBucket}

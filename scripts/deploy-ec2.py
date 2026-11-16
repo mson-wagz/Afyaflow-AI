@@ -36,8 +36,12 @@ def main():
         raise ValueError("Invalid HTTPS hostname")
     archive = io.BytesIO()
     with tarfile.open(fileobj=archive, mode="w:gz") as bundle:
-        for name in ("compose.yaml", "Caddyfile", "release.sh"):
+        for name in ("compose.yaml", "Caddyfile", "release.sh", "backup.sh"):
             bundle.add(Path("deploy/ec2") / name, arcname=name)
+    # Present once the stack has been updated to create the off-host backup bucket.
+    backup_bucket = outputs.get("BackupBucketName", "")
+    if backup_bucket and not re.fullmatch(r"[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]", backup_bucket):
+        raise ValueError("Invalid backup bucket name")
     payload = base64.b64encode(archive.getvalue()).decode("ascii")
     commands = [
         "set -eu",
@@ -47,6 +51,7 @@ def main():
         " ".join([
             f"APP_IMAGE={shlex.quote(image)}", f"APP_DOMAIN={shlex.quote(domain)}",
             f'AWS_REGION={shlex.quote(os.environ["AWS_REGION"])}',
+            f"BACKUP_BUCKET={shlex.quote(backup_bucket)}",
             "bash /opt/afyaflow/release.sh",
         ]),
     ]

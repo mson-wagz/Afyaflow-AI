@@ -150,10 +150,42 @@ the session window afterwards so the PIN is not left on screen.
 ## Persistence and cleanup
 
 Database and TLS state use named Docker volumes on the encrypted root disk.
-Releases never run `docker compose down --volumes`. Backups are local dumps retained
-for seven days; they do not protect against loss of the disk or server account.
-Add off-host backups before keeping valuable data. No production recovery promise
-is implied by this demo configuration.
+Releases never run `docker compose down --volumes`. Each release also keeps a local
+pre-migration dump for seven days.
+
+### Off-host backups
+
+The stack creates a private S3 bucket (output `BackupBucketName`): encrypted
+(SSE-S3), versioned, public access blocked, non-TLS requests and unencrypted uploads
+denied, backups expiring after 35 days. The host role can write and read backups
+but cannot delete them. Releases install a systemd timer that runs
+`/opt/afyaflow/backup.sh backup` daily at 02:30 Nairobi time and upload one backup
+immediately.
+
+The bucket needs a one-time stack update by an operator with CloudFormation
+permissions. It adds the bucket, its policy and an IAM policy statement; it does not
+replace the instance or its disk. Unspecified parameters keep their current values:
+
+```sh
+aws cloudformation deploy --region eu-west-1 --stack-name afyaflow-staging \
+  --template-file deploy/ec2/template.yaml --capabilities CAPABILITY_IAM
+```
+
+Until then, releases print a warning and continue without off-host backups. After
+the next release, check them from Session Manager:
+
+```sh
+sudo -i
+systemctl list-timers afyaflow-backup.timer   # next scheduled run
+journalctl -u afyaflow-backup --since today    # last results
+/opt/afyaflow/backup.sh restore-test           # restore the newest backup into a scratch database
+```
+
+Run `restore-test` after setup and at least monthly; it restores into a separate
+`afyaflow_restore_check` database, verifies migrations and staff records, and drops
+it. To recover for real, download a backup with `aws s3 cp` and restore it with
+`pg_restore` into the `afyaflow` database during a maintenance window. No production
+recovery promise is implied by this demo configuration.
 
 The root disk, ECR repository, and OIDC provider are deliberately retained when
 the stack/instance is deleted or replaced. Retained disks/images still incur
