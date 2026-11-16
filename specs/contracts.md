@@ -50,6 +50,15 @@ eight-hour absolute expiry still applies.
   `queueOrder { rank, level, severity, version }`, `clinicalTie { size, position }` or null,
   `queuePrecedence { at, byName, reason }` or null, and `tieBreak`. Priority objects carry
   `level` (1-5) and `category`.
+- `POST /visits/:id/seen`: plus retry key. Clinical roles. Records the first time a clinician
+  saw the patient; once only (409 `ALREADY_SEEN`).
+- `POST /visits/:id/outcome`: `{ disposition, note? }` plus retry key. `disposition` is ADMITTED,
+  DISCHARGED, DIED, LEFT_WITHOUT_BEING_SEEN, LEFT_AGAINST_MEDICAL_ADVICE or TRANSFERRED_OUT.
+  Clinical roles record any; clerks only LEFT_WITHOUT_BEING_SEEN (403 otherwise), which is
+  refused after the patient is seen (409). Closes the visit atomically: append-only outcome with
+  the approved priority, bed released, follow-ups cancelled, proposals stale, runs superseded,
+  `VISIT_CLOSED` audit. Closed visits leave all working lists and refuse writes (409
+  `VISIT_CLOSED`). See docs/OUTCOME_METRICS.md.
 - `POST /queue/precedence`: `{ patientId, observationVersion, assessmentVersion, reason }`
   plus retry key. Clinical roles only (403). Orders a clinically tied patient first within its
   tie group; refuses a stale version (409 `VERSION_CONFLICT`), an unapproved patient
@@ -110,6 +119,11 @@ official filesystem MCP server. General filesystem tools are not exposed to the 
   overridden / rejected, acceptance rate) and `agentRuns` (count by status, median run time)
   plus `transfers` per department. The response contains no names, visit IDs or free
   text, so it is not a patient-record read and is not written to the access log.
+  Live counts cover open visits only; `live.notYetSeen` and `live.pastTargetNotSeen` count
+  unseen patients. `outcomes` gives counts by disposition, `overTriage` and `underTriage`
+  (`{ numerator, denominator, percent }`, KNH study definitions), left-without-being-seen rate
+  and length of stay; `seenAgainstTarget` gives per-level seen counts, median wait and the
+  share within the SATS target (null for RED).
 
 ## Staff accounts (administrators only)
 

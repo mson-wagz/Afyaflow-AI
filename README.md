@@ -27,7 +27,8 @@ The scoring fixture remains **unvalidated**. This is a research/development demo
 - **Historical research library:** verified public MIMIC-IV-ED Demo import, source inspection, JSON export, explicit MCP-backed AI research reviews and separation from operational demonstrations.
 
 - **Staff access:** server-backed sign-in, HttpOnly cookie sessions, locking, logout, role checks, and shared authentication throttling. Sessions idle for 15 minutes (`SESSION_IDLE_MINUTES`) are locked by the server as well as the browser.
-- **Operations dashboard:** live workload, priority mix, bed occupancy, arrivals, time-to-triage percentiles and AI proposal acceptance for today, 7 or 30 days. Aggregates only, with no patient identifiers; not available to front-desk staff.
+- **Visit outcomes:** mark when a clinician first sees a patient and close visits as admitted, discharged, died, left without being seen, left against medical advice or transferred; closing frees the bed and cancels open work.
+- **Operations dashboard:** live workload, priority mix, bed occupancy, arrivals, time-to-triage percentiles, AI proposal acceptance, over- and under-triage against the KNH SATS baseline, SATS target compliance, length of stay and left-without-being-seen rate for today, 7 or 30 days. Aggregates only, with no patient identifiers; not available to front-desk staff.
 - **Registration:** demographic and complaint validation, timestamped observations, staff attribution, draft retention, and retry-safe submission.
 - **Measurement feedback:** visible success, missing-value warnings, and range errors. Passing entry checks does not establish clinical normality or save a visit.
 - **Agent assessments:** durable jobs, versioned evidence, bounded execution, actual model/tool traces, and persisted proposals for human review.

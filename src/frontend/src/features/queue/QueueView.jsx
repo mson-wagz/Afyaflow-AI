@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { useBackend, mutation } from '../../api/client.js';
 import useQueue from './useQueue';
-import { Card, Button, Badge, Alert } from '../../components';
+import { Card, Button, Badge, Alert, Modal } from '../../components';
+import { DISPOSITIONS, dispositionsForRole } from '../../../../shared/contracts/outcomes.js';
 
 /**
  * Hospital Queue Management View
@@ -11,8 +12,13 @@ import { Card, Button, Badge, Alert } from '../../components';
  * - Approved state distinct from pending proposals.
  * - Polling failure handling with a visibly stale last-confirmed snapshot.
  */
-export default function QueueView({ isClinical = false }) {
+export default function QueueView({ isClinical = false, staffRole }) {
   const [tieError, setTieError] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [outcomeFor, setOutcomeFor] = useState(null);
+  const [disposition, setDisposition] = useState('');
+  const [note, setNote] = useState('');
+  const outcomeChoices = dispositionsForRole(staffRole);
   const [tieBusy, setTieBusy] = useState(false);
   const {
     queue,
@@ -47,6 +53,19 @@ export default function QueueView({ isClinical = false }) {
       await refreshQueue();
     } catch (e) { setTieError(e.message); }
     finally { setTieBusy(false); }
+  };
+
+  const act = async (path, body) => {
+    setTieError(''); setBusy(true);
+    try { await mutation(path, body); await refreshQueue(); return true; }
+    catch (e) { setTieError(e.message); return false; }
+    finally { setBusy(false); }
+  };
+  const markSeen = (pt) => act(`/visits/${encodeURIComponent(pt.visitId)}/seen`, {});
+  const openOutcome = (pt) => { setOutcomeFor(pt); setDisposition(''); setNote(''); };
+  const submitOutcome = async () => {
+    const body = { disposition, ...(note.trim() ? { note: note.trim() } : {}) };
+    if (await act(`/visits/${encodeURIComponent(outcomeFor.visitId)}/outcome`, body)) setOutcomeFor(null);
   };
 
   return (
@@ -191,6 +210,7 @@ export default function QueueView({ isClinical = false }) {
                 <th style={{ padding: '0.75rem 0.5rem' }}>Approved Priority</th>
                 <th style={{ padding: '0.75rem 0.5rem' }}>Assessment & AI Proposal Status</th>
                 <th style={{ padding: '0.75rem 0.5rem' }}>Department Bay</th>
+                <th style={{ padding: '0.75rem 0.5rem' }}>Seen & Outcome</th>
               </tr>
             </thead>
             <tbody>
@@ -273,12 +293,50 @@ export default function QueueView({ isClinical = false }) {
                   <td style={{ padding: '0.75rem 0.5rem', color: 'var(--color-text-muted)' }}>
                     {pt.assignedDepartment}
                   </td>
+                  <td style={{ padding: '0.75rem 0.5rem' }}>
+                    {pt.seenAt
+                      ? <div style={{ fontSize: '0.75rem' }}>Seen {formatClock(pt.seenAt)}{pt.seenByName ? ` by ${pt.seenByName}` : ''}</div>
+                      : <div style={{ fontSize: '0.75rem', color: 'var(--color-text-subtle)' }}>Not yet seen</div>}
+                    {useBackend && (
+                      <div style={{ display: 'flex', gap: '0.35rem', flexWrap: 'wrap', marginTop: '4px' }}>
+                        {isClinical && !pt.seenAt && (
+                          <Button size="sm" variant="outline" disabled={busy} onClick={() => markSeen(pt)}>Mark seen</Button>
+                        )}
+                        {outcomeChoices.length > 0 && (
+                          <Button size="sm" variant="outline" disabled={busy} onClick={() => openOutcome(pt)}>Record outcome</Button>
+                        )}
+                      </div>
+                    )}
+                  </td>
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
       </Card>
+
+      <Modal isOpen={Boolean(outcomeFor)} onClose={() => setOutcomeFor(null)} title={outcomeFor ? `Record outcome: ${outcomeFor.patientName}` : ''}
+        footer={(
+          <>
+            <Button variant="outline" onClick={() => setOutcomeFor(null)}>Cancel</Button>
+            <Button disabled={busy || !disposition} onClick={submitOutcome}>Close visit</Button>
+          </>
+        )}>
+        <label htmlFor="outcome-disposition" style={{ display: 'block', fontWeight: 600, marginBottom: '0.25rem' }}>Outcome</label>
+        <select id="outcome-disposition" value={disposition} onChange={(e) => setDisposition(e.target.value)} style={{ width: '100%', padding: '0.5rem' }}>
+          <option value="">Choose an outcome…</option>
+          {outcomeChoices.filter((code) => code !== 'LEFT_WITHOUT_BEING_SEEN' || !outcomeFor?.seenAt).map((code) => (
+            <option key={code} value={code}>{DISPOSITIONS[code].label}</option>
+          ))}
+        </select>
+        <label htmlFor="outcome-note" style={{ display: 'block', fontWeight: 600, margin: '0.75rem 0 0.25rem' }}>Note (optional)</label>
+        <textarea id="outcome-note" value={note} onChange={(e) => setNote(e.target.value)} rows={3} maxLength={1000} style={{ width: '100%', padding: '0.5rem' }} />
+        <p style={{ fontSize: '0.8rem', color: 'var(--color-text-muted)', marginTop: '0.5rem' }}>
+          Closing removes the patient from the queue, releases their bed and cancels open rechecks. It cannot be undone.
+        </p>
+      </Modal>
     </div>
   );
 }
+
+const formatClock = (iso) => new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });

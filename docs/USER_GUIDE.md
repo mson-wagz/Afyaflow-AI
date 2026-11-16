@@ -107,6 +107,12 @@ Under the order number, **Same level as above** explains why a patient is below 
 
 **Showing Stale Queue Snapshot** means a refresh failed and older information is retained. Check the last-confirmed time and restore connectivity before treating it as current shared state. **Simulate Polling Outage** is a demo control; end it with **Restore Network**.
 
+### Seeing patients and recording outcomes
+
+When a clinician starts seeing a patient, press **Mark seen** on the queue. When the visit ends, press **Record outcome**, choose **Admitted**, **Discharged**, **Died in A&E**, **Left against medical advice** or **Transferred to another facility**, add an optional note, and press **Close visit**. Front-desk staff can record only **Left without being seen**, for patients who left before a clinician saw them.
+
+Closing a visit removes the patient from the queue, frees their bed and cancels open rechecks. It cannot be undone. The **Operations** screen uses these records to show over- and under-triage against Kenyatta National Hospital's published SATS baseline, the share of patients seen within each SATS target, length of stay and the left-without-being-seen rate. Details: [Outcome metrics](OUTCOME_METRICS.md).
+
 ## 7. Review deterioration
 
 Open **Deterioration Review** after new observation versions are recorded. Compare baseline and latest measurements, timestamps, and differences.
@@ -175,7 +181,7 @@ Nurses, clinicians, doctors and administrators can open **Operations** to see ho
 - **Time to triage:** the median and 90th-percentile time from arrival to the AI proposal and to the clinician decision, and from proposal to decision.
 - **Decisions and AI runs:** how often clinicians approved, overrode or rejected AI proposals, and how assessments ended.
 
-The screen shows counts and times only, never patient names. Acceptance means clinicians agreed with the proposal; it does not measure clinical accuracy. Visits cannot be closed yet, so "open visits" includes every workflow visit. Day boundaries use the facility time zone (`FACILITY_TIMEZONE`, default Africa/Nairobi).
+The screen shows counts and times only, never patient names. Acceptance means clinicians agreed with the proposal; it does not measure clinical accuracy. "Open visits" are those without a recorded outcome; outcome-based figures (over- and under-triage, time seen against target) appear once outcomes are recorded. Day boundaries use the facility time zone (`FACILITY_TIMEZONE`, default Africa/Nairobi).
 
 ## Troubleshooting
 

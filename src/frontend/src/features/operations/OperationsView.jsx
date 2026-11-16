@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { Card, Alert } from '../../components';
 import { api, useBackend } from '../../api/client.js';
 import { TRIAGE_PRIORITY } from '../../../../shared/contracts/triage.js';
+import { DISPOSITIONS, SATS_TARGET_MINUTES, KNH_SATS_BASELINE } from '../../../../shared/contracts/outcomes.js';
 import { StatTile, SegmentedBar, ColumnChart, MeterList } from './charts.jsx';
 import { formatCount, formatMinutes, formatPercent, bucketLabel } from './format.js';
 
@@ -71,6 +72,10 @@ export default function OperationsView() {
     { key: 'UNPRIORITISED', label: 'No approved priority', value: live.byPriority.UNPRIORITISED, color: '#94a3b8', ink: '#0f172a' },
   ];
 
+  const pastTarget = Object.values(live.pastTargetNotSeen || {}).reduce((a, b) => a + b, 0);
+  const { outcomes, seenAgainstTarget } = data;
+  const ratio = (r) => (r.denominator ? `${formatCount(r.numerator)} of ${formatCount(r.denominator)}` : 'No cases yet');
+
   return (
     <div className="ops-root">
       <Card title="Operations" subtitle={`Live workload and flow for ${periodLabel}. Times in ${timezone}; updated ${updated}.`} actions={filters}>
@@ -84,8 +89,10 @@ export default function OperationsView() {
             detail="Assessment ended without a proposal" />
           <StatTile label="Overdue rechecks" value={formatCount(live.followups.overdue)} tone={live.followups.overdue ? 'attention' : undefined}
             detail={`${formatCount(live.followups.open)} open · ${formatCount(live.followups.proposed)} proposed`} />
+          <StatTile label="Past SATS target, not yet seen" value={formatCount(pastTarget)} tone={pastTarget ? 'attention' : undefined}
+            detail={`${formatCount(live.notYetSeen)} open visits not yet seen`} />
         </div>
-        <p className="ops-note">Visits do not record an outcome yet, so open visits include every workflow visit.</p>
+        <p className="ops-note">Open visits are those without a recorded outcome.</p>
       </Card>
 
       <div className="ops-grid">
@@ -134,6 +141,49 @@ export default function OperationsView() {
           </table>
         </Card>
       </div>
+
+      <Card title={`Outcomes: ${formatCount(outcomes.total)}`} subtitle="Visits closed in this period. Triage accuracy uses the Kenyatta National Hospital SATS study definitions">
+        <div className="ops-kpis">
+          <StatTile label="Over-triage" value={formatPercent(outcomes.overTriage.percent)}
+            detail={`${ratio(outcomes.overTriage)} discharged were Red, Orange or Yellow · KNH ${KNH_SATS_BASELINE.overTriagePercent}%`} />
+          <StatTile label="Under-triage" value={formatPercent(outcomes.underTriage.percent)}
+            detail={`${ratio(outcomes.underTriage)} admitted or died were Green · KNH ${KNH_SATS_BASELINE.underTriagePercent}%`} />
+          <StatTile label="Left without being seen" value={formatPercent(outcomes.leftWithoutBeingSeenPercent)}
+            detail={`${formatCount(outcomes.byDisposition.LEFT_WITHOUT_BEING_SEEN)} of ${formatCount(outcomes.total)} closed`} />
+          <StatTile label="Length of stay" value={formatMinutes(outcomes.lengthOfStay.medianMinutes)}
+            detail={outcomes.lengthOfStay.count ? `Median arrival to outcome · 90% within ${formatMinutes(outcomes.lengthOfStay.p90Minutes)}` : 'No closed visits yet'} />
+        </div>
+        <table className="ops-table" style={{ marginTop: '1rem' }}>
+          <thead><tr><th scope="col">Outcome</th><th scope="col">Visits</th></tr></thead>
+          <tbody>
+            {Object.entries(outcomes.byDisposition).map(([code, n]) => (
+              <tr key={code}><td>{DISPOSITIONS[code].label}</td><td>{formatCount(n)}</td></tr>
+            ))}
+          </tbody>
+        </table>
+        <p className="ops-note">
+          KNH figures are the hospital&apos;s published post-SATS baseline ({KNH_SATS_BASELINE.source}), shown for comparison.
+          {outcomes.closedWithoutApprovedPriority ? ` ${formatCount(outcomes.closedWithoutApprovedPriority)} closed without an approved priority count in the denominators only.` : ''}
+        </p>
+      </Card>
+
+      <Card title="Seen against SATS target" subtitle="Patients first seen by a clinician in this period, by approved level">
+        <table className="ops-table">
+          <thead><tr><th scope="col">Level</th><th scope="col">Target</th><th scope="col">Seen</th><th scope="col">Median wait</th><th scope="col">Within target</th><th scope="col">Waiting past target now</th></tr></thead>
+          <tbody>
+            {seenAgainstTarget.map((r) => (
+              <tr key={r.priority}>
+                <td>{`Level ${TRIAGE_PRIORITY[r.priority].level} · ${TRIAGE_PRIORITY[r.priority].category}`}</td>
+                <td>{r.priority === 'RED' ? 'Immediate' : formatMinutes(SATS_TARGET_MINUTES[r.priority])}</td>
+                <td>{formatCount(r.seen)}</td>
+                <td>{formatMinutes(r.medianMinutes)}</td>
+                <td>{r.priority === 'RED' ? '—' : formatPercent(r.withinTargetPercent)}</td>
+                <td>{live.pastTargetNotSeen?.[r.priority] ? `⚠ ${formatCount(live.pastTargetNotSeen[r.priority])}` : '0'}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </Card>
 
       <Card title="Transfers by department">
         {transfers.length ? (

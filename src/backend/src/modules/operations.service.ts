@@ -44,19 +44,20 @@ export class OperationsService {
     const { start, now } = (await db.query(`SELECT (date_trunc('day',now() AT TIME ZONE $1)-make_interval(days=>$2)) AT TIME ZONE $1 start,now() now`,
       [tz, days - 1])).rows[0];
 
-    const [live, review, manual, followups, departments, cohort, decisions, decidedPriorities, runs, transfers, buckets] = await Promise.all([
+    const [live, review, manual, followups, departments, cohort, decisions, decidedPriorities, runs, transfers, buckets, outcomes, seen, overdue] = await Promise.all([
       db.query(`SELECT count(*)::int open,
           count(*) FILTER (WHERE approved_priority='RED')::int red, count(*) FILTER (WHERE approved_priority='ORANGE')::int orange,
           count(*) FILTER (WHERE approved_priority='YELLOW')::int yellow, count(*) FILTER (WHERE approved_priority='GREEN')::int green,
           count(*) FILTER (WHERE approved_priority IS NULL)::int unprioritised,
-          count(*) FILTER (WHERE assessment_status='AWAITING_ASSESSMENT')::int awaiting_assessment
-        FROM visits WHERE data_source='synthetic'`),
+          count(*) FILTER (WHERE assessment_status='AWAITING_ASSESSMENT')::int awaiting_assessment,
+          count(*) FILTER (WHERE seen_at IS NULL)::int not_seen
+        FROM visits WHERE data_source='synthetic' AND closed_at IS NULL`),
       db.query(`SELECT count(*)::int pending, extract(epoch FROM now()-min(p.created_at)) oldest
         FROM proposals p JOIN agent_runs r ON r.id=p.run_id JOIN visits v ON v.id=p.visit_id
-        WHERE v.data_source='synthetic' AND p.status='PENDING' AND r.status IN ('WAITING_FOR_REVIEW','REVIEW_REQUIRED')`),
+        WHERE v.data_source='synthetic' AND v.closed_at IS NULL AND p.status='PENDING' AND r.status IN ('WAITING_FOR_REVIEW','REVIEW_REQUIRED')`),
       // The current assessment ended without a proposal: staff must triage manually.
       db.query(`SELECT count(*)::int n FROM agent_runs r JOIN visits v ON v.id=r.visit_id AND v.observation_version=r.observation_version
-        WHERE v.data_source='synthetic' AND r.status IN ('FAILED','REVIEW_REQUIRED')
+        WHERE v.data_source='synthetic' AND v.closed_at IS NULL AND r.status IN ('FAILED','REVIEW_REQUIRED')
         AND NOT EXISTS(SELECT 1 FROM proposals p WHERE p.run_id=r.id AND p.status='PENDING')`),
       db.query(`SELECT count(*) FILTER (WHERE status='PROPOSED')::int proposed, count(*) FILTER (WHERE status IN ('OPEN','ACKNOWLEDGED'))::int open,
           count(*) FILTER (WHERE status IN ('OPEN','ACKNOWLEDGED') AND due_at<now())::int overdue FROM followups`),
@@ -85,9 +86,35 @@ export class OperationsService {
         FROM generate_series($1::timestamptz AT TIME ZONE $2,date_trunc($3,now() AT TIME ZONE $2),('1 '||$3)::interval) b
         LEFT JOIN visits v ON v.data_source='synthetic' AND v.arrival_at>=b AT TIME ZONE $2 AND v.arrival_at<(b+('1 '||$3)::interval) AT TIME ZONE $2
         GROUP BY b ORDER BY b`, [start, tz, days === 1 ? 'hour' : 'day']),
+      // Outcomes recorded in the window. Under-/over-triage follow the KNH SATS evaluation
+      // (Wangara et al. 2019): under = GREEN admitted or died / all admitted or died;
+      // over = RED, ORANGE or YELLOW discharged / all discharged.
+      db.query(`SELECT count(*)::int total,
+          count(*) FILTER (WHERE o.disposition='ADMITTED')::int admitted, count(*) FILTER (WHERE o.disposition='DISCHARGED')::int discharged,
+          count(*) FILTER (WHERE o.disposition='DIED')::int died, count(*) FILTER (WHERE o.disposition='LEFT_WITHOUT_BEING_SEEN')::int lwbs,
+          count(*) FILTER (WHERE o.disposition='LEFT_AGAINST_MEDICAL_ADVICE')::int lama, count(*) FILTER (WHERE o.disposition='TRANSFERRED_OUT')::int transferred,
+          count(*) FILTER (WHERE o.disposition IN ('ADMITTED','DIED') AND o.priority_at_disposition='GREEN')::int under_n,
+          count(*) FILTER (WHERE o.disposition IN ('ADMITTED','DIED'))::int under_d,
+          count(*) FILTER (WHERE o.disposition='DISCHARGED' AND o.priority_at_disposition IN ('RED','ORANGE','YELLOW'))::int over_n,
+          count(*) FILTER (WHERE o.priority_at_disposition IS NULL)::int unprioritised,
+          ${percentiles('extract(epoch FROM o.recorded_at-v.arrival_at)', 'los')}
+        FROM visit_outcomes o JOIN visits v ON v.id=o.visit_id WHERE v.data_source='synthetic' AND o.recorded_at>=$1`, [start]),
+      // Patients first seen in the window: time from arrival to being seen, against the SATS target of their approved level.
+      db.query(`SELECT v.approved_priority code,count(*)::int n,
+          percentile_cont(0.5) WITHIN GROUP (ORDER BY extract(epoch FROM v.seen_at-v.arrival_at)) p50,
+          count(*) FILTER (WHERE v.seen_at-v.arrival_at<=make_interval(mins=>t.target))::int within_target
+        FROM visits v JOIN (VALUES ('RED',0),('ORANGE',10),('YELLOW',60),('GREEN',240)) t(code,target) ON t.code=v.approved_priority
+        WHERE v.data_source='synthetic' AND v.seen_at>=$1 GROUP BY v.approved_priority`, [start]),
+      // Open, approved and not yet seen, already past their level's target.
+      db.query(`SELECT v.approved_priority code,count(*)::int n FROM visits v
+        JOIN (VALUES ('RED',0),('ORANGE',10),('YELLOW',60),('GREEN',240)) t(code,target) ON t.code=v.approved_priority
+        WHERE v.data_source='synthetic' AND v.closed_at IS NULL AND v.seen_at IS NULL AND now()-v.arrival_at>make_interval(mins=>t.target)
+        GROUP BY v.approved_priority`),
     ]);
 
-    const l = live.rows[0], c = cohort.rows[0], d = decisions.rows[0];
+    const l = live.rows[0], c = cohort.rows[0], d = decisions.rows[0], o = outcomes.rows[0];
+    const percent = (n: number, total: number) => (total ? Math.round((n / total) * 1000) / 10 : null);
+    const levels = ['RED', 'ORANGE', 'YELLOW', 'GREEN'] as const;
     const decided = d.approved + d.overridden + d.rejected;
     const runRows = runs.rows.filter((r) => r.status !== null), runTotal = runs.rows.find((r) => r.status === null);
     const priorityCount = (code: string) => decidedPriorities.rows.find((r) => r.priority === code)?.n ?? 0;
@@ -97,7 +124,8 @@ export class OperationsService {
         openVisits: l.open, awaitingAssessment: l.awaiting_assessment,
         byPriority: { RED: l.red, ORANGE: l.orange, YELLOW: l.yellow, GREEN: l.green, UNPRIORITISED: l.unprioritised },
         proposalsAwaitingReview: review.rows[0].pending, oldestProposalMinutes: minutes(review.rows[0].oldest),
-        needsManualTriage: manual.rows[0].n,
+        needsManualTriage: manual.rows[0].n, notYetSeen: l.not_seen,
+        pastTargetNotSeen: Object.fromEntries(levels.map((code) => [code, overdue.rows.find((r) => r.code === code)?.n ?? 0])),
         followups: followups.rows[0],
         departments: departments.rows.map((r) => ({ id: r.id, name: r.name, status: r.status, occupiedBeds: r.occupied, totalBeds: r.total })),
       },
@@ -117,6 +145,22 @@ export class OperationsService {
         byStatus: Object.fromEntries(runRows.map((r) => [r.status, r.n])),
       },
       transfers: transfers.rows.map((r) => ({ department: r.name, count: r.n })),
+      outcomes: {
+        total: o.total,
+        byDisposition: { ADMITTED: o.admitted, DISCHARGED: o.discharged, DIED: o.died, LEFT_WITHOUT_BEING_SEEN: o.lwbs,
+          LEFT_AGAINST_MEDICAL_ADVICE: o.lama, TRANSFERRED_OUT: o.transferred },
+        underTriage: { numerator: o.under_n, denominator: o.under_d, percent: percent(o.under_n, o.under_d) },
+        overTriage: { numerator: o.over_n, denominator: o.discharged, percent: percent(o.over_n, o.discharged) },
+        leftWithoutBeingSeenPercent: percent(o.lwbs, o.total),
+        closedWithoutApprovedPriority: o.unprioritised,
+        lengthOfStay: timing(o, 'los'),
+      },
+      // RED's target is "immediate", so it reports time to be seen without a compliance percentage.
+      seenAgainstTarget: levels.map((code) => {
+        const r = seen.rows.find((x) => x.code === code);
+        return { priority: code, seen: r?.n ?? 0, medianMinutes: minutes(r?.p50 ?? null),
+          withinTargetPercent: code === 'RED' || !r ? null : percent(r.within_target, r.n) };
+      }),
     };
   }
 }
