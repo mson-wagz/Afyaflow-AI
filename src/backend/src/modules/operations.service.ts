@@ -4,6 +4,7 @@ import type { Staff } from '../auth/auth.js';
 import { config } from '../config.js';
 import { hasPermission, PERMISSIONS } from '../../../shared/contracts/auth.js';
 import { MODEL_CALL_TOOLS, runUsage, hostingUsdPerMonth, round } from './usage.js';
+import { escalationSettings } from './escalation.js';
 
 /* ------------------------------------------------------------------ */
 /* Operations dashboard: aggregate figures for supervisors            */
@@ -115,6 +116,8 @@ export class OperationsService {
 
     const l = live.rows[0], c = cohort.rows[0], d = decisions.rows[0], o = outcomes.rows[0];
     const aiCost = await this.aiCost(start, days, d.approved + d.overridden + d.rejected);
+    const esc = (await db.query(`SELECT count(*) FILTER (WHERE status='SENT')::int sent,count(*) FILTER (WHERE status='FAILED')::int failed,
+      count(*) FILTER (WHERE status='QUEUED')::int queued FROM sms_escalations WHERE created_at>=$1`, [start])).rows[0];
     const percent = (n: number, total: number) => (total ? Math.round((n / total) * 1000) / 10 : null);
     const levels = ['RED', 'ORANGE', 'YELLOW', 'GREEN'] as const;
     const decided = d.approved + d.overridden + d.rejected;
@@ -158,6 +161,8 @@ export class OperationsService {
         lengthOfStay: timing(o, 'los'),
       },
       aiCost,
+      // SMS alerts to the on-call clinician for unseen Level 1 patients (docs/INTEGRATION_MAP.md).
+      escalations: { ...esc, provider: escalationSettings().provider },
       // RED's target is "immediate", so it reports time to be seen without a compliance percentage.
       seenAgainstTarget: levels.map((code) => {
         const r = seen.rows.find((x) => x.code === code);

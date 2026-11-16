@@ -32,6 +32,7 @@ const summary = (overrides = {}) => ({
     underTriage: { numerator: 1, denominator: 7, percent: 14.3 }, overTriage: { numerator: 4, denominator: 10, percent: 40 },
     leftWithoutBeingSeenPercent: 10, closedWithoutApprovedPriority: 0, lengthOfStay: timing(20, 185, 410),
   },
+  escalations: { sent: 3, failed: 1, queued: 0, provider: 'africastalking' },
   aiCost: {
     runs: 6, completedOutcomes: 4, modelCalls: 24, modelCallsPerRun: { average: 4, max: 6 },
     tokensPerAnswer: { input: 1258, output: 83 }, tokens: { input: 30192, output: 1992 }, unmeteredModelCalls: 0, unpricedRuns: 0,
@@ -87,6 +88,7 @@ describe('operations dashboard', () => {
     expect(within(orange).getByText('50%')).toBeInTheDocument();
     expect(within(orange).getByText('⚠ 2')).toBeInTheDocument();
     expect(within(screen.getByText('Level 1 · Emergency').closest('tr')).getByText('Immediate')).toBeInTheDocument();
+    expect(screen.getByText(/SMS escalations to the on-call clinician/)).toHaveTextContent('3 sent, ⚠ 1 failed');
   });
 
   it('switches period and offers a table view of arrivals', async () => {

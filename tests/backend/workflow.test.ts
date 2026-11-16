@@ -1206,3 +1206,31 @@ test('measured token usage and cost per completed outcome come from logged model
   assert.equal(after.hostingUsdPerMonth,18.84);
   assert.ok(after.costPerOutcomeUsd>0 && after.models.some((m:any)=>m.model==='eu.amazon.nova-lite-v1:0'));
 });
+
+test('unseen Level 1 patients past the grace period trigger one nameless SMS to the on-call clinician, with bounded retries',async()=>{
+  const {runEscalations}=await import('../../src/backend/src/modules/escalation.js');
+  const settings={provider:'africastalking',environment:'sandbox',graceMinutes:5,recipient:'+254700000001'};
+  const sent:string[]=[];let fail=false;
+  const sender={provider:'africastalking-sandbox',send:async(_to:string,message:string)=>{sent.push(message);return {ok:!fail,response:{statusCode:fail?500:101}};}};
+  const red={heartRate:135,systolicBp:75,respiratoryRate:32,temperature:37,avpu:'Voice'};
+  const make=async(name:string)=>{const id=(await workflow.register(nurse,{...intake,...red,name,arrivalTime:new Date(Date.now()-10*60000).toISOString()},randomUUID())).data.id;await decision(await assess(id));return id;};
+  const waiting=await make('Synthetic Unseen Red Patient'),seen=await make('Synthetic Seen Red Patient');
+  await workflow.markSeen(nurse,seen,randomUUID());
+  const rows=async(id:string)=>(await database.pool.query('SELECT * FROM sms_escalations WHERE visit_id=$1',[id])).rows;
+  await runEscalations(database,sender,settings);
+  const [alert]=await rows(waiting);
+  assert.equal(alert.status,'SENT');assert.equal(alert.recipient_masked,'+254•••001');
+  assert.equal((await rows(seen)).length,0);
+  assert.ok(!sent.some(m=>m.includes('Synthetic')) && sent.some(m=>/Level 1 \(Emergency\)/.test(m)));
+  // Never twice for the same patient.
+  const count=sent.length;await runEscalations(database,sender,settings);assert.equal(sent.length,count);
+  // A failed send is retried at most three times in total, then left visible as FAILED.
+  const third=await make('Synthetic Retry Red Patient');fail=true;
+  for(let i=0;i<5;i++)await runEscalations(database,sender,settings);
+  const [failed]=await rows(third);assert.equal(failed.status,'FAILED');assert.equal(failed.attempts,3);
+  const audits=(await database.pool.query("SELECT event_type FROM audit_events WHERE visit_id=ANY($1) AND event_type LIKE 'SMS_%'",[[waiting,third]])).rows.map(r=>r.event_type);
+  assert.equal(audits.filter(e=>e==='SMS_ESCALATION_SENT').length,1);assert.equal(audits.filter(e=>e==='SMS_ESCALATION_FAILED').length,3);
+  const session=await loginAs('STAFF-101','123456');
+  const esc=(await get('/operations/summary?period=today',session)).escalations;
+  assert.ok(esc.sent>=1 && esc.failed>=1);
+});

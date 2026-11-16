@@ -184,6 +184,12 @@ export default function OperationsView() {
             ))}
           </tbody>
         </table>
+        {data.escalations && data.escalations.provider !== 'none' && (
+          <p className="ops-note">
+            SMS escalations to the on-call clinician (Level 1 patients unseen past the grace period): {formatCount(data.escalations.sent)} sent
+            {data.escalations.failed ? `, ⚠ ${formatCount(data.escalations.failed)} failed` : ''}.
+          </p>
+        )}
       </Card>
 
       {aiCost && (
