@@ -242,30 +242,40 @@ export class WorkflowService {
     const rows = (await this.database.pool.query(`SELECT p.*,r.model,r.status run_status FROM proposals p JOIN agent_runs r ON r.id=p.run_id
       JOIN visits v ON v.id=p.visit_id WHERE v.data_source='synthetic' AND p.status='PENDING'
       AND r.status IN ('WAITING_FOR_REVIEW','REVIEW_REQUIRED') ORDER BY p.created_at`)).rows;
-    return Promise.all(rows.map(async (p) => {
-      const visit = visits.find((v) => v.id === p.visit_id)!;
+    const visitsById = new Map(visits.map((v) => [v.id, v]));
+    const traces = await this.traces(rows.map((p) => p.run_id));
+    return rows.map((p) => {
+      const visit = visitsById.get(p.visit_id)!;
       return {
         ...visit, patientId: visit.id, proposalId: p.id, patientName: visit.name, observations: visit.vitals,
         observationVersion: p.observation_version, isStale: p.observation_version !== visit.observationVersion,
         proposal: p.data.proposal, protocol: p.data.protocol || protocol, summary: p.data.summary,
-        toolTrace: await this.trace(p.run_id), runStatus: p.run_status,
+        toolTrace: traces.get(p.run_id), runStatus: p.run_status,
       };
-    }));
+    });
   }
 
   /** Tool-call trace for an agent run. */
   async trace(runId: string) {
-    const run = (await this.database.pool.query('SELECT * FROM agent_runs WHERE id=$1', [runId])).rows[0];
-    if (!run) throw new NotFoundException('Agent run not found.');
-    if (isCompetitionMode()) {
-      const visit = (await this.database.pool.query('SELECT data_source FROM visits WHERE id=$1', [run.visit_id])).rows[0];
-      if (visit?.data_source !== 'synthetic' || run.provider !== 'ollama') throw new NotFoundException('Agent run not found.');
-    }
-    const calls = (await this.database.pool.query('SELECT * FROM tool_traces WHERE run_id=$1 ORDER BY timestamp,step', [runId])).rows;
-    return {
-      runId, model: run.model, provider: run.provider, status: run.status, error: run.error,
-      timestamp: iso(run.created_at), toolCalls: calls.map((c) => ({ tool: c.tool, inputs: c.inputs, outputs: c.outputs, durationMs: c.duration_ms, timestamp: iso(c.timestamp) })),
-    };
+    return (await this.traces([runId])).get(runId);
+  }
+
+  /** Tool-call traces for several runs in two queries; every requested run must exist and be visible. */
+  private async traces(runIds: string[]) {
+    const result = new Map<string, any>();
+    if (!runIds.length) return result;
+    const runs = (await this.database.pool.query(`SELECT r.*,v.data_source FROM agent_runs r LEFT JOIN visits v ON v.id=r.visit_id
+      WHERE r.id=ANY($1)`, [runIds])).rows;
+    const visible = runs.filter((run) => !isCompetitionMode() || (run.data_source === 'synthetic' && run.provider === 'ollama'));
+    if (visible.length !== new Set(runIds).size) throw new NotFoundException('Agent run not found.');
+    const calls = new Map<string, any[]>(visible.map((run) => [run.id, []]));
+    for (const c of (await this.database.pool.query('SELECT * FROM tool_traces WHERE run_id=ANY($1) ORDER BY timestamp,step', [runIds])).rows)
+      calls.get(c.run_id)!.push({ tool: c.tool, inputs: c.inputs, outputs: c.outputs, durationMs: c.duration_ms, timestamp: iso(c.timestamp) });
+    for (const run of visible) result.set(run.id, {
+      runId: run.id, model: run.model, provider: run.provider, status: run.status, error: run.error,
+      timestamp: iso(run.created_at), toolCalls: calls.get(run.id),
+    });
+    return result;
   }
 
   /** Latest 100 agent runs for workflow visits. */
@@ -367,7 +377,8 @@ export class WorkflowService {
 
   /** All committed clinical decisions, newest first. */
   async decisions() {
-    return (await this.database.pool.query('SELECT data FROM decisions ORDER BY timestamp DESC')).rows.map((r) => r.data);
+    // Display history only; the full record stays in the append-only decisions table.
+    return (await this.database.pool.query('SELECT data FROM decisions ORDER BY timestamp DESC LIMIT 200')).rows.map((r) => r.data);
   }
 
   /** All departments, flattened for API/routing use. */
@@ -432,8 +443,15 @@ export class WorkflowService {
 
   /** Compare each visit's latest two observations to flag deterioration. */
   async deterioration() {
-    return Promise.all((await this.visits()).map(async (visit) => {
-      const observations = (await this.database.pool.query('SELECT * FROM observations WHERE visit_id=$1 ORDER BY version DESC LIMIT 2', [visit.id])).rows;
+    // Visits first: observations are append-only, so every listed visit has its rows in the second query.
+    const visits = await this.visits();
+    // The latest two observation versions of every workflow visit, in one query.
+    const recent = new Map<string, any[]>();
+    for (const row of (await this.database.pool.query(`SELECT * FROM (SELECT o.*,row_number() OVER (PARTITION BY o.visit_id ORDER BY o.version DESC) recency
+      FROM observations o JOIN visits v ON v.id=o.visit_id WHERE v.data_source='synthetic') ranked WHERE recency<=2 ORDER BY visit_id,version DESC`)).rows)
+      recent.set(row.visit_id, [...(recent.get(row.visit_id) || []), row]);
+    return visits.map((visit) => {
+      const observations = recent.get(visit.id)!;
       const latest = { ...observations[0].vitals, id: observations[0].id, recordedAt: iso(observations[0].recorded_at) };
       const baseline = observations[1] ? { ...observations[1].vitals, id: observations[1].id, recordedAt: iso(observations[1].recorded_at) } : latest;
       return {
@@ -442,7 +460,7 @@ export class WorkflowService {
         observationVersion: visit.observationVersion, comparison: observations[1] ? compareObservationsForDeterioration(baseline, latest) : null,
         ageInfo: calculateObservationAge(latest.recordedAt), status: visit.assessmentStatus,
       };
-    }));
+    });
   }
 
   /** Clinician reassessment: manually escalate priority or dismiss a deterioration alert. */

@@ -118,6 +118,17 @@ test('routing enforces clinical permission and assessment/department versions',a
   assert.equal(a.data.transferId,b.data.transferId);
   assert.match((await workflow.queue()).queue.find(v=>v.visitId===visit.id)!.assignedDepartment,/General Outpatient/);
 });
+test('deterioration compares each visit with its own previous observations',async () => {
+  const single=await register(),repeated=await register();
+  const vitals={heartRate:128,systolicBp:120,diastolicBp:80,respiratoryRate:16,temperature:37,spO2:98,avpu:'Alert',mobility:'Walking normally'};
+  await workflow.observations(nurse,repeated.data.id,{vitals,expectedVersion:1},randomUUID());
+  const items=await workflow.deterioration();
+  const one=items.find(i=>i.patientId===single.data.id)!,two=items.find(i=>i.patientId===repeated.data.id)!;
+  assert.equal(one.latestObservation,null);assert.equal(one.comparison,null);assert.equal(one.baselineObservation.heartRate,75);
+  assert.equal(two.baselineObservation.heartRate,75);assert.equal(two.latestObservation.heartRate,128);
+  assert.equal(two.observationVersion,2);assert.ok(two.comparison);
+  await assert.rejects(workflow.trace('RUN-does-not-exist'),(error:any)=>error.getStatus()===404);
+});
 test('manual escalation only raises urgency',async () => {
   const result=await register(),proposal=await assess(result.data.id);
   await workflow.decide(nurse,{patientId:proposal.patientId,proposalId:proposal.proposalId,observationVersion:proposal.observationVersion,
