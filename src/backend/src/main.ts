@@ -11,7 +11,7 @@ import { resolve } from 'node:path';
 import { getCurrentInvoke } from '@codegenie/serverless-express';
 import { Database } from './database/db.js';
 import { allowAuthAttempt } from './auth/rate-limit.js';
-import { trustedCloudFrontSource } from './auth/ingress.js';
+import { trustedCloudFrontSource, trustedProxySource } from './auth/ingress.js';
 
 export async function createApp() {
   const app=await NestFactory.create<NestExpressApplication>(AppModule,{logger:process.env.NODE_ENV==='test'?false:['error','warn','log']});
@@ -33,7 +33,11 @@ export async function createApp() {
     if (req.path==='/api/auth/login' || req.path==='/api/auth/unlock') {
       // API Gateway's invocation context is authoritative; client forwarding headers are not.
       const event=process.env.AWS_LAMBDA_FUNCTION_NAME ? getCurrentInvoke().event : undefined;
-      const key=viewerSource || event?.requestContext?.http?.sourceIp || event?.requestContext?.identity?.sourceIp || req.socket.remoteAddress || 'local';
+      // Behind Caddy the socket address is the proxy's, which would put every user in one bucket.
+      const proxySource=config.trustProxyClientIp ? trustedProxySource(req.headers) : null;
+      if(config.trustProxyClientIp && !proxySource)
+        return res.status(403).json({code:'INVALID_INGRESS',message:'Use the application website to access this service.'});
+      const key=viewerSource || proxySource || event?.requestContext?.http?.sourceIp || event?.requestContext?.identity?.sourceIp || req.socket.remoteAddress || 'local';
       try {
         if (!await allowAuthAttempt(database,key)) return res.status(429).json({code:'RATE_LIMITED',message:'Too many sign-in attempts. Try again in a minute.'});
       } catch {return res.status(503).json({code:'AUTH_UNAVAILABLE',message:'Sign-in is temporarily unavailable. Please try again.'});}

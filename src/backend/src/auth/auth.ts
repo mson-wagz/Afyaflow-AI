@@ -1,4 +1,5 @@
-import { CanActivate, ExecutionContext, Injectable, Inject, UnauthorizedException, ForbiddenException, BadRequestException } from '@nestjs/common';
+import { CanActivate, ExecutionContext, Injectable, Inject, UnauthorizedException, ForbiddenException, BadRequestException, HttpException, HttpStatus } from '@nestjs/common';
+import { allowAuthAttempt, clearAuthAttempts, ACCOUNT_LIMIT, accountKey, unknownAccountKey } from './rate-limit.js';
 import { randomBytes, scryptSync, timingSafeEqual } from 'node:crypto';
 import { z } from 'zod';
 import type { Request } from 'express';
@@ -31,7 +32,11 @@ export class AuthService {
   async signIn(body:unknown) {
     const {identifier,pin}=parse(credentials,body);
     const staff=(await this.database.pool.query('SELECT * FROM staff WHERE lower(id)=lower($1) OR lower(staff_number)=lower($1) OR lower(profile->>\'name\')=lower($1)',[identifier])).rows[0];
+    // Unknown identifiers are throttled the same way, so the response does not reveal which accounts exist.
+    const attemptKey=staff ? accountKey(staff.id) : unknownAccountKey(identifier);
+    await this.requireAccountAttempt(attemptKey);
     if (!staff || !pinMatches(pin,staff.pin_hash)) throw new UnauthorizedException({code:'INVALID_CREDENTIALS',message:'Invalid staff identifier or PIN.'});
+    await clearAuthAttempts(this.database,attemptKey);
     const token=randomBytes(32).toString('hex');
     await this.database.transaction(async db => {
       await db.query("INSERT INTO sessions(token_hash,staff_id,expires_at) VALUES($1,$2,now()+interval '8 hours')",[hash(token),staff.id]);
@@ -52,12 +57,19 @@ export class AuthService {
     const {pin}=parse(z.object({pin:z.string().regex(/^\d{4}$/)}).strict(),body);
     const session=await this.session(req,true);
     const row=(await this.database.pool.query('SELECT pin_hash FROM staff WHERE id=$1',[session.staff.id])).rows[0];
+    // Shares the sign-in budget: a locked terminal must not become a way to guess the account PIN.
+    await this.requireAccountAttempt(accountKey(session.staff.id));
     if (!pinMatches(pin,row.pin_hash)) throw new UnauthorizedException({code:'INVALID_PIN',message:'Incorrect PIN.'});
+    await clearAuthAttempts(this.database,accountKey(session.staff.id));
     await this.database.transaction(async db => {
       await db.query('UPDATE sessions SET locked=false WHERE token_hash=$1',[session.sessionHash]);
       await audit(db,session.staff.id,'SESSION_UNLOCK',{});
     });
     return {success:true,staff:session.staff};
+  }
+  private async requireAccountAttempt(key:string) {
+    if (!await allowAuthAttempt(this.database,key,ACCOUNT_LIMIT))
+      throw new HttpException({code:'ACCOUNT_RATE_LIMITED',message:'Too many incorrect PIN attempts for this account. Wait 15 minutes or ask an administrator.'},HttpStatus.TOO_MANY_REQUESTS);
   }
 }
 @Injectable()
