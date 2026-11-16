@@ -345,6 +345,35 @@ test('shared auth throttling is atomic and permits a new window after expiry',as
   assert.equal(await allowAuthAttempt(database,source),true);
 });
 
+test('failed PINs are throttled per account across identifier forms and shared with unlock',async()=>{
+  const attempt=(identifier:string,pin:string)=>fetch(`${base}/api/auth/login`,{method:'POST',
+    headers:{'Content-Type':'application/json'},body:JSON.stringify({identifier,pin})});
+  const forms=['STAFF-104','KNH-OPS-005','Samuel Kiprop'];
+  // A success clears earlier failures.
+  for(let i=0;i<9;i++)assert.equal((await attempt(forms[i%3],'0000')).status,401);
+  const login=await attempt('STAFF-104','4567');
+  assert.equal(login.status,201);
+  const session=login.headers.get('set-cookie')!.split(';')[0];
+  // Ten failures, through any identifier form, exhaust the account budget...
+  for(let i=0;i<10;i++)assert.equal((await attempt(forms[i%3],'0000')).status,401);
+  // ...after which even the correct PIN is not checked, so a lucky guess is not confirmed.
+  const blocked=await attempt('KNH-OPS-005','4567');
+  assert.equal(blocked.status,429);
+  assert.equal((await blocked.json()).code,'ACCOUNT_RATE_LIMITED');
+  // Unlocking a terminal draws on the same budget.
+  await fetch(`${base}/api/auth/lock`,{method:'POST',headers:{Cookie:session,'Content-Type':'application/json'},body:'{}'});
+  const unlock=(pin:string)=>fetch(`${base}/api/auth/unlock`,{method:'POST',headers:{Cookie:session,'Content-Type':'application/json'},body:JSON.stringify({pin})});
+  assert.equal((await unlock('4567')).status,429);
+  // The budget renews once the window expires.
+  const {hash}=await import('../../src/backend/src/database/db.js');
+  await database.pool.query("UPDATE auth_rate_limits SET expires_at=now()-interval '1 second' WHERE key_hash=$1",[hash('account:STAFF-104')]);
+  assert.equal((await unlock('4567')).status,201);
+  assert.equal((await attempt('STAFF-104','4567')).status,201);
+  // Unknown identifiers get the same response, so throttling does not reveal which accounts exist.
+  for(let i=0;i<10;i++)assert.equal((await attempt('NOT-A-STAFF-ID','0000')).status,401);
+  assert.equal((await attempt('not-a-staff-id','0000')).status,429);
+});
+
 test('worker recovery is bounded after repeated hard interruptions',async()=>{
   const result=await register(),job=await jobFor(result.data.id);
   await database.pool.query("UPDATE agent_runs SET status='RUNNING',attempts=2,lease_until=now()-interval '1 minute' WHERE id=$1",[job.runId]);

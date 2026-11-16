@@ -91,6 +91,12 @@ files through SSM and invokes `release.sh`. That script:
 4. Waits for container health and attempts the previous app image on health failure.
 5. Keeps the successful configuration and removes old local images/backups.
 
+Sign-in throttling needs each visitor's real address. Caddy overwrites the
+`X-AfyaFlow-Client-IP` header with the connecting address, and `TRUST_PROXY_CLIENT_IP=true`
+tells the app to throttle by it instead of Caddy's container address. Keep the app
+container's port unpublished: if port 3000 were reachable directly, a client could set
+that header itself. Sign-in and unlock requests without a valid header are rejected.
+
 The pipeline separately verifies the HTTPS API health endpoint. Certificate or
 external-network failures fail the job even if the containers are healthy; inspect
 the current deployment before retrying. Database migrations are never automatically
