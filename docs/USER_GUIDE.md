@@ -145,6 +145,8 @@ Use the header lock control before leaving a shared terminal. Unlock with your P
 
 Open **Staff Access & Audit** for permitted events. Nurses and clerks see their own staff events; clinicians and administrators see broader history. **Authorised Clinical Decision & Audit History** in the triage screen records patient decisions and reasons. History is not editable through the app.
 
+Viewing patient records is also recorded: each screen that shows patient data logs who viewed which patients and when (repeated refreshes of the same view are recorded once every five minutes). Administrators can review this record-access history, for example to answer "who has viewed this patient?", through `GET /api/audit/access?patientId=<visit ID>`. If the system cannot record an access, it does not show the data and asks you to try again.
+
 ## Troubleshooting
 
 ### Active reassessment and follow-ups

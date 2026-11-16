@@ -1,4 +1,5 @@
-import { Controller, Get, Post, Body, Param, Req, Res, Headers, Inject, UseGuards, UnauthorizedException } from '@nestjs/common';
+import { Controller, Get, Post, Body, Param, Query, Req, Res, Headers, Inject, UseGuards, UseInterceptors, UnauthorizedException } from '@nestjs/common';
+import { AccessLogged, AccessLogInterceptor, listAccess } from './audit/access-log.js';
 import type { Request, Response } from 'express';
 import { AuthService, SessionGuard, StaffRequest } from './auth/auth.js';
 import { WorkflowService, requestKey } from './modules/workflow.service.js';
@@ -7,6 +8,7 @@ import { config } from './config.js';
 import { FollowupService } from './modules/followup.service.js';
 
 @Controller('api')
+@UseInterceptors(AccessLogInterceptor)
 export class ApiController {
   constructor(@Inject(AuthService) private readonly auth:AuthService,
     @Inject(WorkflowService) private readonly workflow:WorkflowService,
@@ -34,30 +36,31 @@ export class ApiController {
     });
     res.clearCookie('afyaflow_session',{path:'/api'});return {success:true};
   }
-  @Get('visits') @UseGuards(SessionGuard) visits() {return this.workflow.visits();}
-  @Get('visits/:id/evidence') @UseGuards(SessionGuard) evidence(@Param('id')id:string) {return this.workflow.evidence(id);}
-  @Get('research/cases') @UseGuards(SessionGuard) researchCases() {return this.workflow.researchCases();}
-  @Get('research/export') @UseGuards(SessionGuard) async researchExport(@Res({passthrough:true})res:Response) {
+  @Get('visits') @UseGuards(SessionGuard) @AccessLogged() visits() {return this.workflow.visits();}
+  @Get('visits/:id/evidence') @UseGuards(SessionGuard) @AccessLogged() evidence(@Param('id')id:string) {return this.workflow.evidence(id);}
+  @Get('research/cases') @UseGuards(SessionGuard) @AccessLogged() researchCases() {return this.workflow.researchCases();}
+  @Get('research/export') @UseGuards(SessionGuard) @AccessLogged() async researchExport(@Res({passthrough:true})res:Response) {
     res.attachment('afyaflow-mimic-iv-ed-demo-2.2.json');return this.workflow.researchExport();
   }
-  @Get('research/cases/:id') @UseGuards(SessionGuard) researchCase(@Param('id')id:string) {return this.workflow.researchCase(id);}
+  @Get('research/cases/:id') @UseGuards(SessionGuard) @AccessLogged() researchCase(@Param('id')id:string) {return this.workflow.researchCase(id);}
   @Post('visits') @UseGuards(SessionGuard) register(@Req()req:StaffRequest,@Body()body:unknown,@Headers('idempotency-key')key:string) {return this.workflow.register(req.staff,body,requestKey(key));}
   @Post('visits/:id/observations') @UseGuards(SessionGuard) observations(@Req()req:StaffRequest,@Param('id')visitId:string,@Body()body:unknown,@Headers('idempotency-key')key:string) {return this.workflow.observations(req.staff,visitId,body,requestKey(key));}
-  @Get('queue') @UseGuards(SessionGuard) queue() {return this.workflow.queue();}
-  @Get('triage/proposals') @UseGuards(SessionGuard) proposals() {return this.workflow.pending();}
-  @Get('triage/decisions') @UseGuards(SessionGuard) decisions() {return this.workflow.decisions();}
+  @Get('queue') @UseGuards(SessionGuard) @AccessLogged() queue() {return this.workflow.queue();}
+  @Get('triage/proposals') @UseGuards(SessionGuard) @AccessLogged() proposals() {return this.workflow.pending();}
+  @Get('triage/decisions') @UseGuards(SessionGuard) @AccessLogged() decisions() {return this.workflow.decisions();}
   @Post('triage/decisions') @UseGuards(SessionGuard) decide(@Req()req:StaffRequest,@Body()body:unknown,@Headers('idempotency-key')key:string) {return this.workflow.decide(req.staff,body,requestKey(key));}
-  @Get('agents/runs') @UseGuards(SessionGuard) runs() {return this.workflow.runs();}
-  @Get('agents/runs/:id') @UseGuards(SessionGuard) trace(@Param('id')runId:string) {return this.workflow.trace(runId);}
+  @Get('agents/runs') @UseGuards(SessionGuard) @AccessLogged() runs() {return this.workflow.runs();}
+  @Get('agents/runs/:id') @UseGuards(SessionGuard) @AccessLogged() trace(@Param('id')runId:string) {return this.workflow.trace(runId);}
   @Post('visits/:id/assessment') @UseGuards(SessionGuard) assess(@Req()req:StaffRequest,@Param('id')visitId:string) {return this.workflow.requestAssessment(req.staff,visitId);}
   @Get('departments') @UseGuards(SessionGuard) departments() {return this.workflow.departments();}
-  @Get('routing/candidates') @UseGuards(SessionGuard) routing() {return this.workflow.routing();}
+  @Get('routing/candidates') @UseGuards(SessionGuard) @AccessLogged() routing() {return this.workflow.routing();}
   @Post('routing/transfers') @UseGuards(SessionGuard) transfer(@Req()req:StaffRequest,@Body()body:unknown,@Headers('idempotency-key')key:string) {return this.workflow.transfer(req.staff,body,requestKey(key));}
-  @Get('deterioration') @UseGuards(SessionGuard) deterioration() {return this.workflow.deterioration();}
+  @Get('deterioration') @UseGuards(SessionGuard) @AccessLogged() deterioration() {return this.workflow.deterioration();}
   @Post('deterioration/decisions') @UseGuards(SessionGuard) reassess(@Req()req:StaffRequest,@Body()body:unknown,@Headers('idempotency-key')key:string) {return this.workflow.reassess(req.staff,body,requestKey(key));}
-  @Get('audit') @UseGuards(SessionGuard) audit(@Req()req:StaffRequest) {return this.workflow.audit(req.staff);}
-  @Get('followups') @UseGuards(SessionGuard) followupList(@Req()req:StaffRequest) {return this.followups.list(req.staff);}
+  @Get('audit') @UseGuards(SessionGuard) @AccessLogged() audit(@Req()req:StaffRequest) {return this.workflow.audit(req.staff);}
+  @Get('audit/access') @UseGuards(SessionGuard) @AccessLogged() accessLog(@Req()req:StaffRequest,@Query('patientId')patientId?:string) {return listAccess(this.database,req.staff,patientId);}
+  @Get('followups') @UseGuards(SessionGuard) @AccessLogged() followupList(@Req()req:StaffRequest) {return this.followups.list(req.staff);}
   @Get('followups/staff') @UseGuards(SessionGuard) followupStaff(@Req()req:StaffRequest) {return this.followups.staff(req.staff);}
-  @Get('followups/:id/history') @UseGuards(SessionGuard) followupHistory(@Req()req:StaffRequest,@Param('id')taskId:string) {return this.followups.history(req.staff,taskId);}
+  @Get('followups/:id/history') @UseGuards(SessionGuard) @AccessLogged() followupHistory(@Req()req:StaffRequest,@Param('id')taskId:string) {return this.followups.history(req.staff,taskId);}
   @Post('followups/:id/actions') @UseGuards(SessionGuard) followupAction(@Req()req:StaffRequest,@Param('id')taskId:string,@Body()body:unknown,@Headers('idempotency-key')key:string) {return this.followups.act(req.staff,taskId,body,requestKey(key));}
 }

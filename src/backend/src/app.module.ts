@@ -5,5 +5,6 @@ import { WorkflowService } from './modules/workflow.service.js';
 import { AgentWorker } from './modules/agent-worker.js';
 import { ApiController } from './api.controller.js';
 import { FollowupService } from './modules/followup.service.js';
-@Module({controllers:[ApiController],providers:[Database,AuthService,SessionGuard,WorkflowService,FollowupService,AgentWorker]})
+import { AccessLogInterceptor } from './audit/access-log.js';
+@Module({controllers:[ApiController],providers:[Database,AuthService,SessionGuard,WorkflowService,FollowupService,AgentWorker,AccessLogInterceptor]})
 export class AppModule {}

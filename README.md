@@ -35,6 +35,7 @@ The scoring fixture remains **unvalidated**. This is a research/development demo
 - **Routing:** review synthetic department availability/capacity and explicitly commit a transfer with version checks.
 - **Offline intake:** browser-local registration drafts and reconnect replay. Clinical decisions require online server acknowledgement.
 - **Audit history:** persisted staff decisions and workflow events, with append-only database protection for observations, decisions, transfers, and audit records.
+- **Read-access logging:** every view of patient records is recorded (who, which patients, which screen, when) in an append-only access log, reviewable by administrators; data is withheld if access cannot be recorded.
 
 Capacity and staffing figures are synthetic, not live hospital telemetry. The frontend is responsive and includes a web manifest; service-worker caching, reliable offline app loading, and installability across target devices remain to be implemented or verified.
 

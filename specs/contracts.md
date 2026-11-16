@@ -62,6 +62,18 @@ official filesystem MCP server. General filesystem tools are not exposed to the 
   targetPriority? }` plus retry key. A clinician may ESCALATE (manual priority) or
   DISMISS an alert. This is a manual clinical decision, not model approval.
 - `GET /audit`: own staff events, or wider history for clinician/admin roles.
+- `GET /audit/access?patientId=`: administrators only. The newest 200 read-access
+  records, optionally for one patient: who viewed which records, through which route
+  and when. Other roles receive 403; a malformed `patientId` is 400.
+
+Read access is audited. Every route that returns patient records (visits, evidence,
+queue, proposals, decisions, agent runs and traces, routing, deterioration,
+follow-ups, research cases and export, and the audit views) appends an `access_log`
+row with the staff member, route, route parameters and the patient IDs returned. The
+same staff member viewing the same records through the same route is recorded once
+per 5 minutes, so polling does not flood the log; any change is recorded at once.
+If access cannot be recorded, the response is withheld with 503
+`ACCESS_NOT_RECORDED`. `access_log` is append-only in the database.
 
 Errors carry a status plus `code`/`message` where applicable. Invalid input is 400,
 missing/expired session is 401, non-clinical or locked access is 403 and stale
