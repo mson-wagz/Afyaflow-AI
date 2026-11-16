@@ -24,7 +24,11 @@ export const config = {
   // Bounds paid model calls: each new or retried assessment counts once.
   agentRunsPerStaffHour:Number(process.env.AGENT_RUNS_PER_STAFF_HOUR || 20),
   agentRunsPerHour:Number(process.env.AGENT_RUNS_PER_HOUR || 100),
+  // IANA time zone that defines "today" and day boundaries on the operations dashboard.
+  facilityTimezone:process.env.FACILITY_TIMEZONE || 'Africa/Nairobi',
 };
+try {new Intl.DateTimeFormat('en',{timeZone:config.facilityTimezone});}
+catch {throw new Error('FACILITY_TIMEZONE must be an IANA time zone such as Africa/Nairobi.');}
 for (const [name,value] of [['AGENT_RUNS_PER_STAFF_HOUR',config.agentRunsPerStaffHour],['AGENT_RUNS_PER_HOUR',config.agentRunsPerHour]] as const)
   if(!Number.isInteger(value) || value<1 || value>100000) throw new Error(`${name} must be an integer between 1 and 100000.`);
 if(!['report-only','enforce'].includes(config.cspMode)) throw new Error('CSP_MODE must be report-only or enforce.');

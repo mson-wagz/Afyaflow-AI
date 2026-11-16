@@ -498,3 +498,49 @@ a:focus-visible {
   box-shadow: var(--shadow-xl);
   text-align: center;
 }
+
+/* Operations dashboard */
+.ops-root { display: flex; flex-direction: column; gap: 1rem; }
+.ops-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 340px), 1fr)); gap: 1rem; }
+.ops-kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 170px), 1fr)); gap: 0.75rem; }
+.ops-tile { border: 1px solid var(--color-border-subtle); border-radius: var(--radius-md); padding: 0.75rem 0.9rem; background: var(--color-surface); }
+.ops-tile-attention { border-color: var(--color-warning); background: var(--color-warning-light); }
+.ops-tile-label { font-size: 0.8rem; color: var(--color-text-muted); }
+.ops-tile-value { font-size: 1.75rem; font-weight: 700; color: var(--color-text); line-height: 1.2; font-variant-numeric: tabular-nums; }
+.ops-tile-detail { font-size: 0.75rem; color: var(--color-text-subtle); margin-top: 2px; }
+.ops-note { font-size: 0.75rem; color: var(--color-text-subtle); margin-top: 0.75rem; }
+.ops-empty { font-size: 0.85rem; color: var(--color-text-subtle); padding: 0.5rem 0; }
+.ops-filters { display: inline-flex; border: 1px solid var(--color-border); border-radius: var(--radius-md); overflow: hidden; }
+.ops-filter { border: 0; background: var(--color-surface); color: var(--color-text-muted); padding: 0.35rem 0.75rem; font: inherit; font-size: 0.8rem; cursor: pointer; white-space: nowrap; }
+.ops-filter + .ops-filter { border-left: 1px solid var(--color-border); }
+.ops-filter.active { background: var(--color-primary-light); color: var(--color-primary-dark); font-weight: 600; }
+.ops-filter:focus-visible, .ops-link:focus-visible, .ops-segment:focus-visible { outline: none; box-shadow: var(--focus-ring); }
+.ops-figure { margin: 0; }
+.ops-figure-head { display: flex; justify-content: space-between; align-items: baseline; gap: 0.5rem; margin-bottom: 0.5rem; }
+.ops-caption { font-size: 0.85rem; color: var(--color-text-muted); }
+.ops-link { border: 0; background: none; color: var(--color-primary-dark); font: inherit; font-size: 0.8rem; cursor: pointer; text-decoration: underline; padding: 0; }
+.ops-segbar { display: flex; gap: 2px; height: 28px; }
+.ops-segment { min-width: 4px; border-radius: 4px; font-size: 0.8rem; font-weight: 600; display: flex; align-items: center; padding-left: 6px; white-space: nowrap; overflow: visible; }
+.ops-legend { list-style: none; display: flex; flex-wrap: wrap; gap: 0.35rem 1rem; padding: 0; margin: 0.6rem 0 0; font-size: 0.8rem; color: var(--color-text-muted); }
+.ops-legend strong { color: var(--color-text); font-variant-numeric: tabular-nums; }
+.ops-swatch { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 6px; vertical-align: -1px; }
+.ops-chart { position: relative; }
+.ops-chart svg { max-width: 100%; display: block; }
+.ops-chart rect:focus { outline: none; }
+.ops-axis { font-size: 11px; fill: var(--color-text-subtle); font-variant-numeric: tabular-nums; }
+.ops-tooltip { position: absolute; top: 0; transform: translateX(-50%); background: var(--color-text); color: var(--color-text-inverse); font-size: 0.75rem; padding: 0.3rem 0.5rem; border-radius: var(--radius-sm); pointer-events: none; white-space: nowrap; }
+.ops-table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+.ops-table th { text-align: left; color: var(--color-text-muted); font-weight: 600; border-bottom: 1px solid var(--color-border); padding: 0.35rem 0.5rem; }
+.ops-table td { border-bottom: 1px solid var(--color-border-subtle); padding: 0.35rem 0.5rem; color: var(--color-text); }
+.ops-table td:last-child, .ops-table th:last-child { text-align: right; font-variant-numeric: tabular-nums; }
+.ops-meters { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 0.6rem; }
+.ops-meter { display: grid; grid-template-columns: minmax(0, 1fr) minmax(80px, 1.2fr) auto; align-items: center; gap: 0.75rem; font-size: 0.85rem; }
+.ops-meter-name { color: var(--color-text); overflow-wrap: anywhere; }
+.ops-flag { color: var(--color-text-muted); font-size: 0.75rem; }
+.ops-meter-track { height: 8px; background: var(--color-border-subtle); border-radius: var(--radius-full); overflow: hidden; }
+.ops-meter-fill { display: block; height: 100%; border-radius: var(--radius-full); }
+.ops-meter-value { color: var(--color-text-muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
+@media (max-width: 480px) {
+  .ops-meter { grid-template-columns: 1fr auto; }
+  .ops-meter-track { grid-column: 1 / -1; grid-row: 2; }
+}

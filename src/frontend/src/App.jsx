@@ -17,7 +17,8 @@ import { RoutingView } from './features/routing';
 import { SyncProvider, useOfflineSync, OfflineSyncView } from './offline';
 import { confirmDiscardUnsynced } from './offline/browserData.js';
 import { Header, Navigation } from './components';
-import { SESSION_STATUS } from '../../shared/contracts/auth.js';
+import { SESSION_STATUS, hasPermission, PERMISSIONS } from '../../shared/contracts/auth.js';
+import { OperationsView } from './features/operations';
 
 import { useBackend, competitionMode } from './api/client.js';
 import ResearchView from './features/research/ResearchView.jsx';
@@ -69,6 +70,7 @@ function AppShell() {
             pendingSyncCount={pendingCount}
             competitionMode={competitionMode}
             isAdmin={staff.role === 'admin'}
+            staffRole={staff.role}
           />
 
           <div
@@ -99,6 +101,7 @@ function AppShell() {
           {currentView === 'queue' && <QueueView />}
           {currentView === 'deterioration' && <DeteriorationView currentStaff={staff} isClinical={isClinical} />}
           {currentView === 'routing' && <RoutingView currentStaff={staff} isClinical={isClinical} />}
+          {currentView === 'operations' && hasPermission(staff.role, PERMISSIONS.OPERATIONS_VIEW) && <OperationsView />}
           {currentView === 'offline-sync' && <OfflineSyncView />}
           {currentView === 'security-audit' && <SecurityAuditView />}
           {currentView === 'staff-accounts' && staff.role === 'admin' && <StaffAccountsView />}

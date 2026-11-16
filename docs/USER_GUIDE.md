@@ -156,6 +156,18 @@ Viewing patient records is also recorded: each screen that shows patient data lo
 
 You cannot change your own account, and the last active administrator cannot be deactivated. Authenticator apps are set up by the system operator.
 
+## 11. Watch operations
+
+Nurses, clinicians, doctors and administrators can open **Operations** to see how the department is running. Choose **Today**, **7 days** or **30 days**; the screen refreshes every minute.
+
+- **Live workload:** open visits, visits awaiting an AI assessment, proposals waiting for a clinician (with how long the oldest has waited), assessments that ended without a proposal and need manual triage, and overdue rechecks. Tiles needing attention are highlighted with ⚠.
+- **Priority mix and beds:** open visits by approved priority, and occupied beds against capacity for each department.
+- **Arrivals:** per hour today, or per day. Select **Show table** for exact numbers.
+- **Time to triage:** the median and 90th-percentile time from arrival to the AI proposal and to the clinician decision, and from proposal to decision.
+- **Decisions and AI runs:** how often clinicians approved, overrode or rejected AI proposals, and how assessments ended.
+
+The screen shows counts and times only, never patient names. Acceptance means clinicians agreed with the proposal; it does not measure clinical accuracy. Visits cannot be closed yet, so "open visits" includes every workflow visit. Day boundaries use the facility time zone (`FACILITY_TIMEZONE`, default Africa/Nairobi).
+
 ## Troubleshooting
 
 ### Active reassessment and follow-ups
