@@ -6,6 +6,11 @@ HttpOnly, SameSite=Strict cookie; sessions expire after eight hours. The databas
 staff role is authoritative. A supplied `staffId`, role or browser persona cannot
 grant clinical authority. Locked sessions cannot access patient endpoints.
 
+All API responses carry `Cache-Control: no-store`, and every response carries the
+security headers described in deploy/ec2/README.md (HSTS in production, framing,
+sniffing, referrer and permissions policies, and a Content-Security-Policy that is
+report-only unless `CSP_MODE=enforce`).
+
 Sessions are also locked server-side after `SESSION_IDLE_MINUTES` (default 15) with no
 authenticated request, which covers closed tabs, crashed devices and bypassed client
 timers. The next request returns 403 `SESSION_LOCKED` (the frontend shows its lock

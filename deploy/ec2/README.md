@@ -97,6 +97,16 @@ tells the app to throttle by it instead of Caddy's container address. Keep the a
 container's port unpublished: if port 3000 were reachable directly, a client could set
 that header itself. Sign-in and unlock requests without a valid header are rejected.
 
+The app sets browser security headers on every response
+(`src/backend/src/security-headers.ts`): HSTS for one year (production only),
+`X-Frame-Options: DENY`, `nosniff`, a strict referrer policy, a
+`Permissions-Policy` that allows only the microphone on this origin, and
+`Cache-Control: no-store` on all API responses so patient data is not cached. The
+Content-Security-Policy is sent as `Content-Security-Policy-Report-Only` until
+enforcement is confirmed safe: open the site, sign in, use registration including
+voice intake, and check the browser console for CSP violation reports. If there are
+none, add `CSP_MODE: enforce` to the app's `environment` in `compose.yaml` and release.
+
 The pipeline separately verifies the HTTPS API health endpoint. Certificate or
 external-network failures fail the job even if the containers are healthy; inspect
 the current deployment before retrying. Database migrations are never automatically
