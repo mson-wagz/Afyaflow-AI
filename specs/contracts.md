@@ -43,12 +43,18 @@ eight-hour absolute expiry still applies.
   queues a new assessment without silently changing approved priority.
 - `GET /queue`: approved priority ordering, arrival timestamps, pending proposals,
   assessment state and workload. Model failure does not hide waiting patients.
-  Ordering is `queue-order-v2` (docs/QUEUE_ORDERING.md): approved SATS level, then for
-  Level 1 higher TEWS (unscored first) and earlier arrival, for Levels 2-4 earlier arrival
-  and higher TEWS, and finally visit ID, a strict total order. Each entry has
-  `queueOrder { rank, level, severity, version }` and `tieBreak` (the rule that placed it
-  below the entry above on the same level, else null). Priority objects carry `level` (1-5)
-  and `category`.
+  Ordering is `queue-order-v3` (docs/QUEUE_ORDERING.md): approved SATS level; for Level 1
+  higher TEWS (unscored first) then arrival minute; for Levels 2-4 arrival minute then TEWS.
+  Patients equal on those are clinically tied and ordered by a current clinician choice, then
+  registration sequence, then visit ID: a strict total order. Each entry has
+  `queueOrder { rank, level, severity, version }`, `clinicalTie { size, position }` or null,
+  `queuePrecedence { at, byName, reason }` or null, and `tieBreak`. Priority objects carry
+  `level` (1-5) and `category`.
+- `POST /queue/precedence`: `{ patientId, observationVersion, assessmentVersion, reason }`
+  plus retry key. Clinical roles only (403). Orders a clinically tied patient first within its
+  tie group; refuses a stale version (409 `VERSION_CONFLICT`), an unapproved patient
+  (409 `NOT_APPROVED`) or one not tied (409 `NOT_TIED`). Append-only, audited
+  `QUEUE_PRECEDENCE_SET`; lapses when observations or assessment change.
 
 ## Agent and human decisions
 

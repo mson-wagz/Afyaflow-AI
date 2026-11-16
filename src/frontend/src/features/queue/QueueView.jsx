@@ -1,5 +1,5 @@
-import React from 'react';
-import { useBackend } from '../../api/client.js';
+import React, { useState } from 'react';
+import { useBackend, mutation } from '../../api/client.js';
 import useQueue from './useQueue';
 import { Card, Button, Badge, Alert } from '../../components';
 
@@ -11,7 +11,9 @@ import { Card, Button, Badge, Alert } from '../../components';
  * - Approved state distinct from pending proposals.
  * - Polling failure handling with a visibly stale last-confirmed snapshot.
  */
-export default function QueueView() {
+export default function QueueView({ isClinical = false }) {
+  const [tieError, setTieError] = useState('');
+  const [tieBusy, setTieBusy] = useState(false);
   const {
     queue,
     rawQueue,
@@ -28,8 +30,34 @@ export default function QueueView() {
     getWaitingTime,
   } = useQueue();
 
+  // Level 1 patients equal on every clinical criterion all need immediate care at once.
+  const level1Tied = rawQueue.filter((p) => p.clinicalTie && p.queueOrder?.level === 1).length;
+
+  // A clinician chooses which clinically tied patient to see first (reason required, audited).
+  const seeFirst = async (pt) => {
+    setTieError('');
+    const reason = window.prompt(`Why should ${pt.patientName} be seen first among the tied patients?`);
+    if (reason === null) return;
+    if (reason.trim().length < 5) { setTieError('Enter a reason of at least 5 characters.'); return; }
+    setTieBusy(true);
+    try {
+      await mutation('/queue/precedence', {
+        patientId: pt.visitId, observationVersion: pt.observationVersion, assessmentVersion: pt.assessmentVersion, reason: reason.trim(),
+      });
+      await refreshQueue();
+    } catch (e) { setTieError(e.message); }
+    finally { setTieBusy(false); }
+  };
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+      {level1Tied > 0 && (
+        <Alert variant="danger" title={`${level1Tied} Level 1 patients are clinically tied`}>
+          They have the same severity and arrival time, and each needs immediate care. Call additional clinicians
+          to see them in parallel; the order shown is only who to start with.
+        </Alert>
+      )}
+      {tieError && <Alert variant="danger" onClose={() => setTieError('')}>{tieError}</Alert>}
       {/* Stale Data Alert (QUEUE-04) */}
       {isStale && (
         <Alert
@@ -180,6 +208,21 @@ export default function QueueView() {
                     {pt.tieBreak && queue[idx - 1]?.queueOrder?.rank === pt.queueOrder?.rank - 1 && (
                       <div style={{ fontSize: '0.7rem', fontWeight: 400, maxWidth: '11rem', marginTop: '2px' }}>
                         Same level as above: {pt.tieBreak}
+                      </div>
+                    )}
+                    {pt.clinicalTie && (
+                      <div style={{ marginTop: '4px', fontWeight: 400 }}>
+                        <Badge variant="warning">Tied {pt.clinicalTie.position} of {pt.clinicalTie.size}</Badge>
+                        {pt.queuePrecedence && (
+                          <div style={{ fontSize: '0.7rem', maxWidth: '11rem' }}>
+                            Seen first: {pt.queuePrecedence.byName} — {pt.queuePrecedence.reason}
+                          </div>
+                        )}
+                        {isClinical && useBackend && pt.clinicalTie.position > 1 && (
+                          <div style={{ marginTop: '4px' }}>
+                            <Button size="sm" variant="outline" disabled={tieBusy} onClick={() => seeFirst(pt)}>See first</Button>
+                          </div>
+                        )}
                       </div>
                     )}
                   </td>

@@ -4,10 +4,10 @@ import { consumeWindow } from '../auth/rate-limit.js';
 import { z } from 'zod';
 import { Database, audit, id, idempotent, hash } from '../database/db.js';
 import { Staff, parse, requireClinical } from '../auth/auth.js';
-import { registrationSchema, observationsSchema, decisionSchema, transferSchema } from './patients/schemas.js';
+import { registrationSchema, observationsSchema, decisionSchema, transferSchema, precedenceSchema } from './patients/schemas.js';
 import { config } from '../config.js';
 import { TRIAGE_PRIORITY } from '../../../shared/contracts/triage.js';
-import { sortQueueByApprovedPriority, calculateWorkloadSnapshot, calculateElapsedWaitingTime } from '../../../shared/contracts/queue.js';
+import { sortQueueByApprovedPriority, calculateWorkloadSnapshot, calculateElapsedWaitingTime, areClinicallyTied } from '../../../shared/contracts/queue.js';
 import { generateRoutingProposal } from '../../../shared/contracts/routing.js';
 import { compareObservationsForDeterioration, calculateObservationAge } from '../../../shared/contracts/deterioration.js';
 import { readProtocol } from '../../../../services/mcp/tools.js';
@@ -69,6 +69,10 @@ export interface VisitRow {
   assigned_department: string | null;
   vitals: Record<string, any>;
   recorded_at: string;
+  registration_seq: string;
+  precedence_at: string | null;
+  precedence_by: string | null;
+  precedence_reason: string | null;
 }
 
 /* ------------------------------------------------------------------ */
@@ -159,8 +163,14 @@ export class WorkflowService {
 
   /** All synthetic (live workflow) visits with their latest observation. */
   async visits() {
-    const rows = (await this.database.pool.query<VisitRow>(`SELECT v.*,o.id observation_id,o.vitals,o.recorded_at FROM visits v
-      JOIN observations o ON o.visit_id=v.id AND o.version=v.observation_version WHERE v.data_source='synthetic' ORDER BY v.arrival_at`)).rows;
+    // A clinician's "see first" decision counts only while observations and assessment are unchanged.
+    const rows = (await this.database.pool.query<VisitRow>(`SELECT v.*,o.id observation_id,o.vitals,o.recorded_at,
+        qp.created_at precedence_at,qp.staff_name precedence_by,qp.reason precedence_reason FROM visits v
+      JOIN observations o ON o.visit_id=v.id AND o.version=v.observation_version
+      LEFT JOIN LATERAL (SELECT q.created_at,q.reason,s.profile->>'name' staff_name FROM queue_precedence q JOIN staff s ON s.id=q.staff_id
+        WHERE q.visit_id=v.id AND q.observation_version=v.observation_version AND q.assessment_version=v.assessment_version
+        ORDER BY q.created_at DESC LIMIT 1) qp ON true
+      WHERE v.data_source='synthetic' ORDER BY v.arrival_at`)).rows;
     const protocol = await readProtocol();
     return rows.map((v) => {
       // Invalid or missing arrival time falls back to "now" (0 min wait).
@@ -171,6 +181,8 @@ export class WorkflowService {
         presentingComplaint: v.complaint, arrivalTime, approvedPriority: priority(v.approved_priority),
         assessmentVersion: v.assessment_version, observationVersion: v.observation_version, observationId: v.observation_id,
         assessmentStatus: v.assessment_status, assignedDepartment: v.assigned_department,
+        registrationSeq: Number(v.registration_seq),
+        queuePrecedence: v.precedence_at ? { at: iso(v.precedence_at), byName: v.precedence_by, reason: v.precedence_reason } : null,
         evidenceChecklist: evidenceChecklist({ age: v.age, vitals: v.vitals, version: v.observation_version, observationId: v.observation_id }, protocol),
         vitals: { ...v.vitals, recordedAt: iso(v.recorded_at) },
       };
@@ -376,6 +388,34 @@ export class WorkflowService {
   }
 
   /** All committed clinical decisions, newest first. */
+  /**
+   * Record a clinician's choice to see one clinically tied patient first. It orders that patient
+   * ahead of the others in its tie group only (same level, severity and arrival minute), never
+   * changes a level, and lapses when the patient's observations or assessment change.
+   */
+  async precedence(staff: Staff, body: unknown, key: string) {
+    requireClinical(staff); const input = parse(precedenceSchema, body);
+    return this.database.transaction((db) => idempotent(db, staff.id, 'queue-precedence', key, input, async () => {
+      const visit = (await db.query('SELECT * FROM visits WHERE id=$1 FOR UPDATE', [input.patientId])).rows[0];
+      if (!visit) throw new NotFoundException('Visit not found.');
+      requireWorkflowVisit(visit);
+      if (visit.observation_version !== input.observationVersion || visit.assessment_version !== input.assessmentVersion)
+        throw new ConflictException({ code: 'VERSION_CONFLICT', message: 'Observations or assessment changed. Refresh the queue.' });
+      if (!visit.approved_priority)
+        throw new ConflictException({ code: 'NOT_APPROVED', message: 'Only patients with an approved priority can be ordered.' });
+      const queue = (await this.queue()).queue as Array<{ id: string }>;
+      const entry = queue.find((v) => v.id === visit.id);
+      const tiedWith = queue.filter((v) => v.id !== visit.id && entry && areClinicallyTied(entry, v)).map((v) => v.id);
+      if (!tiedWith.length)
+        throw new ConflictException({ code: 'NOT_TIED', message: 'This patient is not tied with another patient. The queue order already follows the clinical rules.' });
+      const record = { precedenceId: id('QPR'), patientId: visit.id, tiedWith, reason: input.reason, decidedAt: new Date().toISOString() };
+      await db.query('INSERT INTO queue_precedence(id,visit_id,observation_version,assessment_version,staff_id,reason) VALUES($1,$2,$3,$4,$5,$6)',
+        [record.precedenceId, visit.id, visit.observation_version, visit.assessment_version, staff.id, input.reason]);
+      await audit(db, staff.id, 'QUEUE_PRECEDENCE_SET', { precedenceId: record.precedenceId, tiedWith, reason: input.reason }, visit.id);
+      return { success: true, data: record };
+    }));
+  }
+
   async decisions() {
     // Display history only; the full record stays in the append-only decisions table.
     return (await this.database.pool.query('SELECT data FROM decisions ORDER BY timestamp DESC LIMIT 200')).rows.map((r) => r.data);
