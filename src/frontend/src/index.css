@@ -551,3 +551,10 @@ a:focus-visible {
 .trace-steps { padding-left: 1.25rem; margin: 0.75rem 0; font-size: 0.85rem; display: flex; flex-direction: column; gap: 0.45rem; }
 .trace-muted { color: var(--color-text-subtle); font-size: 0.75rem; }
 .trace-summary { margin-top: 4px; padding: 0.4rem 0.6rem; border-left: 3px solid var(--color-primary); background: var(--color-primary-light); font-size: 0.8rem; color: var(--color-text); }
+
+/* AI summary in the queue, kept after the decision */
+.queue-ai-summary { margin-top: 6px; max-width: 22rem; font-size: 0.75rem; }
+.queue-ai-summary > summary { cursor: pointer; color: var(--color-primary-dark); font-weight: 600; }
+.queue-ai-summary-tag { margin-left: 6px; font-weight: 400; color: var(--color-text-subtle); }
+.queue-ai-summary p { margin-top: 4px; color: var(--color-text); line-height: 1.4; white-space: pre-wrap; }
+.queue-ai-summary .queue-ai-summary-note { color: var(--color-text-subtle); font-style: italic; }
