@@ -147,6 +147,36 @@ Give each PIN to its owner privately (not by email or chat history). The PIN is 
 only as a salted hash and the `STAFF_PIN_RESET` audit event never contains it. Close
 the session window afterwards so the PIN is not left on screen.
 
+## SMS escalation (Africa's Talking)
+
+AfyaFlow can text the on-call clinician when a Level 1 patient is still unseen
+`ESCALATION_GRACE_MINUTES` after arrival. Settings live in `/opt/afyaflow/sms.env` on the
+host only: never in the repository, and releases leave the file alone.
+
+The sandbox only delivers to the Africa's Talking simulator. A real phone needs a live
+(production) Africa's Talking account with airtime credit and its API key.
+
+```sh
+sudo -i
+cd /opt/afyaflow
+umask 077
+cat > sms.env <<'ENV'
+SMS_PROVIDER=africastalking
+AT_ENVIRONMENT=production
+AT_USERNAME=<your Africa's Talking username>
+AT_API_KEY=<your API key>
+ONCALL_PHONE=+2547XXXXXXXX
+ESCALATION_GRACE_MINUTES=5
+ESCALATION_CHECK_SECONDS=60
+ENV
+docker compose --env-file .env --project-name afyaflow up -d app
+curl -s https://$(sed -n 's/^APP_DOMAIN=//p' .env)/api/health   # "sms":{"provider":"africastalking",...}
+```
+
+For a short demonstration, `ESCALATION_GRACE_MINUTES=1` and `ESCALATION_CHECK_SECONDS=15` send
+the alert about a minute after an unseen Level 1 patient arrives. Remove `sms.env` and run
+the same `up -d app` command to turn alerts off. The message contains no patient name.
+
 ## Persistence and cleanup
 
 Database and TLS state use named Docker volumes on the encrypted root disk.
