@@ -45,7 +45,13 @@ paediatric emergency pathway.
 3. **Clinical discriminators.** SATS places patients with emergency signs (RED) and very
    urgent or urgent discriminators (ORANGE / YELLOW) at that level regardless of TEWS.
    AfyaFlow has none of these yet. Until it does, the clinician's review is the only
-   safeguard for such presentations.
+   safeguard for such presentations. As an interim aid, the agent can flag **possible
+   emergency signs** written in the complaint (`src/shared/contracts/danger-signs.js`: chest
+   pain, difficulty breathing, seizure, reduced consciousness or collapse, heavy bleeding,
+   severe burn, poisoning or overdose, pregnancy with bleeding or abdominal pain, severe pain).
+   Each flag must quote the complaint word for word; flags never change the score, and the
+   nurse confirms them and overrides with a reason if present. The list is a draft for review
+   and is not the SATS discriminator list.
 4. **Senior clinician discretion.** SATS allows a senior health professional to change the
    level. AfyaFlow supports this through override and reassessment, with a recorded reason.
 5. **Adolescents (13–17).** Confirm that the adult chart is appropriate for all adolescents

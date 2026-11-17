@@ -43,6 +43,14 @@ describe('AI summary on screen', () => {
     expect(screen.queryByRole('note', { name: 'AI summary' })).toBeNull();
   });
 
+  it('shows possible emergency signs with the patient’s quoted words, and says the score is unchanged', async () => {
+    serve([{ ...proposal('Chest pain reported.'), dangerSigns: [{ sign: 'chest_pain', label: 'Chest pain', quote: 'severe chest pain' }] }]);
+    render(<TriageView currentStaff={{ id: 'STAFF-101', role: 'nurse' }} isClinical />);
+    const box = await screen.findByRole('note', { name: 'Possible emergency signs' });
+    expect(within(box).getByText(/severe chest pain/)).toBeInTheDocument();
+    expect(within(box).getByText(/The score is unchanged/)).toBeInTheDocument();
+  });
+
   it('shows the saved summary as a readable line in the run trace', () => {
     render(<RunTrace trace={{ toolCalls: [
       { tool: 'save_pending_proposal', durationMs: 20, inputs: { summary: 'Proposed RED from TEWS 9.' }, outputs: { saved: true } },

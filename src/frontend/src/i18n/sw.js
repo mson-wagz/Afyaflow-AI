@@ -96,6 +96,7 @@ export const SW = {
     'Kufunga kunamtoa mgonjwa kwenye foleni, kunaachia kitanda chake na kufuta ukaguzi uliopangwa. Haiwezi kutenduliwa.',
 
   'AI summary': 'Muhtasari wa AI',
+  'Possible emergency sign': 'Huenda ni dalili ya dharura',
   'decided': 'imeamuliwa',
   'awaiting decision': 'inasubiri uamuzi',
   'Drafted by the agent. The approved priority is the clinician’s decision.': 'Imeandaliwa na wakala wa AI. Kipaumbele kilichoidhinishwa ni uamuzi wa mhudumu wa afya.',
