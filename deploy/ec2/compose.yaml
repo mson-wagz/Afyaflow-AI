@@ -43,6 +43,11 @@ services:
       AGENT_RUNS_PER_STAFF_HOUR: ${AGENT_RUNS_PER_STAFF_HOUR:-20}
       AGENT_RUNS_PER_HOUR: ${AGENT_RUNS_PER_HOUR:-100}
       NODE_OPTIONS: --max-old-space-size=384
+    # Optional server-only settings for SMS escalation (provider, API key, on-call number).
+    # Kept in /opt/afyaflow/sms.env, never in the repository, and untouched by releases.
+    env_file:
+      - path: sms.env
+        required: false
     depends_on:
       postgres:
         condition: service_healthy

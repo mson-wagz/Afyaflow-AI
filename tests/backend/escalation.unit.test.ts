@@ -11,6 +11,9 @@ test('SMS escalation is off by default and validated when enabled',()=>{
   assert.throws(()=>escalationSettings({...env,AT_API_KEY:''}),/AT_API_KEY/);
   assert.throws(()=>escalationSettings({SMS_PROVIDER:'twilio'}),/none or africastalking/);
   assert.throws(()=>escalationSettings({ESCALATION_GRACE_MINUTES:'0'}),/between 1 and 120/);
+  assert.equal(escalationSettings({}).checkSeconds,60);
+  assert.equal(escalationSettings({ESCALATION_CHECK_SECONDS:'15'}).checkSeconds,15);
+  assert.throws(()=>escalationSettings({ESCALATION_CHECK_SECONDS:'5'}),/between 15 and 300/);
 });
 
 test("Africa's Talking request goes to the sandbox with the key in a header, and statuses are read per recipient",async()=>{

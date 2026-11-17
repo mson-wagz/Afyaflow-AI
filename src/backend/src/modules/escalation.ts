@@ -21,11 +21,14 @@ export function escalationSettings(env: NodeJS.ProcessEnv = process.env) {
   const graceMinutes = Number(env.ESCALATION_GRACE_MINUTES || 5);
   if (!Number.isInteger(graceMinutes) || graceMinutes < 1 || graceMinutes > 120) throw new Error('ESCALATION_GRACE_MINUTES must be between 1 and 120.');
   const recipient = env.ONCALL_PHONE || '';
+  // How often to check for unseen Level 1 patients (a shorter interval suits demonstrations).
+  const checkSeconds = Number(env.ESCALATION_CHECK_SECONDS || 60);
+  if (!Number.isInteger(checkSeconds) || checkSeconds < 15 || checkSeconds > 300) throw new Error('ESCALATION_CHECK_SECONDS must be between 15 and 300.');
   if (provider !== 'none') {
     if (!/^\+\d{9,15}$/.test(recipient)) throw new Error('ONCALL_PHONE must be an international number such as +2547XXXXXXXX.');
     if (!env.AT_USERNAME || !env.AT_API_KEY) throw new Error('AT_USERNAME and AT_API_KEY are required for SMS escalation.');
   }
-  return { provider, environment, graceMinutes, recipient };
+  return { provider, environment, graceMinutes, recipient, checkSeconds };
 }
 
 /** Africa's Talking SMS (sandbox or production). The API key stays in the server environment. */
@@ -94,7 +97,7 @@ export class EscalationWorker implements OnModuleInit, OnModuleDestroy {
     this.timer = setInterval(() => {
       if (this.active) return;
       this.active = runEscalations(this.database, sender, settings).catch(() => console.error('SMS escalation unavailable.')).finally(() => { this.active = null; });
-    }, 60000);
+    }, settings.checkSeconds * 1000);
   }
   async onModuleDestroy() { if (this.timer) clearInterval(this.timer); await this.active; }
 }
