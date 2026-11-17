@@ -290,6 +290,11 @@ export default function QueueView({ isClinical = false, staffRole }) {
                     ) : (
                       <Badge variant="online">{pt.assessmentStatus === 'REJECTED_REQUIRES_REASSESSMENT' ? t('Reassessment Required') : (useBackend?t('Confirmed Server State'):'Saved Demo State')}</Badge>
                     )}
+                    {pt.aiSummary?.dangerSigns?.length > 0 && (
+                      <div className="queue-danger-signs">
+                        ⚠ {t('Possible emergency sign')}: {pt.aiSummary.dangerSigns.map((s) => s.label).join(', ')}
+                      </div>
+                    )}
                     {pt.aiSummary?.text && (
                       <details className="queue-ai-summary">
                         <summary>
