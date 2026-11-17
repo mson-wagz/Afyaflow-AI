@@ -10,6 +10,7 @@ import { readProtocolThroughFilesystem } from './borrowed-protocol.js';
 import { config } from '../../src/backend/src/config.js';
 import { assertCompetitionRun } from '../../src/backend/src/runtime-policy.js';
 import { reassessmentContext } from './reassessment.js';
+import { DANGER_SIGNS, validateDangerSigns } from '../../src/shared/contracts/danger-signs.js';
 
 export const protocolPath='services/mcp/protocols/synthetic-adult-v1.json';
 export async function readProtocol() {return JSON.parse(await readFile(protocolPath,'utf8'));}
@@ -50,14 +51,16 @@ export async function createRunTools(database:Database,runId:string) {
       if (!evidence || !protocol) throw new Error('Retrieve observations and protocol before scoring.');
       scoring=scoreEvidence(evidence,protocol);return scoring;
     },
-    save_pending_proposal:async ({summary}:{summary:string}) => {
+    save_pending_proposal:async ({summary,dangerSigns}:{summary:string;dangerSigns?:{sign:string;quote:string}[]}) => {
       if (!scoring || !evidence || !protocol) throw new Error('Evidence and deterministic score are required before saving.');
+      // Possible emergency signs must quote the complaint's own words and be on the approved list.
+      const signs=validateDangerSigns(dangerSigns,evidence.presentingComplaint);
       const result=await database.transaction(async db => {
         const visit=(await db.query('SELECT * FROM visits WHERE id=$1 FOR UPDATE',[run.visit_id])).rows[0];
         const lockedRun=(await db.query('SELECT * FROM agent_runs WHERE id=$1 FOR UPDATE',[runId])).rows[0];
         if (lockedRun.status !== 'RUNNING' || lockedRun.attempts !== run.attempts || lockedRun.delivery_generation !== run.delivery_generation || new Date(lockedRun.lease_until).getTime() < Date.now()) throw new Error('Agent lease expired.');
         if (visit.observation_version !== run.observation_version) throw new Error('STALE_OBSERVATIONS: request a new assessment.');
-        const data={proposal:scoring,protocol,summary,protocolChecksum:hash(JSON.stringify(protocol)),observationId:evidence.observationId,
+        const data={proposal:scoring,protocol,summary,dangerSigns:signs.accepted,rejectedDangerSigns:signs.rejected,protocolChecksum:hash(JSON.stringify(protocol)),observationId:evidence.observationId,
           observationVersion:run.observation_version,clinicalValidated:false};
         const proposalId=id('PROP');
         const inserted=(await db.query(`INSERT INTO proposals(id,run_id,visit_id,observation_version,data)
@@ -78,19 +81,20 @@ export async function createRunTools(database:Database,runId:string) {
           }
         }
         await db.query("UPDATE visits SET assessment_status=$2 WHERE id=$1",[run.visit_id,scoring.isSufficientEvidence ? 'PENDING_CLINICAL_DECISION':'REVIEW_REQUIRED']);
-        return {proposalId:inserted.id,followupId,status:'PENDING',priority:scoring.priority,requiresHumanApproval:true,clinicalValidated:false};
+        return {proposalId:inserted.id,followupId,status:'PENDING',priority:scoring.priority,dangerSigns:signs.accepted,rejectedDangerSigns:signs.rejected,requiresHumanApproval:true,clinicalValidated:false};
       });
       saved=true;return result;
     },
   };
   for (const name of Object.keys(callbacks)) {
-    const schema=name === 'save_pending_proposal' ? z.object({summary:z.string().min(1).max(2000)}).strict() : z.object({}).strict();
+    const schema=name === 'save_pending_proposal' ? z.object({summary:z.string().min(1).max(2000),
+      dangerSigns:z.array(z.object({sign:z.string().max(40),quote:z.string().max(200)}).strict()).max(5).optional()}).strict() : z.object({}).strict();
     server.registerTool(name,{description:{
       get_observations:'Retrieve the actual versioned observations for this assessment. No other patients can be queried.',
       read_protocol:'Retrieve the fixed synthetic scoring fixture and its missing-evidence policy.',
       get_reassessment_context:'Compare only this synthetic visit’s bound and previous recorded observations. Returns sourced change flags, not continuous monitoring or a schedule.',
       score_protocol:'Calculate a deterministic proposal from retrieved evidence. Never invent measurements or choose a priority yourself.',
-      save_pending_proposal:'Persist the calculated proposal and any evidence-required follow-up proposal for human review. This cannot approve, assign owners, set due times or change the queue.',
+      save_pending_proposal:`Persist the calculated proposal and any evidence-required follow-up proposal for human review. This cannot approve, assign owners, set due times or change the queue. Optional dangerSigns: possible emergency signs written in the presenting complaint, each {sign, quote} where sign is one of ${Object.keys(DANGER_SIGNS).join(', ')} and quote is the complaint's exact words. They never change the priority; the nurse confirms them.`,
     }[name]!,inputSchema:schema},async (args:any) => {
       const started=performance.now();let output:any;
       try {output=await callbacks[name](args);} catch(error) {output={error:error instanceof Error ? error.message:'Tool failed'};}

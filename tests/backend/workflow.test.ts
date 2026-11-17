@@ -1251,3 +1251,23 @@ test('the AI summary stays with the patient in the queue after the clinician dec
   const fresh=(await workflow.register(nurse,{...intake,name:'Synthetic No Summary'},randomUUID())).data.id;
   assert.equal((await get('/queue',session)).queue.find((v:any)=>v.visitId===fresh).aiSummary,null);
 });
+
+test('the agent can flag possible emergency signs only by quoting the complaint, and they never change the score',async()=>{
+  const session=await loginAs('STAFF-101','123456');
+  const visitId=(await workflow.register(nurse,{...intake,name:'Synthetic Danger Sign',presentingComplaint:'Severe chest pain since morning'},randomUUID())).data.id;
+  const flagging:Model=async messages=>{
+    const step=messages.filter(m=>m.role==='assistant').length;
+    const name=['get_observations','read_protocol','score_protocol','save_pending_proposal'][step];
+    const input=name==='save_pending_proposal'?{summary:'Synthetic test harness: chest pain reported in the complaint.',dangerSigns:[
+      {sign:'chest_pain',quote:'chest pain'},{sign:'seizure',quote:'fitting'},{sign:'invented',quote:'chest pain'}]}:{};
+    return {content:[{toolUse:{toolUseId:`flag-${step}`,name,input}}]};
+  };
+  const proposal=await assess(visitId,1,flagging);
+  assert.deepEqual(proposal.dangerSigns,[{sign:'chest_pain',label:'Chest pain',quote:'chest pain'}]);
+  // Normal vitals still score Green: a flag asks the nurse to confirm, it does not raise the level.
+  assert.equal(proposal.proposal.priority.code,'GREEN');
+  const stored=(await database.pool.query('SELECT data FROM proposals WHERE id=$1',[proposal.proposalId])).rows[0].data;
+  assert.deepEqual(stored.rejectedDangerSigns.map((r:any)=>r.reason),['Quote not found in the complaint','Not on the approved list']);
+  const row=(await get('/queue',session)).queue.find((v:any)=>v.visitId===visitId);
+  assert.equal(row.aiSummary.dangerSigns[0].sign,'chest_pain');
+});
