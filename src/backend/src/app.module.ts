@@ -8,5 +8,6 @@ import { FollowupService } from './modules/followup.service.js';
 import { AccessLogInterceptor } from './audit/access-log.js';
 import { OperationsService } from './modules/operations.service.js';
 import { EscalationWorker } from './modules/escalation.js';
-@Module({controllers:[ApiController],providers:[Database,AuthService,SessionGuard,WorkflowService,FollowupService,OperationsService,AgentWorker,EscalationWorker,AccessLogInterceptor]})
+import { ReportService } from './modules/reports.service.js';
+@Module({controllers:[ApiController],providers:[Database,AuthService,SessionGuard,WorkflowService,FollowupService,OperationsService,ReportService,AgentWorker,EscalationWorker,AccessLogInterceptor]})
 export class AppModule {}
