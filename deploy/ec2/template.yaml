@@ -93,6 +93,15 @@ Resources:
                 Resource:
                   - !Sub arn:${AWS::Partition}:bedrock:eu-*::foundation-model/amazon.nova-lite-v1:0
                   - !Sub arn:${AWS::Partition}:bedrock:${AWS::Region}:${AWS::AccountId}:inference-profile/eu.amazon.nova-lite-v1:0
+              # SMS escalation through Amazon SNS (SMS_PROVIDER=sns). Direct SMS to a phone number
+              # has no resource ARN, so publishing is allowed on '*' and denied on every topic:
+              # the role can send text messages and nothing else in SNS.
+              - Effect: Allow
+                Action: sns:Publish
+                Resource: '*'
+              - Effect: Deny
+                Action: sns:Publish
+                Resource: !Sub arn:${AWS::Partition}:sns:*:*:*
               # Off-host database backups: write and read for restore tests, never delete.
               - Effect: Allow
                 Action: [s3:PutObject, s3:GetObject]
