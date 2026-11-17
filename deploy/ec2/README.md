@@ -173,6 +173,13 @@ docker compose --env-file .env --project-name afyaflow up -d app
 curl -s https://$(sed -n 's/^APP_DOMAIN=//p' .env)/api/health   # "sms":{"provider":"africastalking",...}
 ```
 
+**Amazon SNS instead of Africa's Talking.** `SMS_PROVIDER=sns` sends through Amazon SNS with
+the server's AWS role, so `sms.env` holds no API key: only `SMS_PROVIDER=sns`, `ONCALL_PHONE`
+and the timing settings. The role needs `sns:Publish` (in `template.yaml`; apply it with a stack
+update). New AWS accounts are in the SMS sandbox, which delivers only to verified numbers: in the
+SNS console (eu-west-1) open *Text messaging (SMS)* → *Sandbox destination phone numbers* and
+verify the on-call number. The account's monthly SMS spend limit applies (AWS's default is low).
+
 For a short demonstration, `ESCALATION_GRACE_MINUTES=1` and `ESCALATION_CHECK_SECONDS=15` send
 the alert about a minute after an unseen Level 1 patient arrives. Remove `sms.env` and run
 the same `up -d app` command to turn alerts off. The message contains no patient name.
