@@ -559,3 +559,14 @@ a:focus-visible {
 .queue-ai-summary p { margin-top: 4px; color: var(--color-text); line-height: 1.4; white-space: pre-wrap; }
 .queue-ai-summary .queue-ai-summary-note { color: var(--color-text-subtle); font-style: italic; }
 .queue-danger-signs { margin-top: 6px; max-width: 22rem; font-size: 0.75rem; font-weight: 600; color: var(--color-warning-dark); }
+
+/* AI reports (handover, quality review) */
+.report { display: flex; flex-direction: column; gap: 0.6rem; }
+.report-head { display: flex; gap: 0.6rem; align-items: center; flex-wrap: wrap; }
+.report-meta { font-size: 0.75rem; color: var(--color-text-muted); }
+.report-text { white-space: pre-wrap; font-size: 0.9rem; line-height: 1.5; padding: 0.8rem 1rem; border-left: 3px solid var(--color-primary); background: var(--color-primary-light); border-radius: var(--radius-sm); }
+.report-error { color: var(--color-danger-dark); font-size: 0.9rem; }
+.report-ack { display: flex; gap: 0.5rem; align-items: flex-end; flex-wrap: wrap; font-size: 0.8rem; }
+.report-ack .form-input { flex: 1; min-width: 12rem; }
+.report-note, .report-empty, .report-progress { font-size: 0.85rem; color: var(--color-text-muted); }
+.report-disclaimer { font-size: 0.75rem; color: var(--color-text-subtle); font-style: italic; }

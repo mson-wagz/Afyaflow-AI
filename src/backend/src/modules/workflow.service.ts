@@ -126,7 +126,7 @@ export function requestKey(value: unknown) {
 export const AGENT_QUOTA_MESSAGE = 'The hourly AI assessment limit has been reached. Retry the assessment later or make a reasoned manual decision.';
 
 /** Counts one model run against the per-staff and deployment-wide hourly limits. */
-async function consumeAgentQuota(db: PoolClient, staffId: string | null) {
+export async function consumeAgentQuota(db: PoolClient, staffId: string | null) {
   const hour = 3600;
   if (staffId && !(await consumeWindow(db, `agent-runs:staff:${staffId}`, { limit: config.agentRunsPerStaffHour, windowSeconds: hour }))) return false;
   return consumeWindow(db, 'agent-runs:global', { limit: config.agentRunsPerHour, windowSeconds: hour });

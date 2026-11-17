@@ -10,7 +10,7 @@ export function openaiModel(modelId=config.openaiModel,options:{apiKey?:string;f
   if(!apiKey)throw new Error('OpenAI credentials are not configured.');
   const transport=options.fetch || fetch;
   let history:any[]=[],consumed=0;
-  const model:Model=async(messages,tools,signal)=>{
+  const model:Model=async(messages,tools,signal,system)=>{
     const input=[...history];
     for(const message of messages.slice(consumed)) {
       if(message.role==='assistant')continue; // Raw response items are already in history.
@@ -28,7 +28,7 @@ export function openaiModel(modelId=config.openaiModel,options:{apiKey?:string;f
     });
     const response=await transport('https://api.openai.com/v1/responses',{
       method:'POST',headers:{Authorization:`Bearer ${apiKey}`,'Content-Type':'application/json'},signal,
-      body:JSON.stringify({model:modelId,instructions,input,tools:definitions,parallel_tool_calls:false,
+      body:JSON.stringify({model:modelId,instructions:system ?? instructions,input,tools:definitions,parallel_tool_calls:false,
         max_output_tokens:1200,store:false,include:['reasoning.encrypted_content']}),
     });
     // Provider error bodies can contain sensitive inputs. Do not propagate them.
