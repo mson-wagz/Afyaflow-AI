@@ -55,6 +55,17 @@ describe('seeing patients and recording outcomes', () => {
     expect(options()).toContain('Left against medical advice');
   });
 
+  it('keeps the AI summary on the queue row after the decision, labelled as the agent’s draft', async () => {
+    api.mockResolvedValue(served([visit('SYN-5', { aiSummary: { text: 'TEWS 9 from recorded vital signs; proposed RED.', status: 'DECIDED', proposedPriority: 'RED' } }), visit('SYN-6')]));
+    render(<QueueView isClinical staffRole="nurse" />);
+    const r = await row('Synthetic SYN-5');
+    expect(within(r).getByText('AI summary')).toBeInTheDocument();
+    expect(within(r).getByText('decided')).toBeInTheDocument();
+    expect(within(r).getByText('TEWS 9 from recorded vital signs; proposed RED.')).toBeInTheDocument();
+    expect(within(r).getByText(/The approved priority is the clinician’s decision/)).toBeInTheDocument();
+    expect(within(await row('Synthetic SYN-6')).queryByText('AI summary')).toBeNull();
+  });
+
   it('shows no outcome actions to administrators', async () => {
     api.mockResolvedValue(served([visit('SYN-4')]));
     render(<QueueView staffRole="admin" />);

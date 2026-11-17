@@ -1234,3 +1234,20 @@ test('unseen Level 1 patients past the grace period trigger one nameless SMS to 
   const esc=(await get('/operations/summary?period=today',session)).escalations;
   assert.ok(esc.sent>=1 && esc.failed>=1);
 });
+
+test('the AI summary stays with the patient in the queue after the clinician decides',async()=>{
+  const session=await loginAs('STAFF-101','123456');
+  const visitId=(await workflow.register(nurse,intake,randomUUID())).data.id;
+  const proposal=await assess(visitId);
+  const pending=(await get('/queue',session)).queue.find((v:any)=>v.visitId===visitId);
+  assert.equal(pending.aiSummary.status,'PENDING');
+  assert.equal(pending.aiSummary.text,'Synthetic test harness: recorded observations require clinician review.');
+  await decision(proposal);
+  const decided=(await get('/queue',session)).queue.find((v:any)=>v.visitId===visitId);
+  assert.equal(decided.aiSummary.status,'DECIDED');
+  assert.equal(decided.aiSummary.text,'Synthetic test harness: recorded observations require clinician review.');
+  assert.equal(decided.aiSummary.proposedPriority,decided.approvedPriority.code);
+  // A patient with no assessment yet has no summary.
+  const fresh=(await workflow.register(nurse,{...intake,name:'Synthetic No Summary'},randomUUID())).data.id;
+  assert.equal((await get('/queue',session)).queue.find((v:any)=>v.visitId===fresh).aiSummary,null);
+});

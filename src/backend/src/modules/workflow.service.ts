@@ -251,8 +251,16 @@ export class WorkflowService {
   async queue() {
     const visits = await this.visits();
     const proposals = (await this.database.pool.query("SELECT visit_id,data FROM proposals WHERE status='PENDING'")).rows;
+    // The latest AI summary per visit, kept after the proposal is decided so the next clinician
+    // can read why the agent proposed that level.
+    const summaries = new Map((await this.database.pool.query(`SELECT DISTINCT ON (p.visit_id) p.visit_id,p.data->>'summary' summary,p.status,
+        p.data->'proposal'->'priority'->>'code' proposed,p.created_at FROM proposals p
+      WHERE p.status IN ('PENDING','DECIDED') AND coalesce(p.data->>'summary','')<>'' ORDER BY p.visit_id,p.created_at DESC`)).rows
+      .map((r) => [r.visit_id, { text: r.summary, status: r.status, proposedPriority: r.proposed ?? null, createdAt: iso(r.created_at) }]));
     // The shared sort/workload helpers read approvedPriority.code, so keep the priority object here.
-    const queue = sortQueueByApprovedPriority(visits.map((v) => ({ ...v, pendingProposal: proposals.find((p) => p.visit_id === v.id)?.data.proposal || null })));
+    const queue = sortQueueByApprovedPriority(visits.map((v) => ({ ...v,
+      pendingProposal: proposals.find((p) => p.visit_id === v.id)?.data.proposal || null,
+      aiSummary: summaries.get(v.id) ?? null })));
     return { queue, snapshotTimestamp: new Date().toISOString(), workload: calculateWorkloadSnapshot(queue, 4) };
   }
 
