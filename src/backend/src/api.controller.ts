@@ -8,6 +8,7 @@ import { Database, audit } from './database/db.js';
 import { config } from './config.js';
 import { FollowupService } from './modules/followup.service.js';
 import { OperationsService } from './modules/operations.service.js';
+import { ReportService } from './modules/reports.service.js';
 import { visitBundle } from './modules/fhir.js';
 import { escalationSettings } from './modules/escalation.js';
 const smsStatus=()=>{const s=escalationSettings();return {provider:s.provider,environment:s.provider==='none'?null:s.environment};};
@@ -19,7 +20,8 @@ export class ApiController {
     @Inject(WorkflowService) private readonly workflow:WorkflowService,
     @Inject(Database) private readonly database:Database,
     @Inject(FollowupService) private readonly followups:FollowupService,
-    @Inject(OperationsService) private readonly operations:OperationsService) {}
+    @Inject(OperationsService) private readonly operations:OperationsService,
+    @Inject(ReportService) private readonly reports:ReportService) {}
   @Get('health') async health() {await this.database.pool.query('SELECT 1');return {status:'ok',database:'postgresql',mode:config.mode,agentProvider:config.provider,dataResidency:config.dataResidency,sms:smsStatus(),clinicalValidated:false};}
   @Post('auth/login') async login(@Body()body:unknown,@Res({passthrough:true})res:Response) {
     const result=await this.auth.signIn(body);
@@ -58,6 +60,10 @@ export class ApiController {
   }
   @Post('visits/:id/seen') @UseGuards(SessionGuard) seen(@Req()req:StaffRequest,@Param('id')visitId:string,@Headers('idempotency-key')key:string) {return this.workflow.markSeen(req.staff,visitId,requestKey(key));}
   @Post('visits/:id/outcome') @UseGuards(SessionGuard) outcome(@Req()req:StaffRequest,@Param('id')visitId:string,@Body()body:unknown,@Headers('idempotency-key')key:string) {return this.workflow.recordOutcome(req.staff,visitId,body,requestKey(key));}
+  // AI reports (shift handover, quality review): drafts for people to acknowledge; access-logged.
+  @Get('reports/:kind/latest') @UseGuards(SessionGuard) @AccessLogged() latestReport(@Req()req:StaffRequest,@Param('kind')kind:string) {return this.reports.latest(req.staff,kind);}
+  @Post('reports/:kind') @UseGuards(SessionGuard) @AccessLogged() generateReport(@Req()req:StaffRequest,@Param('kind')kind:string) {return this.reports.generate(req.staff,kind);}
+  @Post('reports/:id/acknowledge') @UseGuards(SessionGuard) @AccessLogged() acknowledgeReport(@Req()req:StaffRequest,@Param('id')reportId:string,@Body()body:unknown) {return this.reports.acknowledge(req.staff,reportId,body);}
   @Post('queue/precedence') @UseGuards(SessionGuard) precedence(@Req()req:StaffRequest,@Body()body:unknown,@Headers('idempotency-key')key:string) {return this.workflow.precedence(req.staff,body,requestKey(key));}
   @Get('triage/proposals') @UseGuards(SessionGuard) @AccessLogged() proposals() {return this.workflow.pending();}
   @Get('triage/decisions') @UseGuards(SessionGuard) @AccessLogged() decisions() {return this.workflow.decisions();}

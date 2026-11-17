@@ -5,8 +5,8 @@ import { instructions, type Model } from './model.js';
 // Native Ollama tool calling; no remote fallback, API key or transcript storage.
 export function ollamaModel(modelId=config.ollamaModel,transport:typeof fetch=fetch):Model {
   const calls=new Map<string,string>();
-  const model:Model=async(messages,tools,signal)=>{
-    const input:any[]=[{role:'system',content:instructions}];
+  const model:Model=async(messages,tools,signal,system)=>{
+    const input:any[]=[{role:'system',content:system ?? instructions}];
     for(const message of messages) {
       if(message.role==='assistant') {
         const content=(message.content || []).filter(p=>p.text).map(p=>p.text).join('\n');

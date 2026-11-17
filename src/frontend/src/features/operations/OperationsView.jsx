@@ -6,6 +6,7 @@ import { DISPOSITIONS, SATS_TARGET_MINUTES, KNH_SATS_BASELINE } from '../../../.
 import { StatTile, SegmentedBar, ColumnChart, MeterList } from './charts.jsx';
 import { formatCount, formatMinutes, formatPercent, bucketLabel } from './format.js';
 import { formatUsd } from '../triage/RunTrace.jsx';
+import { AgentReportCard } from '../reports';
 
 const PERIODS = [{ id: 'today', label: 'Today' }, { id: '7d', label: '7 days' }, { id: '30d', label: '30 days' }];
 const REFRESH_MS = 60000;
@@ -28,7 +29,7 @@ const RUN_STATUS = [
  * Operations dashboard for supervisors: live workload and flow figures for the chosen period.
  * The server returns counts and durations only, with no patient names or visit IDs.
  */
-export default function OperationsView() {
+export default function OperationsView({ staff } = {}) {
   const [period, setPeriod] = useState('today');
   const [data, setData] = useState(null);
   const [error, setError] = useState('');
@@ -210,6 +211,12 @@ export default function OperationsView() {
             {aiCost.unmeteredModelCalls ? ` ⚠ ${aiCost.unmeteredModelCalls} model call(s) reported no usage and are not counted.` : ''}
           </p>
         </Card>
+      )}
+
+      {['clinician', 'doctor', 'admin'].includes(staff?.role) && (
+        <AgentReportCard kind="quality-review" title="AI quality review of mis-triaged cases" staffId={staff.id}
+          subtitle="The agent compares triage levels with outcomes over the last 30 days and drafts findings and questions for the triage committee. Visit IDs only."
+          generateLabel="Run quality review" acknowledgeLabel="Mark reviewed" />
       )}
 
       <Card title="Transfers by department">

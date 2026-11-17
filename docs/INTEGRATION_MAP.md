@@ -25,6 +25,7 @@ connected). Nothing below is simulated and presented as live.
 | --- | --- | --- | --- |
 | Amazon Bedrock, Nova Lite (eu-west-1) | **Live** | Model that plans the assessment and chooses tools | Server's AWS instance role; no keys on the host |
 | AfyaFlow MCP server | **Live** | Five tools: read versioned observations, read the protocol, read reassessment context, deterministic scoring, save a pending proposal | Bound to one run; cannot approve or change the queue |
+| AfyaFlow report tools (MCP) | **Live** | Read-only tools for the AI shift handover and quality review; one save tool stores a draft ([AI_REPORTS.md](AI_REPORTS.md)) | Bound to one report; cannot change patients, priorities or the queue |
 | Official MCP filesystem server | **Live** | Reads the protocol file, read-only | Limited to the protocol directory |
 | PostgreSQL | **Live** | Records, jobs, decisions, audit and access logs | Server-only password |
 | Local speech recognition (Whisper tiny, in the browser) | **Live** | Voice intake in English and Swahili, reviewed by staff before saving | None: runs on the device |
