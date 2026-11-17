@@ -66,6 +66,12 @@ describe('seeing patients and recording outcomes', () => {
     expect(within(await row('Synthetic SYN-6')).queryByText('AI summary')).toBeNull();
   });
 
+  it('marks a queue row with any possible emergency sign the agent quoted', async () => {
+    api.mockResolvedValue(served([visit('SYN-7', { aiSummary: { text: 'x', status: 'PENDING', dangerSigns: [{ sign: 'seizure', label: 'Seizure or fitting', quote: 'fitting' }] } })]));
+    render(<QueueView isClinical staffRole="nurse" />);
+    expect(within(await row('Synthetic SYN-7')).getByText(/Possible emergency sign: Seizure or fitting/)).toBeInTheDocument();
+  });
+
   it('shows no outcome actions to administrators', async () => {
     api.mockResolvedValue(served([visit('SYN-4')]));
     render(<QueueView staffRole="admin" />);

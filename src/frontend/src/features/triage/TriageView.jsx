@@ -209,6 +209,29 @@ export default function TriageView({ currentStaff, isClinical = false }) {
             </div>
           )}
 
+          {/* Possible emergency signs the agent found in the written complaint (quoted, never scored) */}
+          {activeCase.dangerSigns?.length > 0 && (
+            <div
+              role="note"
+              aria-label="Possible emergency signs"
+              style={{
+                marginBottom: '1.25rem', padding: '0.85rem 1rem', borderRadius: 'var(--radius-md)',
+                border: '1px solid var(--color-warning)', backgroundColor: 'var(--color-warning-light)',
+              }}
+            >
+              <strong style={{ color: 'var(--color-warning-dark)' }}>⚠ Possible emergency signs in the complaint</strong>
+              <ul style={{ margin: '0.4rem 0 0.4rem 1.1rem', fontSize: '0.9rem' }}>
+                {activeCase.dangerSigns.map((s) => (
+                  <li key={s.sign}><b>{s.label}</b>: “{s.quote}”</li>
+                ))}
+              </ul>
+              <p style={{ fontSize: '0.8rem', color: 'var(--color-text-muted)' }}>
+                Found by the AI in the patient’s own words. The score is unchanged: confirm with the patient and, if present,
+                use Clinical Override Priority with a reason. Draft sign list awaiting KNH triage committee review.
+              </p>
+            </div>
+          )}
+
           {/* Recorded Vitals Table */}
           <div style={{ marginBottom: '1.25rem' }}>
             <h4 style={{ fontSize: '0.9rem', fontWeight: 600, color: 'var(--color-text-muted)', marginBottom: '0.5rem' }}>

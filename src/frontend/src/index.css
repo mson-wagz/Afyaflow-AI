@@ -558,3 +558,4 @@ a:focus-visible {
 .queue-ai-summary-tag { margin-left: 6px; font-weight: 400; color: var(--color-text-subtle); }
 .queue-ai-summary p { margin-top: 4px; color: var(--color-text); line-height: 1.4; white-space: pre-wrap; }
 .queue-ai-summary .queue-ai-summary-note { color: var(--color-text-subtle); font-style: italic; }
+.queue-danger-signs { margin-top: 6px; max-width: 22rem; font-size: 0.75rem; font-weight: 600; color: var(--color-warning-dark); }

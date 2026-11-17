@@ -253,10 +253,10 @@ export class WorkflowService {
     const proposals = (await this.database.pool.query("SELECT visit_id,data FROM proposals WHERE status='PENDING'")).rows;
     // The latest AI summary per visit, kept after the proposal is decided so the next clinician
     // can read why the agent proposed that level.
-    const summaries = new Map((await this.database.pool.query(`SELECT DISTINCT ON (p.visit_id) p.visit_id,p.data->>'summary' summary,p.status,
+    const summaries = new Map((await this.database.pool.query(`SELECT DISTINCT ON (p.visit_id) p.visit_id,p.data->>'summary' summary,p.status,p.data->'dangerSigns' danger_signs,
         p.data->'proposal'->'priority'->>'code' proposed,p.created_at FROM proposals p
       WHERE p.status IN ('PENDING','DECIDED') AND coalesce(p.data->>'summary','')<>'' ORDER BY p.visit_id,p.created_at DESC`)).rows
-      .map((r) => [r.visit_id, { text: r.summary, status: r.status, proposedPriority: r.proposed ?? null, createdAt: iso(r.created_at) }]));
+      .map((r) => [r.visit_id, { text: r.summary, status: r.status, proposedPriority: r.proposed ?? null, createdAt: iso(r.created_at), dangerSigns: r.danger_signs ?? [] }]));
     // The shared sort/workload helpers read approvedPriority.code, so keep the priority object here.
     const queue = sortQueueByApprovedPriority(visits.map((v) => ({ ...v,
       pendingProposal: proposals.find((p) => p.visit_id === v.id)?.data.proposal || null,
@@ -277,7 +277,7 @@ export class WorkflowService {
       return {
         ...visit, patientId: visit.id, proposalId: p.id, patientName: visit.name, observations: visit.vitals,
         observationVersion: p.observation_version, isStale: p.observation_version !== visit.observationVersion,
-        proposal: p.data.proposal, protocol: p.data.protocol || protocol, summary: p.data.summary,
+        proposal: p.data.proposal, protocol: p.data.protocol || protocol, summary: p.data.summary, dangerSigns: p.data.dangerSigns ?? [],
         toolTrace: traces.get(p.run_id), runStatus: p.run_status,
       };
     });
