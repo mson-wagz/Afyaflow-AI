@@ -99,10 +99,10 @@ function AppShell() {
           {currentView === 'research' && sessionStatus !== SESSION_STATUS.LOCKED && <ResearchView isClinical={isClinical} />}
           {currentView === 'registration' && <RegistrationView key={staff.id} currentStaff={staff} />}
           {currentView === 'triage' && <TriageView currentStaff={staff} isClinical={isClinical} />}
-          {currentView === 'queue' && <QueueView isClinical={isClinical} staffRole={staff.role} />}
+          {currentView === 'queue' && <QueueView isClinical={isClinical} staffRole={staff.role} staffId={staff.id} />}
           {currentView === 'deterioration' && <DeteriorationView currentStaff={staff} isClinical={isClinical} />}
           {currentView === 'routing' && <RoutingView currentStaff={staff} isClinical={isClinical} />}
-          {currentView === 'operations' && hasPermission(staff.role, PERMISSIONS.OPERATIONS_VIEW) && <OperationsView />}
+          {currentView === 'operations' && hasPermission(staff.role, PERMISSIONS.OPERATIONS_VIEW) && <OperationsView staff={staff} />}
           {currentView === 'offline-sync' && <OfflineSyncView />}
           {currentView === 'security-audit' && <SecurityAuditView />}
           {currentView === 'staff-accounts' && staff.role === 'admin' && <StaffAccountsView />}
