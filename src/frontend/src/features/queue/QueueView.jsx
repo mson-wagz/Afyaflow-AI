@@ -4,6 +4,7 @@ import { useBackend, mutation } from '../../api/client.js';
 import useQueue from './useQueue';
 import { Card, Button, Badge, Alert, Modal } from '../../components';
 import { DISPOSITIONS, dispositionsForRole } from '../../../../shared/contracts/outcomes.js';
+import { AgentReportCard } from '../reports';
 
 /**
  * Hospital Queue Management View
@@ -13,7 +14,7 @@ import { DISPOSITIONS, dispositionsForRole } from '../../../../shared/contracts/
  * - Approved state distinct from pending proposals.
  * - Polling failure handling with a visibly stale last-confirmed snapshot.
  */
-export default function QueueView({ isClinical = false, staffRole }) {
+export default function QueueView({ isClinical = false, staffRole, staffId }) {
   const t = useT();
   const [tieError, setTieError] = useState('');
   const [busy, setBusy] = useState(false);
@@ -91,6 +92,13 @@ export default function QueueView({ isClinical = false, staffRole }) {
             The queue displays the last saved demo state. Unsynchronised local changes are not presented as confirmed.
           </div>
         </Alert>
+      )}
+
+      {/* AI shift handover: drafted by the report agent, acknowledged by the incoming staff member */}
+      {['nurse', 'clinician', 'doctor'].includes(staffRole) && (
+        <AgentReportCard kind="handover" title="Shift handover (AI draft)" staffId={staffId} otherAcknowledger
+          subtitle="The agent checks unseen patients, pending decisions, rechecks and the last 12 hours, then drafts a note for the incoming nurse."
+          generateLabel="Prepare handover" acknowledgeLabel="Acknowledge handover" />
       )}
 
       {/* Workload Snapshot Banner (QUEUE-03) */}
