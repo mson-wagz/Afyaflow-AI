@@ -1,5 +1,6 @@
 import { Injectable, Inject, OnModuleInit, OnModuleDestroy } from '@nestjs/common';
 import { Database, audit, id } from '../database/db.js';
+import { SNSClient, PublishCommand } from '@aws-sdk/client-sns';
 
 /* ------------------------------------------------------------------ */
 /* SMS escalation to the on-call clinician (docs/INTEGRATION_MAP.md)   */
@@ -15,7 +16,7 @@ const MAX_ATTEMPTS = 3;
 
 export function escalationSettings(env: NodeJS.ProcessEnv = process.env) {
   const provider = env.SMS_PROVIDER || 'none';
-  if (!['none', 'africastalking'].includes(provider)) throw new Error('SMS_PROVIDER must be none or africastalking.');
+  if (!['none', 'africastalking', 'sns'].includes(provider)) throw new Error('SMS_PROVIDER must be none, africastalking or sns.');
   const environment = env.AT_ENVIRONMENT || 'sandbox';
   if (!['sandbox', 'production'].includes(environment)) throw new Error('AT_ENVIRONMENT must be sandbox or production.');
   const graceMinutes = Number(env.ESCALATION_GRACE_MINUTES || 5);
@@ -26,9 +27,10 @@ export function escalationSettings(env: NodeJS.ProcessEnv = process.env) {
   if (!Number.isInteger(checkSeconds) || checkSeconds < 15 || checkSeconds > 300) throw new Error('ESCALATION_CHECK_SECONDS must be between 15 and 300.');
   if (provider !== 'none') {
     if (!/^\+\d{9,15}$/.test(recipient)) throw new Error('ONCALL_PHONE must be an international number such as +2547XXXXXXXX.');
-    if (!env.AT_USERNAME || !env.AT_API_KEY) throw new Error('AT_USERNAME and AT_API_KEY are required for SMS escalation.');
+    if (provider === 'africastalking' && (!env.AT_USERNAME || !env.AT_API_KEY)) throw new Error("AT_USERNAME and AT_API_KEY are required for Africa's Talking SMS escalation.");
   }
-  return { provider, environment, graceMinutes, recipient, checkSeconds };
+  // Amazon SNS has no sandbox/production switch of its own here: it uses the account's SMS settings.
+  return { provider, environment: provider === 'sns' ? 'aws' : environment, graceMinutes, recipient, checkSeconds };
 }
 
 /** Africa's Talking SMS (sandbox or production). The API key stays in the server environment. */
@@ -52,6 +54,26 @@ export function africasTalkingSender(env: NodeJS.ProcessEnv = process.env, fetch
     },
   };
 }
+
+/**
+ * Amazon SNS direct SMS. Uses the server's AWS role (no API key); requires sns:Publish on the
+ * instance role. New AWS accounts are in the SMS sandbox, which delivers only to verified numbers.
+ */
+export function snsSender(env: NodeJS.ProcessEnv = process.env, client: { send: (command: PublishCommand) => Promise<any> } = new SNSClient({ region: env.AWS_REGION || 'eu-west-1' })): SmsSender {
+  return {
+    provider: 'aws-sns',
+    async send(to, message) {
+      const response = await client.send(new PublishCommand({
+        PhoneNumber: to, Message: message,
+        MessageAttributes: { 'AWS.SNS.SMS.SMSType': { DataType: 'String', StringValue: 'Transactional' } },
+      }));
+      return { ok: Boolean(response?.MessageId), response: { messageId: response?.MessageId ?? null } };
+    },
+  };
+}
+
+/** The sender for the configured provider. */
+export const smsSender = (provider: string): SmsSender => (provider === 'sns' ? snsSender() : africasTalkingSender());
 
 const mask = (phone: string) => phone.replace(/^(\+\d{3})\d+(\d{3})$/, '$1•••$2');
 
@@ -93,7 +115,7 @@ export class EscalationWorker implements OnModuleInit, OnModuleDestroy {
   onModuleInit() {
     const settings = escalationSettings();
     if (settings.provider === 'none' || process.env.ESCALATION_WORKER_DISABLED === 'true' || process.env.AWS_LAMBDA_FUNCTION_NAME) return;
-    const sender = africasTalkingSender();
+    const sender = smsSender(settings.provider);
     this.timer = setInterval(() => {
       if (this.active) return;
       this.active = runEscalations(this.database, sender, settings).catch(() => console.error('SMS escalation unavailable.')).finally(() => { this.active = null; });

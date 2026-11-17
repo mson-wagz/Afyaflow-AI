@@ -31,6 +31,7 @@ connected). Nothing below is simulated and presented as live.
 | Local model, Ollama + Qwen3 0.6B | **Live option** | Same agent with no per-token fee and no data leaving the server | None |
 | FHIR R4 export (`GET /api/visits/:id/fhir`) | **Live API, no receiver** | Sends a visit to a hospital system in a standard format | Staff session; access-logged |
 | SMS escalation, Africa's Talking | **Sandbox** | Texts the on-call clinician when a Level 1 patient passes target unseen | API key in server environment only |
+| SMS escalation, Amazon SNS | **Live option** | Same alert through AWS, for demonstration; Africa's Talking is the production route in Kenya | Server's AWS role (no key); number verified in the SNS SMS sandbox |
 | KNH hospital information system | **Planned** | Receive FHIR bundles; send patient registration | Needs KNH ICT agreement and credentials |
 | SHA / Taifa Care HMIS and client registry | **Planned** | Patient identity and claims context | Needs Digital Health Agency onboarding |
 | WhatsApp, USSD | **Planned** | Patient queue updates without a smartphone app | Needs provider account and consent design |
