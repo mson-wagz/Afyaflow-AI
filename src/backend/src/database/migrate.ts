@@ -69,6 +69,10 @@ export async function migrate(database: Database) {
       await db.query(await readFile('src/backend/src/database/012_sms_escalations.sql','utf8'));
       await db.query("INSERT INTO schema_migrations(version) VALUES('012')");
     }
+    if (!(await db.query("SELECT 1 FROM schema_migrations WHERE version='013'")).rowCount) {
+      await db.query(await readFile('src/backend/src/database/013_agent_reports.sql','utf8'));
+      await db.query("INSERT INTO schema_migrations(version) VALUES('013')");
+    }
   });
 }
 if (
