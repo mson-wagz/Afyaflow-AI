@@ -186,6 +186,29 @@ export default function TriageView({ currentStaff, isClinical = false }) {
             </Alert>
           )}
 
+          {/* The agent's summary of the evidence (drafted by AI; the clinician decides) */}
+          {activeCase.summary && (
+            <div
+              role="note"
+              aria-label="AI summary"
+              style={{
+                marginBottom: '1.25rem',
+                padding: '0.85rem 1rem',
+                borderRadius: 'var(--radius-md)',
+                border: '1px solid var(--color-primary)',
+                backgroundColor: 'var(--color-primary-light)',
+              }}
+            >
+              <div style={{ display: 'flex', justifyContent: 'space-between', gap: '0.5rem', flexWrap: 'wrap', marginBottom: '0.35rem' }}>
+                <strong style={{ color: 'var(--color-primary-dark)' }}>AI summary</strong>
+                <span style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>
+                  Drafted by the agent from the recorded evidence. Check it before deciding.
+                </span>
+              </div>
+              <p style={{ whiteSpace: 'pre-wrap', fontSize: '0.9rem', color: 'var(--color-text)' }}>{activeCase.summary}</p>
+            </div>
+          )}
+
           {/* Recorded Vitals Table */}
           <div style={{ marginBottom: '1.25rem' }}>
             <h4 style={{ fontSize: '0.9rem', fontWeight: 600, color: 'var(--color-text-muted)', marginBottom: '0.5rem' }}>
