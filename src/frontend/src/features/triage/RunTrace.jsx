@@ -46,6 +46,9 @@ export default function RunTrace({ trace }) {
             <li key={i}>
               <strong>Tool: {call.tool}</strong> <span className="trace-muted">({n(call.durationMs)} ms)</span>
               <div>{failed ? `⚠ Error: ${call.outputs.error}` : 'Returned successfully'}</div>
+              {call.tool === 'save_pending_proposal' && call.inputs?.summary && (
+                <div className="trace-summary">AI summary: “{call.inputs.summary}”</div>
+              )}
             </li>
           );
         })}
