@@ -95,6 +95,11 @@ export const SW = {
   'Closing removes the patient from the queue, releases their bed and cancels open rechecks. It cannot be undone.':
     'Kufunga kunamtoa mgonjwa kwenye foleni, kunaachia kitanda chake na kufuta ukaguzi uliopangwa. Haiwezi kutenduliwa.',
 
+  'AI summary': 'Muhtasari wa AI',
+  'decided': 'imeamuliwa',
+  'awaiting decision': 'inasubiri uamuzi',
+  'Drafted by the agent. The approved priority is the clinician’s decision.': 'Imeandaliwa na wakala wa AI. Kipaumbele kilichoidhinishwa ni uamuzi wa mhudumu wa afya.',
+
   // Outcomes
   'Admitted': 'Amelazwa',
   'Discharged': 'Ameruhusiwa kwenda nyumbani',

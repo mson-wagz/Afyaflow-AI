@@ -290,6 +290,18 @@ export default function QueueView({ isClinical = false, staffRole }) {
                     ) : (
                       <Badge variant="online">{pt.assessmentStatus === 'REJECTED_REQUIRES_REASSESSMENT' ? t('Reassessment Required') : (useBackend?t('Confirmed Server State'):'Saved Demo State')}</Badge>
                     )}
+                    {pt.aiSummary?.text && (
+                      <details className="queue-ai-summary">
+                        <summary>
+                          {t('AI summary')}
+                          <span className="queue-ai-summary-tag">
+                            {pt.aiSummary.status === 'DECIDED' ? t('decided') : t('awaiting decision')}
+                          </span>
+                        </summary>
+                        <p>{pt.aiSummary.text}</p>
+                        <p className="queue-ai-summary-note">{t('Drafted by the agent. The approved priority is the clinician’s decision.')}</p>
+                      </details>
+                    )}
                   </td>
                   <td style={{ padding: '0.75rem 0.5rem', color: 'var(--color-text-muted)' }}>
                     {pt.assignedDepartment}
