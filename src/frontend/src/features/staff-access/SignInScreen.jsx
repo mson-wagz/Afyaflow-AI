@@ -4,6 +4,20 @@ import useAuth from './useAuth';
 import { Button, Input, Card, Alert } from '../../components';
 import { PIN_LENGTH } from '../../../../shared/contracts/auth.js';
 
+const THEME_KEY = 'afyaflow-signin-theme';
+
+/** Saved choice first, then the device's colour-scheme preference, else dark (the original look). */
+const readTheme = () => {
+  try {
+    const saved = window.localStorage.getItem(THEME_KEY);
+    if (saved === 'light' || saved === 'dark') return saved;
+  } catch { /* storage unavailable */ }
+  try {
+    if (window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches) return 'light';
+  } catch { /* matchMedia unavailable */ }
+  return 'dark';
+};
+
 /**
  * Staff Sign-In Screen
  * 
@@ -20,6 +34,14 @@ export default function SignInScreen() {
   // Administrators are asked for an authenticator-app code after a correct PIN.
   const [needsCode, setNeedsCode] = useState(false);
   const [otp, setOtp] = useState('');
+  const [theme, setTheme] = useState(readTheme);
+  const isDark = theme === 'dark';
+
+  const toggleTheme = () => {
+    const next = isDark ? 'light' : 'dark';
+    setTheme(next);
+    try { window.localStorage.setItem(THEME_KEY, next); } catch { /* per-device preference only */ }
+  };
 
   const handleSubmit = async (e) => {
     if (e) e.preventDefault();
@@ -54,18 +76,20 @@ export default function SignInScreen() {
   };
 
   return (
-    <div
-      style={{
-        minHeight: '100vh',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        padding: '1.5rem',
-        backgroundColor: '#0f172a',
-      }}
-    >
+    <div className="signin-screen" data-theme={theme}>
+      <button
+        type="button"
+        className="signin-theme-toggle"
+        onClick={toggleTheme}
+        aria-pressed={isDark}
+        aria-label={isDark ? t('Switch to light theme') : t('Switch to dark theme')}
+        title={isDark ? t('Switch to light theme') : t('Switch to dark theme')}
+      >
+        <span aria-hidden="true">{isDark ? '☀️' : '🌙'}</span>
+        <span>{isDark ? t('Light') : t('Dark')}</span>
+      </button>
       <div style={{ maxWidth: '480px', width: '100%' }}>
-        <div style={{ textAlign: 'center', marginBottom: '1.5rem', color: '#f8fafc' }}>
+        <div style={{ textAlign: 'center', marginBottom: '1.5rem', color: 'var(--signin-heading)' }}>
           <div
             style={{
               display: 'inline-flex',
@@ -84,7 +108,7 @@ export default function SignInScreen() {
             🩺
           </div>
           <h1 style={{ fontSize: '1.75rem', fontWeight: 800 }}>AfyaFlow AI</h1>
-          <p style={{ color: '#94a3b8', fontSize: '0.925rem', marginTop: '0.25rem' }}>
+          <p style={{ color: 'var(--signin-subtle)', fontSize: '0.925rem', marginTop: '0.25rem' }}>
             {t('Emergency Triage & Patient Flow Assistant')}
           </p>
           <div
@@ -93,19 +117,19 @@ export default function SignInScreen() {
               display: 'inline-block',
               padding: '0.25rem 0.75rem',
               borderRadius: 'var(--radius-full)',
-              backgroundColor: 'rgba(255, 255, 255, 0.08)',
+              backgroundColor: 'var(--signin-chip-bg)',
               fontSize: '0.75rem',
-              color: '#cbd5e1',
+              color: 'var(--signin-chip-text)',
             }}
           >
             {t('Kenyatta National Hospital • Triage Station')}
           </div>
-          <div style={{ marginTop: '0.75rem' }}><LanguageSwitcher dark /></div>
+          <div style={{ marginTop: '0.75rem' }}><LanguageSwitcher dark={isDark} /></div>
         </div>
 
         <Card
           style={{
-            backgroundColor: '#ffffff',
+            backgroundColor: 'var(--color-surface)',
             boxShadow: 'var(--shadow-xl)',
             borderRadius: 'var(--radius-lg)',
           }}
