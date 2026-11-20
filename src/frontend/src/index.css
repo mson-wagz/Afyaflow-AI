@@ -570,3 +570,62 @@ a:focus-visible {
 .report-ack .form-input { flex: 1; min-width: 12rem; }
 .report-note, .report-empty, .report-progress { font-size: 0.85rem; color: var(--color-text-muted); }
 .report-disclaimer { font-size: 0.75rem; color: var(--color-text-subtle); font-style: italic; }
+
+/* Sign-in screen theme (light / dark), scoped to the sign-in page */
+.signin-screen {
+  --signin-bg: #0f172a;
+  --signin-heading: #f8fafc;
+  --signin-subtle: #94a3b8;
+  --signin-chip-bg: rgba(255, 255, 255, 0.08);
+  --signin-chip-text: #cbd5e1;
+  --color-surface: #1e293b;
+  --color-bg: #0f172a;
+  --color-border: #475569;
+  --color-border-subtle: #334155;
+  --color-text: #f1f5f9;
+  --color-text-muted: #cbd5e1;
+  --color-text-subtle: #94a3b8;
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1.5rem;
+  background-color: var(--signin-bg);
+  color: var(--color-text);
+  transition: background-color 0.2s ease;
+}
+.signin-screen[data-theme="light"] {
+  --signin-bg: #e2e8f0;
+  --signin-heading: #0f172a;
+  --signin-subtle: #475569;
+  --signin-chip-bg: rgba(15, 23, 42, 0.06);
+  --signin-chip-text: #334155;
+  --color-surface: #ffffff;
+  --color-bg: #f8fafc;
+  --color-border: #cbd5e1;
+  --color-border-subtle: #e2e8f0;
+  --color-text: #0f172a;
+  --color-text-muted: #475569;
+  --color-text-subtle: #64748b;
+}
+.signin-screen .form-input::placeholder { color: var(--color-text-subtle); }
+.signin-theme-toggle {
+  position: fixed;
+  top: 1rem;
+  right: 1rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  min-height: 40px;
+  padding: 0.4rem 0.85rem;
+  border-radius: var(--radius-full);
+  border: 1px solid var(--color-border);
+  background-color: var(--color-surface);
+  color: var(--color-text);
+  font: inherit;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: var(--shadow-md);
+}
+.signin-theme-toggle:hover { border-color: var(--color-primary); }
